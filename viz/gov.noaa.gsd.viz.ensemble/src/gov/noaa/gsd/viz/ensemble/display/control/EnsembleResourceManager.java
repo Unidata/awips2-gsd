@@ -16,6 +16,7 @@ import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.core.rsc.IDisposeListener;
 import com.raytheon.uf.viz.core.rsc.ResourceList;
 import com.raytheon.uf.viz.core.rsc.capabilities.DensityCapability;
+import com.raytheon.uf.viz.core.rsc.capabilities.DisplayTypeCapability;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.grid.rsc.general.AbstractGridResource;
 import com.raytheon.viz.ui.editor.AbstractEditor;
@@ -158,6 +159,11 @@ public class EnsembleResourceManager implements IDisposeListener {
         // method.
         rsc.getProperties().setSystemResource(true);
         rsc.registerListener((IDisposeListener) this);
+
+        if (rsc.hasCapability(DisplayTypeCapability.class)) {
+            rsc.getCapability(DisplayTypeCapability.class)
+                    .setSuppressingMenuItems(true);
+        }
 
         // Set to default density for all loaded resources if can
         // But it may be unmatched with current display. Fix it later
