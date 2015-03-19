@@ -1115,8 +1115,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         ecl.add(Calculation.COMBINED_ENS_REL_FREQ.getTitle(), false);
         ecl.add(Calculation.TRIPLET_ENS_REL_FREQ.getTitle(), false);
         ecl.add(Calculation.ENSEMBLE_RELATIVE_FREQUENCY.getTitle(), false);
-        ecl.add(Calculation.HISTOGRAM_SAMPLING.getTitle(), true);
-        ecl.add(Calculation.HISTOGRAM_TEXT.getTitle(), true);
+        ecl.add(Calculation.HISTOGRAM_SAMPLING.getTitle(), false);
+        ecl.add(Calculation.HISTOGRAM_TEXT.getTitle(), false);
 
         runItem.addSelectionListener(ecl);
 
