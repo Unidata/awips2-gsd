@@ -265,6 +265,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
     private static final Color DISABLED_FOREGROUND_COLOR = SWTResourceManager.MEDIUM_GRAY;
 
+    static protected boolean REFRESH_ON = true;
+
     private Label label_frameTimeUsingBasis = null;
 
     private Label label_TimeMatchResourceLabel = null;
@@ -786,7 +788,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
     private void toggleItemVisible(final TreeItem item) {
 
         final IRefreshListener viewer = this;
-        VizApp.runAsync(new Runnable() {
+        VizApp.runSync(new Runnable() {
 
             @Override
             public void run() {
@@ -1100,6 +1102,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
         EnsembleToolItemActionListener ecl = new EnsembleToolItemActionListener(
                 runItem);
+
         ecl.add(BUNDLE_CMD_TITLE, false);
         ecl.addSeparator();
         ecl.add(Calculation.MEAN.getTitle(), true);
@@ -1115,8 +1118,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         ecl.add(Calculation.COMBINED_ENS_REL_FREQ.getTitle(), false);
         ecl.add(Calculation.TRIPLET_ENS_REL_FREQ.getTitle(), false);
         ecl.add(Calculation.ENSEMBLE_RELATIVE_FREQUENCY.getTitle(), false);
-        ecl.add(Calculation.HISTOGRAM_SAMPLING.getTitle(), false);
-        ecl.add(Calculation.HISTOGRAM_TEXT.getTitle(), false);
+        ecl.add(Calculation.HISTOGRAM_SAMPLING.getTitle(), true);
+        ecl.add(Calculation.HISTOGRAM_TEXT.getTitle(), true);
 
         runItem.addSelectionListener(ecl);
 
@@ -1141,6 +1144,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     "gov.noaa.gsd.viz.ensemble",
                     "icons/volume-browser-lower-case-40x24px.gif");
         }
+
     }
 
     /*
@@ -1798,6 +1802,39 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 }
                 ensembleTree.deselect(userClickedTreeItem);
             }
+            /* Is this a simple left-click (MB1) over a tree item? */
+            else if ((userClickedTreeItem != null) && (event.button == 1)) {
+
+                /*
+                 * By default, left-clicking on a tree item in the tree will
+                 * toggle that product's visibility.
+                 */
+
+                final Object mousedItem = userClickedTreeItem.getData();
+
+                /* A string means it is an ensemble product name */
+                if (mousedItem instanceof String) {
+
+                    String ensembleName = (String) mousedItem;
+
+                    ToggleEnsembleVisiblityJob ccj = new ToggleEnsembleVisiblityJob(
+                            "Toggle Ensemble Members Visibility");
+                    ccj.setPriority(Job.INTERACTIVE);
+                    ccj.setTargetEnsembleProduct(ensembleName);
+                    /* interactive, yes, but don't race other Jobs */
+                    ccj.schedule(elegantWaitPeriod);
+
+                } else if (mousedItem instanceof GenericResourceHolder) {
+
+                    ToggleProductVisiblityJob ccj = new ToggleProductVisiblityJob(
+                            "Toggle Product Visibility");
+                    ccj.setPriority(Job.INTERACTIVE);
+                    ccj.setTargetTreeItem(userClickedTreeItem);
+                    /* interactive, yes, but don't race other Jobs */
+                    ccj.schedule(elegantWaitPeriod);
+                }
+            }
+
         }
 
         @Override
@@ -1978,41 +2015,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                         }
                     }
                 }
-
             }
-            /* Is this a simple left-click (MB1) over a tree item? */
-            else if (event.button == 1) {
-
-                /*
-                 * By default, left-clicking on a tree item in the tree will
-                 * toggle that product's visibility.
-                 */
-
-                final Object mousedItem = userClickedTreeItem.getData();
-
-                /* A string means it is an ensemble product name */
-                if (mousedItem instanceof String) {
-
-                    String ensembleName = (String) mousedItem;
-
-                    ToggleEnsembleVisiblityJob ccj = new ToggleEnsembleVisiblityJob(
-                            "Toggle Ensemble Members Visibility");
-                    ccj.setPriority(Job.INTERACTIVE);
-                    ccj.setTargetEnsembleProduct(ensembleName);
-                    /* interactive, yes, but don't race other Jobs */
-                    ccj.schedule(elegantWaitPeriod);
-
-                } else if (mousedItem instanceof GenericResourceHolder) {
-
-                    ToggleProductVisiblityJob ccj = new ToggleProductVisiblityJob(
-                            "Toggle Product Visibility");
-                    ccj.setPriority(Job.INTERACTIVE);
-                    ccj.setTargetTreeItem(userClickedTreeItem);
-                    /* interactive, yes, but don't race other Jobs */
-                    ccj.schedule(elegantWaitPeriod);
-                }
-            }
-
         }
     }
 
@@ -2186,6 +2189,9 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             return;
         }
 
+        final Map<String, List<GenericResourceHolder>> ensembleResourcesMap = EnsembleToolManager
+                .getInstance().getEnsembleResources();
+
         VizApp.runAsync(new Runnable() {
             @SuppressWarnings("unchecked")
             public void run() {
@@ -2194,8 +2200,6 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     return;
                 }
 
-                Map<String, List<GenericResourceHolder>> ensembleResourcesMap = EnsembleToolManager
-                        .getInstance().getEnsembleResources();
                 Map<String, List<GenericResourceHolder>> previousResourcesMap = null;
 
                 // this method only acts on an instance of a Map ...
@@ -3410,6 +3414,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             if (!volumeBrowserJustOpened) {
                 grabFocus();
             }
+            REFRESH_ON = true;
         }
 
         @Override
@@ -3426,6 +3431,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     EnsembleToolManager.getInstance().getActiveToolLayer()
                             .transferFocusToEditor();
                 }
+                REFRESH_ON = false;
             }
         }
 
@@ -3466,14 +3472,17 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
     @Override
     public void refresh() {
 
-        VizApp.runAsync(new Runnable() {
-            @Override
-            public void run() {
-                if (isViewerTreeReady()) {
-                    ensemblesTreeViewer.refresh(true);
+        if (REFRESH_ON) {
+            VizApp.runAsync(new Runnable() {
+                @Override
+                public void run() {
+                    if (isViewerTreeReady()) {
+                        ensemblesTreeViewer.refresh(true);
+                    }
                 }
-            }
-        });
+            });
+        }
+
     }
 
     protected void updateCursor(final Cursor c) {

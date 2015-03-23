@@ -13,6 +13,11 @@ import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResou
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.jobs.Job;
+
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.common.status.UFStatus.Priority;
@@ -90,38 +95,21 @@ public class GeneratedDataLoader {
         if (generatedloadMode == GeneratedloadMode.SAME_UNIT_AND_LEVEL
                 && !levels.isEmpty()) {
 
-            Thread t = null;
             for (final String level : levels) {
+                if ((level == null) || (level.length() <= 0)) {
+                    continue;
+                }
                 for (final String unit : units) {
                     // load to the map editor
-                    t = new Thread() {
-                        public void run() {
-                            AbstractEditor theEditor = (AbstractEditor) VizWorkbenchManager
-                                    .getInstance().getActiveEditor();
-                            if (!(theEditor.getActiveDisplayPane()
-                                    .getDescriptor() instanceof IMapDescriptor))
-                                return;
-                            GeneratedEnsembleGridResourceData ensembleData = new GeneratedEnsembleGridResourceData(
-                                    calculator,
-
-                                    theEditor.getActiveDisplayPane()
-                                            .getDescriptor(), level, unit);
-
-                            LoadProperties loadProperties = new LoadProperties();
-
-                            try {
-                                ensembleData.construct(loadProperties,
-                                        theEditor.getActiveDisplayPane()
-                                                .getDescriptor());
-                            } catch (VizException e) {
-                                statusHandler.handle(Priority.PROBLEM,
-                                        e.getLocalizedMessage(), e);
-                            }
-
-                            theEditor.refresh();
-                        }
-                    };
-                    t.start();
+                    if ((unit == null) || (unit.length() <= 0)) {
+                        continue;
+                    } else {
+                        LoadGeneratedResourceToMapEditorJob ccj = new LoadGeneratedResourceToMapEditorJob(
+                                "Load Generated Resource To Map Editor",
+                                calculator, level, unit);
+                        ccj.setPriority(Job.SHORT);
+                        ccj.schedule();
+                    }
 
                 }
             }
@@ -149,36 +137,21 @@ public class GeneratedDataLoader {
         if (generatedloadMode == GeneratedloadMode.SAME_UNIT_AND_LEVEL
                 && !levels.isEmpty()) {
 
-            Thread t = null;
             for (final String level : levels) {
+                if ((level == null) || (level.length() <= 0)) {
+                    continue;
+                }
                 for (final String unit : units) {
-                    // load to the map editor
-                    t = new Thread() {
-                        public void run() {
-                            // Temp solution!!!!
-                            AbstractEditor theEditor = (AbstractEditor) VizWorkbenchManager
-                                    .getInstance().getActiveEditor();
-                            if (!(theEditor.getActiveDisplayPane()
-                                    .getDescriptor() instanceof TimeSeriesDescriptor))
-                                return;
-                            GeneratedTimeSeriesResourceData ensembleData = new GeneratedTimeSeriesResourceData(
-                                    calculator, level, unit);
-
-                            LoadProperties loadProperties = new LoadProperties();
-
-                            try {
-                                ensembleData.construct(loadProperties,
-                                        theEditor.getActiveDisplayPane()
-                                                .getDescriptor());
-                            } catch (VizException e) {
-                                statusHandler.handle(Priority.PROBLEM,
-                                        e.getLocalizedMessage(), e);
-                            }
-
-                            theEditor.refresh();
-                        }
-                    };
-                    t.start();
+                    // load to the time series editor
+                    if ((unit == null) || (unit.length() <= 0)) {
+                        continue;
+                    } else {
+                        LoadGeneratedResourceToTimeSeriesEditorJob ccj = new LoadGeneratedResourceToTimeSeriesEditorJob(
+                                "Load Generated Resource To Time Series Editor",
+                                calculator, level, unit);
+                        ccj.setPriority(Job.SHORT);
+                        ccj.schedule();
+                    }
                 }
             }
         }
@@ -220,65 +193,20 @@ public class GeneratedDataLoader {
         if (generatedloadMode == GeneratedloadMode.SAME_UNIT_AND_LEVEL
                 && !levels.isEmpty()) {
 
-            Thread t = null;
             for (final String level : levels) {
+                if ((level == null) || (level.length() <= 0)) {
+                    continue;
+                }
                 for (final String unit : units) {
-                    // load to the map editor
-                    t = new Thread() {
-                        public void run() {
-                            AbstractEditor theEditor = (AbstractEditor) VizWorkbenchManager
-                                    .getInstance().getActiveEditor();
-                            if (!(theEditor.getActiveDisplayPane()
-                                    .getDescriptor() instanceof IMapDescriptor)) {
-                                return;
-                            }
+                    if ((unit == null) || (unit.length() <= 0)) {
+                        continue;
+                    } else {
+                        LoadOverlayJob ccj = new LoadOverlayJob(
+                                "Load Overlay Resource", overlay, level, unit);
+                        ccj.setPriority(Job.SHORT);
+                        ccj.schedule();
+                    }
 
-                            if (overlay == Calculation.HISTOGRAM_SAMPLING) {
-                                // how to pass the level and unit into the
-                                // HistogramResource
-                                HistogramResourceData resourceData = new HistogramResourceData(
-                                        theEditor.getActiveDisplayPane()
-                                                .getDescriptor(), level, unit,
-                                        HistogramResource.DisplayMode.SAMPLING);
-
-                                LoadProperties loadProperties = new LoadProperties();
-
-                                try {
-                                    resourceData.construct(loadProperties,
-                                            theEditor.getActiveDisplayPane()
-                                                    .getDescriptor());
-                                } catch (VizException e) {
-                                    statusHandler.handle(Priority.PROBLEM,
-                                            e.getLocalizedMessage(), e);
-                                }
-
-                            } else if (overlay == Calculation.HISTOGRAM_TEXT) {
-                                // how to pass the level and unit into the
-                                // HistogramResource
-                                HistogramResourceData resourceData = new HistogramResourceData(
-                                        theEditor.getActiveDisplayPane()
-                                                .getDescriptor(),
-                                        level,
-                                        unit,
-                                        HistogramResource.DisplayMode.TEXT_HISTGRAM);
-
-                                LoadProperties loadProperties = new LoadProperties();
-
-                                try {
-                                    resourceData.construct(loadProperties,
-                                            theEditor.getActiveDisplayPane()
-                                                    .getDescriptor());
-                                } catch (VizException e) {
-                                    statusHandler.handle(Priority.PROBLEM,
-                                            e.getLocalizedMessage(), e);
-                                }
-
-                            }
-
-                            theEditor.refresh();
-                        }
-                    };
-                    t.start();
                 }
             }
         }
@@ -424,6 +352,178 @@ public class GeneratedDataLoader {
                     units.add(unit);
 
             }
+        }
+    }
+
+    /*
+     * This loads overlay product like sampling.
+     */
+    protected class LoadOverlayJob extends Job {
+
+        private Calculation overlay = null;
+
+        private String unit = null;
+
+        private String level = null;
+
+        public LoadOverlayJob(String name, final Calculation ov,
+                final String lev, final String un) {
+            super(name);
+            overlay = ov;
+            level = lev;
+            unit = un;
+        }
+
+        @Override
+        protected IStatus run(IProgressMonitor monitor) {
+            IStatus status = Status.CANCEL_STATUS;
+
+            AbstractEditor theEditor = (AbstractEditor) VizWorkbenchManager
+                    .getInstance().getActiveEditor();
+            if (!(theEditor.getActiveDisplayPane().getDescriptor() instanceof IMapDescriptor)) {
+                return Status.CANCEL_STATUS;
+            }
+
+            if (overlay == Calculation.HISTOGRAM_SAMPLING) {
+                // how to pass the level and unit into the
+                // HistogramResource
+                HistogramResourceData resourceData = new HistogramResourceData(
+                        theEditor.getActiveDisplayPane().getDescriptor(),
+                        level, unit, HistogramResource.DisplayMode.SAMPLING);
+
+                LoadProperties loadProperties = new LoadProperties();
+
+                try {
+                    resourceData.construct(loadProperties, theEditor
+                            .getActiveDisplayPane().getDescriptor());
+                    status = Status.OK_STATUS;
+                } catch (VizException e) {
+                    statusHandler.handle(Priority.PROBLEM,
+                            e.getLocalizedMessage(), e);
+                }
+
+            } else if (overlay == Calculation.HISTOGRAM_TEXT) {
+                // how to pass the level and unit into the
+                // HistogramResource
+                HistogramResourceData resourceData = new HistogramResourceData(
+                        theEditor.getActiveDisplayPane().getDescriptor(),
+                        level, unit,
+                        HistogramResource.DisplayMode.TEXT_HISTGRAM);
+
+                LoadProperties loadProperties = new LoadProperties();
+
+                try {
+                    resourceData.construct(loadProperties, theEditor
+                            .getActiveDisplayPane().getDescriptor());
+                    status = Status.OK_STATUS;
+                } catch (VizException e) {
+                    statusHandler.handle(Priority.PROBLEM,
+                            e.getLocalizedMessage(), e);
+                }
+
+            }
+
+            theEditor.refresh();
+
+            return status;
+        }
+    }
+
+    /*
+     * This loads generated calculation products.
+     */
+    protected class LoadGeneratedResourceToMapEditorJob extends Job {
+
+        EnsembleCalculator calculator = null;
+
+        private String unit = null;
+
+        private String level = null;
+
+        public LoadGeneratedResourceToMapEditorJob(String name,
+                final EnsembleCalculator calc, final String lev, final String un) {
+            super(name);
+            calculator = calc;
+            level = lev;
+            unit = un;
+        }
+
+        @Override
+        protected IStatus run(IProgressMonitor monitor) {
+            IStatus status = Status.CANCEL_STATUS;
+
+            AbstractEditor theEditor = (AbstractEditor) VizWorkbenchManager
+                    .getInstance().getActiveEditor();
+            if (!(theEditor.getActiveDisplayPane().getDescriptor() instanceof IMapDescriptor)) {
+                return Status.CANCEL_STATUS;
+            }
+            GeneratedEnsembleGridResourceData ensembleData = new GeneratedEnsembleGridResourceData(
+                    calculator,
+
+                    theEditor.getActiveDisplayPane().getDescriptor(), level,
+                    unit);
+
+            LoadProperties loadProperties = new LoadProperties();
+
+            try {
+                ensembleData.construct(loadProperties, theEditor
+                        .getActiveDisplayPane().getDescriptor());
+                status = Status.OK_STATUS;
+            } catch (VizException e) {
+                statusHandler.handle(Priority.PROBLEM, e.getLocalizedMessage(),
+                        e);
+            }
+
+            theEditor.refresh();
+
+            return status;
+        }
+    }
+
+    /*
+     * This loads generated calculation products.
+     */
+    protected class LoadGeneratedResourceToTimeSeriesEditorJob extends Job {
+
+        EnsembleCalculator calculator = null;
+
+        private String unit = null;
+
+        private String level = null;
+
+        public LoadGeneratedResourceToTimeSeriesEditorJob(String name,
+                final EnsembleCalculator calc, final String lev, final String un) {
+            super(name);
+            calculator = calc;
+            level = lev;
+            unit = un;
+        }
+
+        @Override
+        protected IStatus run(IProgressMonitor monitor) {
+            IStatus status = Status.CANCEL_STATUS;
+            AbstractEditor theEditor = (AbstractEditor) VizWorkbenchManager
+                    .getInstance().getActiveEditor();
+            if (!(theEditor.getActiveDisplayPane().getDescriptor() instanceof TimeSeriesDescriptor)) {
+                return status;
+            }
+            GeneratedTimeSeriesResourceData ensembleData = new GeneratedTimeSeriesResourceData(
+                    calculator, level, unit);
+
+            LoadProperties loadProperties = new LoadProperties();
+
+            try {
+                ensembleData.construct(loadProperties, theEditor
+                        .getActiveDisplayPane().getDescriptor());
+                status = Status.OK_STATUS;
+            } catch (VizException e) {
+                statusHandler.handle(Priority.PROBLEM, e.getLocalizedMessage(),
+                        e);
+            }
+
+            theEditor.refresh();
+
+            return status;
         }
     }
 
