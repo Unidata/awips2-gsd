@@ -786,7 +786,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
     private void toggleItemVisible(final TreeItem item) {
 
         final IRefreshListener viewer = this;
-        VizApp.runSync(new Runnable() {
+        VizApp.runAsync(new Runnable() {
 
             @Override
             public void run() {
@@ -834,7 +834,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     /* toggle visibility */
                     isVisible = !isVisible;
                     gr.getRsc().getProperties().setVisible(isVisible);
-
+                    gr.getRsc().issueRefresh();
                     /* update tree item to reflect new state */
                     if (isVisible) {
                         item.setForeground(EnsembleToolViewer.ENABLED_FOREGROUND_COLOR);
@@ -1115,8 +1115,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         ecl.add(Calculation.COMBINED_ENS_REL_FREQ.getTitle(), false);
         ecl.add(Calculation.TRIPLET_ENS_REL_FREQ.getTitle(), false);
         ecl.add(Calculation.ENSEMBLE_RELATIVE_FREQUENCY.getTitle(), false);
-        ecl.add(Calculation.HISTOGRAM_SAMPLING.getTitle(), true);
-        ecl.add(Calculation.HISTOGRAM_TEXT.getTitle(), true);
+        ecl.add(Calculation.HISTOGRAM_SAMPLING.getTitle(), false);
+        ecl.add(Calculation.HISTOGRAM_TEXT.getTitle(), false);
 
         runItem.addSelectionListener(ecl);
 

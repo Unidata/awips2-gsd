@@ -20,7 +20,7 @@
     -->
 <vbSourceList>
 <!-- GFS Ensemble -->
-     <vbSource key="GEFS" name="GFS Ensemble" category="Ensemble" views="PLANVIEW TIMESERIES" />
+     <vbSource key="GEFS" name="GEFS" category="Ensemble" views="PLANVIEW TIMESERIES" />
 <!-- SREF Ensemble -->
-     <vbSource key="SREF212" name="SREF Ensemble" category="Ensemble" views="PLANVIEW TIMESERIES"/>
+     <vbSource key="SREF212" name="SREF" category="Ensemble" views="PLANVIEW TIMESERIES"/>
 </vbSourceList>

@@ -17,11 +17,13 @@ import com.raytheon.uf.viz.core.drawables.IRenderableDisplay;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.uf.viz.core.rsc.IInitListener;
 import com.raytheon.uf.viz.core.rsc.ResourceList;
 import com.raytheon.uf.viz.core.rsc.ResourceList.AddListener;
 import com.raytheon.uf.viz.core.rsc.ResourceList.RemoveListener;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
+import com.raytheon.viz.grid.rsc.general.D2DGridResource;
 import com.raytheon.viz.grid.rsc.general.GridResource;
 import com.raytheon.viz.ui.EditorUtil;
 import com.raytheon.viz.ui.editor.AbstractEditor;
@@ -180,6 +182,7 @@ public class EnsembleToolDisplayCustomizer implements
             /**
              * Ignore if this resource is not compatible with the ensemble tool
              */
+
             if (!isCompatibleResource(rp)) {
                 return;
             }
@@ -209,6 +212,7 @@ public class EnsembleToolDisplayCustomizer implements
                 // register immediately to the resource manager
                 EnsembleResourceManager.getInstance().registerResource(
                         rp.getResource(), getEditor(), true);
+
             }
 
         }
@@ -255,7 +259,17 @@ public class EnsembleToolDisplayCustomizer implements
 
         private boolean isCompatibleResource(ResourcePair rp) {
             AbstractVizResource<?, ?> resource = rp.getResource();
-            if ((resource != null && !isGeneratedResource(rp))
+            if (resource == null) {
+                return false;
+            }
+
+            if (resource instanceof D2DGridResource) {
+                D2DGridResource gr = (D2DGridResource) resource;
+                if (gr.getDisplayType() == DisplayType.IMAGE) {
+                    return false;
+                }
+            }
+            if (!isGeneratedResource(rp)
                     && ((resource instanceof GridResource) || (resource instanceof TimeSeriesResource))) {
                 return true;
             }
