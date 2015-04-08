@@ -681,8 +681,6 @@ public class EnsembleToolManager extends AbstractTool implements
                     }
                 } else if (windowState == ViewerWindowState.MINIMIZED) {
                     if (viewPartRef != null) {
-                        // IWorkbenchPartReference viewPartRef = page
-                        // .findViewReference(EnsembleToolViewer.ID);
                         page.setPartState(viewPartRef,
                                 IWorkbenchPage.STATE_MINIMIZED);
                     }
@@ -928,7 +926,7 @@ public class EnsembleToolManager extends AbstractTool implements
     }
 
     /*
-     * Turn the EnsembleToolManager on or off.
+     * Turn the tool layer for the ensemble tool on or off.
      */
     public void setEditable(boolean makeEditable) {
         if (activeToolLayer != null) {
@@ -938,9 +936,19 @@ public class EnsembleToolManager extends AbstractTool implements
     }
 
     /*
+     * Is the tool layer editable?
+     */
+    public boolean isEditable() {
+
+        return activeToolLayer.isEditable();
+
+    }
+
+    /*
      * Is the Ensemble Tool ready to handle state change?
      */
     public boolean isReady() {
+
         return isReady;
     }
 

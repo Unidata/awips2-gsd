@@ -135,7 +135,7 @@ public class EnsembleResourceManager implements IDisposeListener {
     public synchronized void registerResource(AbstractVizResource<?, ?> rsc,
             AbstractEditor editor, boolean guiUpdate) {
 
-        if ((rsc == null) || (!isToolLayerReady()))
+        if ((rsc == null) || (!EnsembleToolManager.getInstance().isReady()))
             return;
 
         // if this is the first resource ever registered using this editor
@@ -228,7 +228,7 @@ public class EnsembleResourceManager implements IDisposeListener {
     public synchronized void registerGenerated(AbstractVizResource<?, ?> rsc,
             AbstractEditor editor) {
 
-        if ((rsc == null) || (!isToolLayerReady()))
+        if ((rsc == null) || (!EnsembleToolManager.getInstance().isReady()))
             return;
 
         // This may be the first resource ever registered using this editor. If
@@ -268,7 +268,7 @@ public class EnsembleResourceManager implements IDisposeListener {
         // Set resource as a system resource so we don't show the legend
         // in the main map, because we will display it in the ensemble
         // navigator view.
-        if (isToolLayerReady()) {
+        if (EnsembleToolManager.getInstance().isReady()) {
             // TODO: Must refactor so we don't use setSystemResource(boolean)
             // method.
             rsc.getProperties().setSystemResource(true);
@@ -358,12 +358,15 @@ public class EnsembleResourceManager implements IDisposeListener {
     }
 
     /**
-     * Synchronous the registered resource list within editor(s) and GUI.
+     * Synchronize the registered resource list within editor(s) and GUI.
      * --verify if the resources in the list are existing. --Remove any resource
      * in this list, if it was unloaded. --notify GUI if there is any change.
      */
     public void syncRegisteredResource(AbstractEditor editor) {
 
+        if (!EnsembleToolManager.getInstance().isReady()) {
+            return;
+        }
         if (ensembleToolResourcesMap.get(editor) == null) {
             return;
         }
@@ -386,10 +389,11 @@ public class EnsembleResourceManager implements IDisposeListener {
                 // notify GUI if there is any change.
                 notifyClientListChanged();
             } else {
-                // don't show legend if Tool Layer is editable
-                if (isToolLayerReady()) {
-                    gr.getRsc().getProperties().setSystemResource(true);
-                }
+                /*
+                 * don't show legend when the ensemble tool is controlling the
+                 * resource
+                 */
+                gr.getRsc().getProperties().setSystemResource(true);
 
                 // Marks to unselected if the resource is not visible
                 // set resource selection to true.
@@ -442,15 +446,6 @@ public class EnsembleResourceManager implements IDisposeListener {
     }
 
     /**
-     * check if the ensemble GUI is reday
-     * 
-     * @return
-     */
-    public boolean isToolLayerReady() {
-        return EnsembleToolManager.getInstance().isReady();
-    }
-
-    /**
      * Check generated resources update data and display if need
      * 
      * @param editor
@@ -489,7 +484,7 @@ public class EnsembleResourceManager implements IDisposeListener {
      */
     private void notifyClientListChanged() {
 
-        if (isToolLayerReady()) {
+        if (EnsembleToolManager.getInstance().isReady()) {
             EnsembleToolManager.getInstance().refreshView();
         }
     }

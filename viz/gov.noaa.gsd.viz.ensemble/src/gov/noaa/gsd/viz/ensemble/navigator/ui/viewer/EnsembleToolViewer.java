@@ -171,6 +171,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
     private Font viewFont = null;
 
+    private Font smallViewFont = null;
+
     private TabFolder tabFolder_lowerSash = null;
 
     private TabItem tabPreferences = null;
@@ -249,6 +251,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
     private int thickenWidth = 4;
 
+    private boolean autoFocus = true;
+
     private boolean volumeBrowserJustOpened = false;
 
     private long ignoreFocusStartTime = 0;
@@ -264,8 +268,6 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
     private static final Color ENABLED_FOREGROUND_COLOR = SWTResourceManager.BLACK;
 
     private static final Color DISABLED_FOREGROUND_COLOR = SWTResourceManager.MEDIUM_GRAY;
-
-    static protected boolean REFRESH_ON = true;
 
     private Label label_frameTimeUsingBasis = null;
 
@@ -285,6 +287,14 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
     /* class scope for accessibility from inner anonymous class */
     protected TreeItem[] directDescendants = null;
 
+    private Job refreshJob = null;
+
+    private static boolean RefreshRequested = false;
+
+    private static final long LONGEST_REFRESH_WAIT = 1750;
+
+    private static long IGNORE_INTERIM_REFRESH_REQUEST_PERIOD = LONGEST_REFRESH_WAIT;
+
     private static boolean isDisposing = false;
 
     public static boolean isDisposing() {
@@ -296,6 +306,16 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
     }
 
     public EnsembleToolViewer() {
+
+        /*
+         * As long as this ViewPart is not disposed, run a Job which refreshes
+         * the Tree control after a lazy wait period.
+         */
+        refreshJob = new ConstantlyCheckForRefreshJob("");
+        refreshJob.setSystem(true);
+        refreshJob.setPriority(Job.SHORT);
+        /* no need to start it immediately */
+        refreshJob.schedule(LONGEST_REFRESH_WAIT);
 
     }
 
@@ -315,11 +335,13 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
      */
     public void createPartControl(Composite parent) {
 
+        owner = parent;
+
         /* create the defaut icons when the view is initially opened */
         constructImages();
 
-        owner = parent;
-        viewFont = new Font(parent.getDisplay(), "Dialog", 9, SWT.NONE);
+        viewFont = SWTResourceManager.getFont("Dialog", 9, SWT.NONE);
+        smallViewFont = SWTResourceManager.getFont("Dialog", 8, SWT.NONE);
 
         GridLayout gridLayout1 = new GridLayout(1, false);
         parent.setLayout(gridLayout1);
@@ -718,6 +740,11 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
         EnsembleToolViewer.setDisposing(true);
 
+        /* no need to listen for refresh events any more */
+        if (refreshJob != null) {
+            ((ConstantlyCheckForRefreshJob) refreshJob).cancelJob();
+        }
+
         if (columnLabelProviders != null) {
             for (ColumnLabelProvider clp : columnLabelProviders) {
                 clp.dispose();
@@ -731,10 +758,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         if (ensemblesTreeViewer != null) {
             ensemblesTreeViewer = null;
         }
-        if (viewFont != null) {
-            viewFont.dispose();
-            viewFont = null;
-        }
+
+        SWTResourceManager.dispose();
 
         EnsembleToolViewer.setDisposing(false);
 
@@ -1392,7 +1417,6 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                         }
                     }
                 }
-
                 if (!compareResultFound) {
 
                     if (TimeSeriesResourceHolder.class.isAssignableFrom(av1
@@ -1427,16 +1451,26 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                             }
                         }
                     }
-                }
-                if (!compareResultFound) {
+                    if (!compareResultFound) {
 
-                    if ((vr1 != null) && (vr1.getName() != null)
-                            && (vr2 != null) && (vr2.getName() != null)) {
+                        if ((vr1 != null) && (vr1.getName() != null)
+                                && (vr2 != null) && (vr2.getName() != null)) {
 
-                        compareResult = vr1.getName().compareTo(vr2.getName());
-                        compareResultFound = true;
+                            compareResult = vr1.getName().compareTo(
+                                    vr2.getName());
+                        }
                     }
                 }
+            }
+            /*
+             * Finally, check for apples to oranges comparisons.
+             */
+            else if ((av1 instanceof String)
+                    && (av2 instanceof GenericResourceHolder)) {
+                compareResult = 1;
+            } else if ((av1 instanceof GenericResourceHolder)
+                    && (av2 instanceof String)) {
+                compareResult = -1;
             }
 
             return compareResult;
@@ -2039,7 +2073,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
      */
     protected void updateColorsOnEnsembleResource(final String ensembleName) {
 
-        VizApp.runSync(new Runnable() {
+        VizApp.runAsync(new Runnable() {
 
             @Override
             public void run() {
@@ -2069,12 +2103,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             SREFMembersColorChangeJob ccj = new SREFMembersColorChangeJob(
                     "Changing SREF Ensemble Members Colors");
             ccj.setPriority(Job.INTERACTIVE);
-            /**
-             * If we don't pounce on this Job (i.e. by delaying a little) then
-             * (for reasons still unknown) the UI thread clears the dialog box
-             * and repaints the once occluded display more immediately.
-             */
-            ccj.schedule(elegantWaitPeriod);
+            ccj.schedule();
 
         }
 
@@ -2092,12 +2121,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             GEFSMembersColorChangeJob ccj = new GEFSMembersColorChangeJob(
                     "Changing GEFS Ensemble Members Colors");
             ccj.setPriority(Job.INTERACTIVE);
-            /**
-             * If we don't pounce on this Job (i.e. by delaying a little) then
-             * (for reasons still unknown) the UI thread clears the dialog box
-             * and repaints the once occluded display more immediately.
-             */
-            ccj.schedule(elegantWaitPeriod);
+            ccj.schedule();
         }
 
     }
@@ -2313,7 +2337,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         TreeItem ti = null;
         for (String s : expandedElements) {
             ti = this.findTreeItemByLabelName(s);
-            if (ti != null) {
+            if (ti != null && !ti.isDisposed()) {
                 ti.setExpanded(true);
             }
         }
@@ -2327,10 +2351,12 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             TreeItem[] children = ensemblesTreeViewer.getTree().getItems();
             List<TreeItem> immediateChildren = Arrays.asList(children);
             for (TreeItem ti : immediateChildren) {
-                if (ti.getData() instanceof String) {
-                    String s = (String) ti.getData();
-                    if (ti.getExpanded()) {
-                        expandedItems.add(s);
+                if (ti != null && !ti.isDisposed()) {
+                    if (ti.getData() instanceof String) {
+                        String s = (String) ti.getData();
+                        if (ti.getExpanded()) {
+                            expandedItems.add(s);
+                        }
                     }
                 }
             }
@@ -3106,7 +3132,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         GridData gd_composite = new GridData(SWT.LEFT, SWT.CENTER, false,
                 false, 1, 1);
         gd_composite.heightHint = 215;
-        gd_composite.widthHint = 371;
+        gd_composite.widthHint = 351;
         composite.setLayoutData(gd_composite);
         composite.setBackground(SWTResourceManager.MEDIUM_GRAY);
         tabPreferences = new TabItem(tabFolder_lowerSash, SWT.NONE);
@@ -3118,7 +3144,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         composite_ThickenOnSelection.setLayout(new GridLayout(5, false));
         GridData gd_composite_ThickenOnSelection = new GridData(SWT.LEFT,
                 SWT.CENTER, false, false, 1, 1);
-        gd_composite_ThickenOnSelection.widthHint = 166;
+        gd_composite_ThickenOnSelection.widthHint = 152;
         gd_composite_ThickenOnSelection.heightHint = 130;
         composite_ThickenOnSelection
                 .setLayoutData(gd_composite_ThickenOnSelection);
@@ -3147,7 +3173,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         btnUseResourceColor.setText("Use Resource Color");
         btnUseResourceColor.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
                 false, false, 4, 1));
-        btnUseResourceColor.setFont(viewFont);
+        btnUseResourceColor.setFont(smallViewFont);
 
         new Label(composite_ThickenOnSelection, SWT.NONE);
 
@@ -3157,7 +3183,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 false, 3, 1);
         gd_btnChooseColor.widthHint = 115;
         btnChooseColor.setLayoutData(gd_btnChooseColor);
-        btnChooseColor.setFont(viewFont);
+        btnChooseColor.setFont(smallViewFont);
         btnChooseColor.setText("Choose Color ");
         btnChooseColor.setSelection(false);
 
@@ -3167,9 +3193,9 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         label_ColorChooser.setFont(SWTResourceManager.getFont("Dialog", 14,
                 SWT.NONE));
         label_ColorChooser.setAlignment(SWT.CENTER);
-        GridData gd_label = new GridData(SWT.LEFT, SWT.CENTER, false, false, 2,
+        GridData gd_label = new GridData(SWT.LEFT, SWT.CENTER, false, false, 1,
                 1);
-        gd_label.widthHint = 25;
+        gd_label.widthHint = 20;
         label_ColorChooser.setLayoutData(gd_label);
         label_ColorChooser.setEnabled(false);
         label_ColorChooser.setBackground(SWTResourceManager.LIGHT_GRAY);
@@ -3184,7 +3210,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         gd_labelThicknessChooser.widthHint = 60;
         labelThicknessChooser.setLayoutData(gd_labelThicknessChooser);
         labelThicknessChooser.setText("Thickness: ");
-        labelThicknessChooser.setFont(viewFont);
+        labelThicknessChooser.setFont(smallViewFont);
         labelThicknessChooser.setAlignment(SWT.CENTER);
 
         final Spinner spinnerThicknessChooser = new Spinner(
@@ -3302,6 +3328,100 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
         });
 
+        /* Additional preferences */
+
+        Composite composite_SmallFlags = new Composite(composite,
+                SWT.SHADOW_ETCHED_IN);
+        composite_SmallFlags.setLayout(new GridLayout(4, false));
+        GridData gd_composite_SmallFlags = new GridData(SWT.LEFT, SWT.CENTER,
+                true, false, 4, 1);
+        gd_composite_SmallFlags.widthHint = 154;
+        gd_composite_SmallFlags.heightHint = 130;
+        composite_SmallFlags.setLayoutData(gd_composite_SmallFlags);
+
+        /*
+         * Auto-focus preference: asserted by default. Controls whether focus is
+         * grabbed by the View when the mouse enters the Tree control and
+         * grabbed by the active editor when the Tree control loses focus.
+         */
+
+        final Button btnAutoFocus = new Button(composite_SmallFlags, SWT.CHECK);
+        autoFocus = true;
+        btnAutoFocus.setSelection(autoFocus);
+        btnAutoFocus.setText("Auto-Focus");
+        btnAutoFocus.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false,
+                false, 4, 1));
+        btnAutoFocus.setFont(viewFont);
+
+        /* vertical spacers */
+        Label separator1 = new Label(composite_SmallFlags, SWT.SEPARATOR
+                | SWT.HORIZONTAL);
+        GridData gd_separator_1 = new GridData(SWT.LEFT, SWT.CENTER, false,
+                false, 4, 1);
+        gd_separator_1.widthHint = 150;
+        separator1.setLayoutData(gd_separator_1);
+
+        new Label(composite_SmallFlags, SWT.NONE);
+        new Label(composite_SmallFlags, SWT.NONE);
+        new Label(composite_SmallFlags, SWT.NONE);
+
+        Label separator2 = new Label(composite_SmallFlags, SWT.SEPARATOR
+                | SWT.HORIZONTAL);
+        GridData gd_separator_2 = new GridData(SWT.LEFT, SWT.CENTER, false,
+                false, 4, 1);
+        gd_separator_2.widthHint = 150;
+        separator2.setLayoutData(gd_separator_2);
+
+        /*
+         * Editable on Restore preference: for 14.4.1 release only, this
+         * preference is asserted by default and not changeable. It defines the
+         * way that a given ensemble tool layer has its editability turned-on
+         * once the navigator view (this EnsembleToolViewer) is restored.
+         * 
+         * This control will be enabled in future releases, as the user may not
+         * want the tool layer to automatically become editable on view restore.
+         */
+        final Button btnEditableOnRestore = new Button(composite_SmallFlags,
+                SWT.CHECK);
+        btnEditableOnRestore.setSelection(true);
+        btnEditableOnRestore.setText("Make editable on restore");
+        btnEditableOnRestore.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
+                false, false, 4, 1));
+        btnEditableOnRestore.setFont(smallViewFont);
+        btnEditableOnRestore.setEnabled(false);
+
+        /*
+         * Editable on Swap-In preference: for 14.4.1 release only, this
+         * preference is asserted by default and not changeable. It defines the
+         * way that a given ensemble tool layer has its editability turned-on
+         * once an ensemble tool layer is swapped in to the active editor.
+         * 
+         * This control will be enabled in future releases, as the user may not
+         * want the tool layer to automatically become editable when swapped in.
+         */
+        final Button btnEditableOnSwapIn = new Button(composite_SmallFlags,
+                SWT.CHECK);
+        btnEditableOnSwapIn.setSelection(true);
+        btnEditableOnSwapIn.setText("Make editable on swap-in");
+        btnEditableOnSwapIn.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
+                false, false, 4, 1));
+        btnEditableOnSwapIn.setFont(smallViewFont);
+        btnEditableOnSwapIn.setEnabled(false);
+
+        btnAutoFocus.addSelectionListener(new SelectionListener() {
+
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                autoFocus = ((Button) e.getSource()).getSelection();
+            }
+
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                autoFocus = ((Button) e.getSource()).getSelection();
+            }
+
+        });
+
     }
 
     private void fillMetaDataInfoTab(TabFolder tabFolder_lowerSash) {
@@ -3393,33 +3513,24 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
     }
 
     /*
-     * The focus listener transfers focus between the EnsembleToolViewer view
-     * and the CAVE application's active editor. However, this focus listener
-     * ignores focus events just after the Volume Browser is opened (for a
-     * period of IGNORE_FOCUS_PERIOD milliseconds. This was done so the VB
-     * didn't lose focus immediately after opening which automatically pushes
-     * the dialog to behind the CAVE application.
+     * This listener is engaged when the mouse enters or exits the Tree control.
+     * 
+     * Only if the auto-focus user-preference is asserted will this listener
+     * transfers focus between the EnsembleToolViewer view and the CAVE
+     * application's active editor.
+     * 
+     * However, and only if the auto-focus user-preference is asserted, this
+     * focus listener ignores focus events immediately after the Volume Browser
+     * is opened (for a period of IGNORE_FOCUS_PERIOD milliseconds. This was
+     * done so the VB didn't lose focus immediately after opening which
+     * automatically pushes the dialog to behind the CAVE application.
      */
     private class TransferFocusListener implements MouseTrackListener {
 
         @Override
         public void mouseEnter(MouseEvent e) {
-            if (volumeBrowserJustOpened) {
-                long currentTime = System.currentTimeMillis();
-                long timeElapsed = currentTime - ignoreFocusStartTime;
-                if (timeElapsed > IGNORE_FOCUS_PERIOD_MILLIS) {
-                    volumeBrowserJustOpened = false;
-                }
-            }
-            if (!volumeBrowserJustOpened) {
-                grabFocus();
-            }
-            REFRESH_ON = true;
-        }
 
-        @Override
-        public void mouseExit(MouseEvent e) {
-            if (EnsembleToolManager.getInstance().isReady()) {
+            if (autoFocus) {
                 if (volumeBrowserJustOpened) {
                     long currentTime = System.currentTimeMillis();
                     long timeElapsed = currentTime - ignoreFocusStartTime;
@@ -3428,10 +3539,28 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     }
                 }
                 if (!volumeBrowserJustOpened) {
-                    EnsembleToolManager.getInstance().getActiveToolLayer()
-                            .transferFocusToEditor();
+                    grabFocus();
                 }
-                REFRESH_ON = false;
+            }
+        }
+
+        @Override
+        public void mouseExit(MouseEvent e) {
+
+            if (autoFocus) {
+                if (EnsembleToolManager.getInstance().isReady()) {
+                    if (volumeBrowserJustOpened) {
+                        long currentTime = System.currentTimeMillis();
+                        long timeElapsed = currentTime - ignoreFocusStartTime;
+                        if (timeElapsed > IGNORE_FOCUS_PERIOD_MILLIS) {
+                            volumeBrowserJustOpened = false;
+                        }
+                    }
+                    if (!volumeBrowserJustOpened) {
+                        EnsembleToolManager.getInstance().getActiveToolLayer()
+                                .transferFocusToEditor();
+                    }
+                }
             }
         }
 
@@ -3469,24 +3598,22 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         }
     }
 
+    /*
+     * (non-Javadoc)
+     * 
+     * @see com.raytheon.uf.viz.core.rsc.IRefreshListener#refresh()
+     * 
+     * Assert a refresh flag whenever a refresh is requested.
+     */
     @Override
     public void refresh() {
 
-        if (REFRESH_ON) {
-            VizApp.runAsync(new Runnable() {
-                @Override
-                public void run() {
-                    if (isViewerTreeReady()) {
-                        ensemblesTreeViewer.refresh(true);
-                    }
-                }
-            });
-        }
+        RefreshRequested = true;
 
     }
 
     protected void updateCursor(final Cursor c) {
-        VizApp.runSync(new Runnable() {
+        VizApp.runAsync(new Runnable() {
 
             @Override
             public void run() {
@@ -3631,6 +3758,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         protected IStatus run(IProgressMonitor monitor) {
             IStatus status = null;
 
+            /* Turn the refresh period to near-immediate for toggling */
+            IGNORE_INTERIM_REFRESH_REQUEST_PERIOD = 5;
             if (ensembleName == null) {
                 status = Status.CANCEL_STATUS;
             } else {
@@ -3645,9 +3774,9 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
                     if (i == numDescendants - 1) {
                         /*
-                         * if this was the last item to be toggled off, for
-                         * example, in an ensemble group, then you need to
-                         * toggle the parent tree item off also
+                         * if this was the last item to be toggled off, for the
+                         * ensemble group, then you need to toggle the parent
+                         * tree item off also
                          */
                         matchParentToChildrenVisibility(ti);
                     }
@@ -3656,9 +3785,59 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 updateCursor(normalCursor);
                 status = Status.OK_STATUS;
             }
+            /* Reset the refresh period to normal lazy waiting */
+            IGNORE_INTERIM_REFRESH_REQUEST_PERIOD = LONGEST_REFRESH_WAIT;
             return status;
         }
 
+    }
+
+    /**
+     * This job class runs for as long as the Ensemble Tool is open (i.e. not
+     * disposed). It waits for a period of time and then checks to see if a viz
+     * resource refresh has been requested. If so, it refreshs the Tree.
+     */
+    private class ConstantlyCheckForRefreshJob extends Job {
+
+        private IStatus status = Status.OK_STATUS;
+
+        public ConstantlyCheckForRefreshJob(String name) {
+            super(name);
+            status = Status.OK_STATUS;
+        }
+
+        public void cancelJob() {
+            status = Status.CANCEL_STATUS;
+        }
+
+        @Override
+        protected IStatus run(IProgressMonitor monitor) {
+
+            if (status == Status.CANCEL_STATUS) {
+                return status;
+            }
+            /* if a refresh was requested then refresh asynchronolusly. */
+            if ((RefreshRequested) && (isViewerTreeReady())) {
+
+                RefreshRequested = false;
+
+                VizApp.runAsync(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        ensemblesTreeViewer.refresh();
+                    }
+
+                });
+            }
+            /*
+             * wait for a period before checking to see if another refresh was
+             * requested.
+             */
+            schedule(IGNORE_INTERIM_REFRESH_REQUEST_PERIOD);
+            setPriority(Job.SHORT);
+            return Status.OK_STATUS;
+        }
     }
 
     private boolean isViewerTreeReady() {

@@ -18,5 +18,5 @@ package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer;
  */
 public enum ViewerWindowState {
 
-    SHOW_WITH_FOCUS, SHOW_WITHOUT_FOCUS, MINIMIZED, CLOSE;
+    UNDEFINED, SHOW_WITH_FOCUS, SHOW_WITHOUT_FOCUS, MINIMIZED, CLOSE;
 }

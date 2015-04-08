@@ -19,7 +19,7 @@
  **/
 package gov.noaa.gsd.viz.ensemble.display.rsc.histogram;
 
-import gov.noaa.gsd.viz.ensemble.display.control.EnsembleResourceManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolManager;
 
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
@@ -190,8 +190,14 @@ public class EnsSamplingResource extends
     @Override
     protected void paintInternal(IGraphicsTarget target,
             PaintProperties paintProps) throws VizException {
+
+        /*
+         * only show sampling if the ensemble tool is ready and the tool layer
+         * is editable
+         */
         if (sampleCoord == null || isSampling() == false
-                || !(EnsembleResourceManager.getInstance().isToolLayerReady())) {
+                || !(EnsembleToolManager.getInstance().isReady())
+                || !(EnsembleToolManager.getInstance().isEditable())) {
             return;
         }
 

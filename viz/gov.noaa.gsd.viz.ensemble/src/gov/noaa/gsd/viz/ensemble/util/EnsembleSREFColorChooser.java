@@ -97,12 +97,7 @@ public class EnsembleSREFColorChooser extends CaveJFACEDialog {
                 cd.setText("Choose SREF-NMM color");
                 RGB result = cd.open();
                 if (result != null) {
-                    Color c = SWTResourceManager.getColor(result);
-                    RGB rgb = c.getRGB();
-                    float[] hsb = rgb.getHSB();
-                    hsb[1] = 1.0f;
-                    RGB nrgb = new RGB(hsb[0], hsb[1], hsb[2]);
-                    Color nc = SWTResourceManager.getColor(nrgb);
+                    Color nc = SWTResourceManager.getColor(result);
                     ChosenSREFColors.getInstance().set_NMM_color(nc);
                     label_color_NMM.setForeground(nc);
                     applyGradientBG(label_color_NMM);
@@ -146,12 +141,7 @@ public class EnsembleSREFColorChooser extends CaveJFACEDialog {
                 cd.setText("Choose SREF-NMB color");
                 RGB result = cd.open();
                 if (result != null) {
-                    Color c = SWTResourceManager.getColor(result);
-                    RGB rgb = c.getRGB();
-                    float[] hsb = rgb.getHSB();
-                    hsb[1] = 1.0f;
-                    RGB nrgb = new RGB(hsb[0], hsb[1], hsb[2]);
-                    Color nc = SWTResourceManager.getColor(nrgb);
+                    Color nc = SWTResourceManager.getColor(result);
                     ChosenSREFColors.getInstance().set_NMB_color(nc);
                     label_color_NMB.setForeground(nc);
                     applyGradientBG(label_color_NMB);
@@ -195,12 +185,7 @@ public class EnsembleSREFColorChooser extends CaveJFACEDialog {
                 cd.setText("Choose SREF-EM color");
                 RGB result = cd.open();
                 if (result != null) {
-                    Color c = SWTResourceManager.getColor(result);
-                    RGB rgb = c.getRGB();
-                    float[] hsb = rgb.getHSB();
-                    hsb[1] = 1.0f;
-                    RGB nrgb = new RGB(hsb[0], hsb[1], hsb[2]);
-                    Color nc = SWTResourceManager.getColor(nrgb);
+                    Color nc = SWTResourceManager.getColor(result);
                     ChosenSREFColors.getInstance().set_EM_color(nc);
                     label_color_EM.setForeground(nc);
                     applyGradientBG(label_color_EM);
@@ -214,25 +199,24 @@ public class EnsembleSREFColorChooser extends CaveJFACEDialog {
 
     }
 
-    private static Image oldImage = null;
+    // private static Image oldImage = null;
 
     public static void applyGradientBG(Composite c) {
 
         Rectangle rect = c.getClientArea();
-        Image newImage = new Image(c.getDisplay(), rect.width, rect.height);
-        GC gc = new GC(newImage);
-        gc.setBackground(SWTResourceManager.WHITE);
-        gc.fillRectangle(0, 0, rect.width, rect.height);
+        Image image = new Image(c.getDisplay(), rect.width, rect.height);
+        GC gc = new GC(image);
         gc.setForeground(c.getForeground());
         gc.setBackground(c.getBackground());
         gc.fillGradientRectangle(0, 0, rect.width, rect.height, false);
-        c.setBackgroundImage(newImage);
+        c.setBackgroundImage(image);
         gc.dispose();
+        image.dispose();
 
-        if (oldImage != null) {
-            oldImage.dispose();
-            oldImage = newImage;
-        }
+        // if (oldImage != null) {
+        // oldImage.dispose();
+        // oldImage = newImage;
+        // }
     }
 
     /**
