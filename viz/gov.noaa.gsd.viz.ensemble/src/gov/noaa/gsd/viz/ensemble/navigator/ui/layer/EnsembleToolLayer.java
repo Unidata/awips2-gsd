@@ -260,7 +260,8 @@ public class EnsembleToolLayer extends
         unloadAllResources(editor);
         EnsembleToolManager.getInstance().removeToolLayer(this);
 
-        EnsembleResourceManager.getInstance().updateFrameChanges(editor);
+        // TODO: Investigate if this updateFrameChanges call is necessary.
+        // EnsembleResourceManager.getInstance().updateFrameChanges(editor);
         isDisposed = true;
 
     }
