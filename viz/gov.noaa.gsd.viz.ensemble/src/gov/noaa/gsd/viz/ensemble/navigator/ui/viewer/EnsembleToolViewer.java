@@ -16,6 +16,7 @@ import gov.noaa.gsd.viz.ensemble.util.EnsembleGEFSColorChooser;
 import gov.noaa.gsd.viz.ensemble.util.EnsembleSREFColorChooser;
 import gov.noaa.gsd.viz.ensemble.util.ImageResourceManager;
 import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
+import gov.noaa.gsd.viz.ensemble.util.Utilities;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -111,7 +112,7 @@ import com.raytheon.uf.viz.core.rsc.capabilities.OutlineCapability;
  * Features in this class include the ability to:
  * 
  * 1) Behave as proxy for the current active CAVE "editable" ensemble tool; this
- * class is a RCP CAVE view that is coupled to the EnsembleToolManager which
+ * class is an RCP CAVE view that is coupled to the EnsembleToolManager which
  * associates an active RCP CAVE editor ("Map", "TimeSeries", etc.) to an
  * EnsembleToolLayer. This view will display the resources for the active
  * EnsembleToolLayer.
@@ -139,7 +140,11 @@ import com.raytheon.uf.viz.core.rsc.capabilities.OutlineCapability;
  * 
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
- * Oct 8, 2014    5056      polster     Initial creation
+ * Oct 08, 2014    5056      polster     Initial creation
+ * Apr 21, 2015    7681      polster     Ignore toggle group visibility for 14.4.1
+ * Apr 21, 2015    7684      polster     Fixes job which constantly checks for refresh
+ * Apr 21, 2015    7682      polster     ERF 'below threshold' field entry fixed
+ * Apr 21, 2015    7653      polster     Ctrl-MB1 selects viz resource again
  * 
  * </pre>
  * 
@@ -1289,7 +1294,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     // color of the resource inside a greyed bordered rectangle.
                     gc.fillRectangle(4, imageHeight - colorHeight - 2,
                             colorWidth, colorHeight);
-                    gc.setBackground(SWTResourceManager.getColor(color));
+                    gc.setBackground(SWTResourceManager.getColor(Utilities
+                            .desaturate(color)));
                     gc.fillRectangle(4 + ((colorWidth - innerColorWidth) / 2),
                             (imageHeight - colorHeight)
                                     + ((colorHeight - innerColorHeight) / 2)
@@ -1836,9 +1842,13 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 }
                 ensembleTree.deselect(userClickedTreeItem);
             }
-            /* Is this a simple left-click (MB1) over a tree item? */
-            else if ((userClickedTreeItem != null) && (event.button == 1)) {
-
+            /*
+             * Is this a simple left-click (MB1) over a tree item? Also, make
+             * certain this isn't a Ctrl-MB1 (as that key sequence is the
+             * selection feature and is handled in the mouseUp event.
+             */
+            else if ((userClickedTreeItem != null) && (event.button == 1)
+                    && ((event.stateMask & SWT.CTRL) == 0)) {
                 /*
                  * By default, left-clicking on a tree item in the tree will
                  * toggle that product's visibility.
@@ -1851,13 +1861,32 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
                     String ensembleName = (String) mousedItem;
 
+                    /*
+                     * The way that the TreeItem appears to work is that it
+                     * returns the correct number of child items when the
+                     * TreeItem is expanded and always the wrong number of child
+                     * items (usually 1) when the TreeItem is collapsed.
+                     * 
+                     * Therefore, always expand a collpased tree item before
+                     * asking for starting a job that will attempt to get its
+                     * child items.
+                     * 
+                     * TODO: Fix this in the future so we don't force the root
+                     * item to be expanded just to toggle the child items
+                     * visibility. This place to make this change will not be
+                     * here, but instead in the getDirectDescendants method.
+                     */
+
+                    boolean isExpanded = userClickedTreeItem.getExpanded();
+                    if (!isExpanded) {
+                        userClickedTreeItem.setExpanded(true);
+                    }
                     ToggleEnsembleVisiblityJob ccj = new ToggleEnsembleVisiblityJob(
                             "Toggle Ensemble Members Visibility");
                     ccj.setPriority(Job.INTERACTIVE);
                     ccj.setTargetEnsembleProduct(ensembleName);
                     /* interactive, yes, but don't race other Jobs */
                     ccj.schedule(elegantWaitPeriod);
-
                 } else if (mousedItem instanceof GenericResourceHolder) {
 
                     ToggleProductVisiblityJob ccj = new ToggleProductVisiblityJob(
@@ -1868,7 +1897,6 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     ccj.schedule(elegantWaitPeriod);
                 }
             }
-
         }
 
         @Override
@@ -2952,7 +2980,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         }
 
         else if (radioChooserRange_4.getSelection()) {
-            String lns = lowerRangeEntryTextBox_3.getText();
+            String lns = lowerRangeEntryTextBox_4.getText();
             double lowerValue = 0;
             try {
                 lowerValue = Double.parseDouble(lns);
@@ -3758,13 +3786,15 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         protected IStatus run(IProgressMonitor monitor) {
             IStatus status = null;
 
-            /* Turn the refresh period to near-immediate for toggling */
-            IGNORE_INTERIM_REFRESH_REQUEST_PERIOD = 5;
             if (ensembleName == null) {
                 status = Status.CANCEL_STATUS;
             } else {
                 updateCursor(waitCursor);
                 TreeItem ensembleRootItem = findTreeItemByLabelName(ensembleName);
+
+                /* Turn the refresh period to near-immediate for toggling */
+                IGNORE_INTERIM_REFRESH_REQUEST_PERIOD = 1;
+
                 TreeItem[] descendants = getDirectDescendants(ensembleRootItem);
                 TreeItem ti = null;
                 int numDescendants = descendants.length;
@@ -3817,7 +3847,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 return status;
             }
             /* if a refresh was requested then refresh asynchronolusly. */
-            if ((RefreshRequested) && (isViewerTreeReady())) {
+            if (RefreshRequested) {
 
                 RefreshRequested = false;
 
@@ -3825,9 +3855,11 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
                     @Override
                     public void run() {
-                        ensemblesTreeViewer.refresh();
+                        if ((status != Status.CANCEL_STATUS)
+                                && (isViewerTreeReady())) {
+                            ensemblesTreeViewer.refresh();
+                        }
                     }
-
                 });
             }
             /*
