@@ -64,6 +64,7 @@ public class EnsembleViewPartListener implements IPartListener2 {
     public void partHidden(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
             EnsembleToolManager.getInstance().setEditable(false);
+            EnsembleToolManager.getInstance().setViewStateAlreadyModified();
         }
     }
 
@@ -80,6 +81,7 @@ public class EnsembleViewPartListener implements IPartListener2 {
     public void partVisible(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
             EnsembleToolManager.getInstance().setEditable(true);
+            EnsembleToolManager.getInstance().setViewStateAlreadyModified();
         }
     }
 

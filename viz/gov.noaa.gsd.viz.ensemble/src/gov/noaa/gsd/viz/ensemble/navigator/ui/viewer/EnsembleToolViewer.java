@@ -260,6 +260,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
     private boolean volumeBrowserJustOpened = false;
 
+    private boolean userRequestedERF = false;
+
     private long ignoreFocusStartTime = 0;
 
     private static final long IGNORE_FOCUS_PERIOD_MILLIS = 4000;
@@ -475,20 +477,13 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
         parent.pack();
 
-        final EnsembleToolViewer viewer = this;
-        VizApp.runAsync(new Runnable() {
-
-            @Override
-            public void run() {
-                if (viewPartListener == null) {
-                    viewPartListener = new EnsembleViewPartListener(viewer);
-                    IWorkbenchWindow window = PlatformUI.getWorkbench()
-                            .getActiveWorkbenchWindow();
-                    IPartService service = window.getPartService();
-                    service.addPartListener(viewPartListener);
-                }
-            }
-        });
+        if (viewPartListener == null) {
+            viewPartListener = new EnsembleViewPartListener(this);
+            IWorkbenchWindow window = PlatformUI.getWorkbench()
+                    .getActiveWorkbenchWindow();
+            IPartService service = window.getPartService();
+            service.addPartListener(viewPartListener);
+        }
 
         ensemblesTreeViewer.getControl().addMouseTrackListener(
                 trackMouseEntryExit);
@@ -2404,11 +2399,32 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
     private void startAddERFLayer(String mousedEnsembleName) {
 
-        enableDefaultERFTabWidgetState(mousedEnsembleName);
+        userRequestedERF = true;
         tabFolder_lowerSash.setSelection(tabERFLayerControl);
-        lowerRangeEntryTextBox_1.forceFocus();
-        lowerRangeEntryTextBox_1.insert("");
+        enableDefaultERFTabWidgetState(mousedEnsembleName);
 
+    }
+
+    private void putCursorInSelectedERFRange() {
+        if (userRequestedERF == true) {
+
+            if (radioChooserRange_1.getSelection()) {
+                lowerRangeEntryTextBox_1.forceFocus();
+            }
+
+            else if (radioChooserRange_2.getSelection()) {
+                lowerRangeEntryTextBox_2.forceFocus();
+            }
+
+            else if (radioChooserRange_3.getSelection()) {
+                lowerRangeEntryTextBox_3.forceFocus();
+            }
+
+            else if (radioChooserRange_4.getSelection()) {
+                lowerRangeEntryTextBox_4.forceFocus();
+            }
+
+        }
     }
 
     /*
@@ -2756,6 +2772,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         btn_cancelERF.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
+                userRequestedERF = false;
                 disableERFTabWidgets();
                 if (lastSelectedNonTransientTabItem != null) {
                     tabFolder_lowerSash
@@ -2782,6 +2799,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         btn_computeERF.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
+                userRequestedERF = false;
                 computeERF();
             }
         });
@@ -2810,6 +2828,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 upperRangeEntryTextBox_1.setEnabled(true);
                 upperRangeEntryTextBox_2.setEnabled(false);
 
+                lowerRangeEntryTextBox_1.forceFocus();
+
             }
         });
 
@@ -2836,6 +2856,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 lowerRangeEntryTextBox_4.setEnabled(false);
                 upperRangeEntryTextBox_1.setEnabled(false);
                 upperRangeEntryTextBox_2.setEnabled(true);
+
+                lowerRangeEntryTextBox_2.forceFocus();
 
             }
         });
@@ -2864,6 +2886,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 upperRangeEntryTextBox_1.setEnabled(false);
                 upperRangeEntryTextBox_2.setEnabled(false);
 
+                lowerRangeEntryTextBox_3.forceFocus();
+
             }
         });
 
@@ -2890,6 +2914,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 lowerRangeEntryTextBox_4.setEnabled(true);
                 upperRangeEntryTextBox_1.setEnabled(false);
                 upperRangeEntryTextBox_2.setEnabled(false);
+
+                lowerRangeEntryTextBox_4.forceFocus();
 
             }
         });
@@ -3046,6 +3072,14 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         lowerRangeEntryTextBox_4.setEnabled(false);
         upperRangeEntryTextBox_1.setEnabled(true);
         upperRangeEntryTextBox_2.setEnabled(false);
+
+        radioChooserRange_1.setSelection(true);
+        radioChooserRange_2.setSelection(false);
+        radioChooserRange_3.setSelection(false);
+        radioChooserRange_4.setSelection(false);
+
+        lowerRangeEntryTextBox_1.insert("");
+        lowerRangeEntryTextBox_1.forceFocus();
 
         btn_cancelERF.setEnabled(true);
         btn_computeERF.setEnabled(true);
@@ -3518,7 +3552,6 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         gd_filler.widthHint = 150;
         gd_filler.heightHint = 20;
         filler.setLayoutData(gd_filler);
-
     }
 
     protected void updateTimeBasisInfo(String timeBasisRscName, String datatime) {
@@ -3576,7 +3609,13 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         public void mouseExit(MouseEvent e) {
 
             if (autoFocus) {
-                if (EnsembleToolManager.getInstance().isReady()) {
+                /*
+                 * no need to worry about focus if the user is about to do an
+                 * ERF calculation ...
+                 */
+                if (userRequestedERF == true) {
+                    putCursorInSelectedERFRange();
+                } else if (EnsembleToolManager.getInstance().isReady()) {
                     if (volumeBrowserJustOpened) {
                         long currentTime = System.currentTimeMillis();
                         long timeElapsed = currentTime - ignoreFocusStartTime;

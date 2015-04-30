@@ -39,6 +39,7 @@ import org.eclipse.ui.PlatformUI;
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.common.time.DataTime;
+import com.raytheon.uf.viz.core.IDisplayPaneContainer;
 import com.raytheon.uf.viz.core.IExtent;
 import com.raytheon.uf.viz.core.IGraphicsTarget;
 import com.raytheon.uf.viz.core.VizApp;
@@ -78,7 +79,7 @@ import com.vividsolutions.jts.geom.Coordinate;
  * Ensemble Tool; if the activel tool layer is turned off (made "not editable")
  * then the Ensemble Tool is also disabled, but if the user switches to another
  * editor that has an EnsembleToolLayer that is "editable", the manager will
- * become active again. .
+ * become active again.
  * 
  * <pre>
  * 
@@ -112,6 +113,12 @@ public class EnsembleToolLayer extends
     protected boolean isClosingToolLayer = false;
 
     private boolean isDisposed = true;
+
+    private boolean userRequestedEditableToggleViaLegend = false;
+
+    private boolean userRequestedNewEditableTool = false;
+
+    private boolean viewStateAlreadyModified = false;
 
     private List<String> expandedElements = new ArrayList<String>();
 
@@ -267,6 +274,11 @@ public class EnsembleToolLayer extends
         unloadAllResources(editor);
         EnsembleToolManager.getInstance().removeToolLayer(this);
 
+        IDisplayPaneContainer container = getResourceContainer();
+        if (container != null) {
+            container.unregisterMouseHandler(this);
+        }
+
         // TODO: Investigate if this updateFrameChanges call is necessary.
         // EnsembleResourceManager.getInstance().updateFrameChanges(editor);
         isDisposed = true;
@@ -278,6 +290,11 @@ public class EnsembleToolLayer extends
         isDisposed = false;
         descriptor.getResourceList().getProperties(this)
                 .setRenderingOrderId("HIGHEST");
+
+        IDisplayPaneContainer container = getResourceContainer();
+        if (container != null) {
+            container.registerMouseHandler(this);
+        }
 
     }
 
@@ -304,31 +321,99 @@ public class EnsembleToolLayer extends
      * .raytheon.uf.viz.core.rsc.IResourceDataChanged.ChangeType,
      * java.lang.Object)
      * 
-     * If this tool layer has had its editability turned off, then minimimize
-     * the view. If the editability is turned on, then restore the view.
-     * 
-     * The "viewer state change" is run in an asynchronous Job due to a bug in
-     * Eclipse. If this is not done this way a user's request (e.g. to minimize
-     * the view) can cause a race condition between manually and
-     * programmatically setting the state.
+     * The sole purpose of this method is to minimize or restore the ensemble
+     * tool viewer (ViewPart) when its editability is turned off or on,
+     * respectively (if it is not already done).
      */
     @Override
     public void resourceChanged(ChangeType type, Object object) {
         if (type == ChangeType.CAPABILITY
                 && object instanceof EditableCapability) {
+
             EditableCapability editable = (EditableCapability) object;
-            if (editable.isEditable() == false) {
-                SetViewerStateJob ccj = new SetViewerStateJob(
-                        "Minimize Tool View");
-                ccj.setViewerWindowState(ViewerWindowState.MINIMIZED);
-                ccj.setPriority(Job.SHORT);
-                ccj.schedule();
-            } else {
-                SetViewerStateJob ccj = new SetViewerStateJob(
-                        "Restore Tool View");
-                ccj.setViewerWindowState(ViewerWindowState.SHOW_WITHOUT_FOCUS);
-                ccj.setPriority(Job.SHORT);
-                ccj.schedule();
+
+            /* *
+             * The editable state of an instance of the active ensemble tool
+             * layer (i.e. this class) can be changed in one of four ways: the
+             * first is by minimizing or restoring the ensemble tool view, the
+             * second by swapping a display (that contains this instance) into
+             * or out of the active editor, the third by right-clicking on this
+             * (viz resource's) legend and toggling editability from there, or
+             * the fourth by opening another tool which causes the
+             * EditableManager to turn off any other tool layer that is
+             * editable.
+             * 
+             * In the first case, when the ensemble viewer (part listener)
+             * listens for a 'minimize' or 'restore' of the ensemble tool view
+             * the view then gets automatically minimized or restored and the
+             * active tool layer is set to 'not editable' or to 'editable',
+             * respectively; this method intentionally ignores this first case
+             * as the view is already automatically minimized or restored.
+             * 
+             * In the second case, the EnsembleToolManager listens for the
+             * IRenderableDisplayChangedListener.renderableDisplayChanged event
+             * which occurs when a swap happens. When a display with an ensemble
+             * tool layer is swapped in or out, the EnsembleToolManager restores
+             * or minimizes the viewer and, in turn, the viewer's part listener
+             * sets this tool layer to be 'editable' or 'not editable',
+             * respectively. This method intentionally ignores this second case
+             * as the view is already automatically minimized or restored.
+             * 
+             * In the third case, the user changes the editable state via the
+             * legend pop-up menu (right-clicking on a legend). This class
+             * currently listens for a right-click mouse event and sets a flag.
+             * If the flag is true then the ensemble tool view is restored. If
+             * the flag is false then the view is minimized.
+             * 
+             * In the fourth case, the user has opened another editable tool
+             * layer which will make this layer 'not editable'. This method will
+             * then minimize the view.
+             * 
+             * The "viewer state change" is run in an asynchronous Job due to a
+             * bug in Eclipse. If this is not done this way a user's request
+             * (e.g. to minimize the view) can cause a race condition between
+             * manually and programmatically setting the state. The problem is
+             * when the part listener is told of the view becoming hidden before
+             * the ViewPart view state is actually set to minimized.
+             */
+            if ((userRequestedEditableToggleViaLegend == true)
+                    || (userRequestedNewEditableTool == true)) {
+                if (editable.isEditable() == false) {
+                    SetViewerStateJob ccj = new SetViewerStateJob(
+                            "Minimize Tool View");
+                    ccj.setViewerWindowState(ViewerWindowState.MINIMIZED);
+                    ccj.setPriority(Job.SHORT);
+                    ccj.schedule();
+                } else {
+                    SetViewerStateJob ccj = new SetViewerStateJob(
+                            "Restore Tool View");
+                    ccj.setViewerWindowState(ViewerWindowState.SHOW_WITHOUT_FOCUS);
+                    ccj.setPriority(Job.SHORT);
+                    ccj.schedule();
+                }
+            }
+            /*
+             * This condition handles when the ensemble tool layer is not
+             * editable and therefore would not be able to listen for the
+             * right-click mouse event so would not be able to set the
+             * respective flag.
+             * 
+             * Don't change the view state if it has already been done.
+             */
+            else if (viewStateAlreadyModified == false) {
+                if (editable.isEditable() == true) {
+                    SetViewerStateJob ccj = new SetViewerStateJob(
+                            "Restore Tool View");
+                    ccj.setViewerWindowState(ViewerWindowState.SHOW_WITHOUT_FOCUS);
+                    ccj.setPriority(Job.SHORT);
+                    ccj.schedule();
+                } else {
+                    SetViewerStateJob ccj = new SetViewerStateJob(
+                            "Minimize Tool View");
+                    ccj.setViewerWindowState(ViewerWindowState.MINIMIZED);
+                    ccj.setPriority(Job.SHORT);
+                    ccj.schedule();
+                }
             }
         }
         issueRefresh();
@@ -385,7 +470,14 @@ public class EnsembleToolLayer extends
 
     @Override
     public boolean handleMouseDown(int x, int y, int mouseButton) {
-        // TODO
+        if (mouseButton == 3) {
+            /*
+             * TODO: need a better solution to know of the user has requested an
+             * action from right-clicking on the the legend.
+             */
+            userRequestedEditableToggleViaLegend = true;
+        }
+
         return false;
     }
 
@@ -711,6 +803,7 @@ public class EnsembleToolLayer extends
                     public void run() {
                         EnsembleToolManager.getInstance().setViewerWindowState(
                                 state);
+                        clearEditableToggleFlags();
                     }
                 });
             }
@@ -730,6 +823,20 @@ public class EnsembleToolLayer extends
             isEditable = getCapability(EditableCapability.class).isEditable();
         }
         return isEditable;
+    }
+
+    public void setEditabilityChangeInProcess() {
+        userRequestedNewEditableTool = true;
+    }
+
+    public void clearEditableToggleFlags() {
+        userRequestedEditableToggleViaLegend = false;
+        userRequestedNewEditableTool = false;
+        viewStateAlreadyModified = false;
+    }
+
+    public void setViewStateAlreadyModified() {
+        viewStateAlreadyModified = true;
     }
 
 }
