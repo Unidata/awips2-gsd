@@ -145,4 +145,12 @@ public class Utilities {
 
     }
 
+    public static RGB desaturate(RGB c) {
+
+        float[] hsb = c.getHSB();
+        hsb[1] = 0.15f;
+        RGB nc = new RGB(hsb[0], hsb[1], hsb[2]);
+        return nc;
+    }
+
 }

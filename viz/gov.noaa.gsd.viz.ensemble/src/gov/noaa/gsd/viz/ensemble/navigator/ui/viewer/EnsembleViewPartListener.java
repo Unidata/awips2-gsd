@@ -31,8 +31,6 @@ import com.raytheon.uf.viz.core.VizApp;
  */
 public class EnsembleViewPartListener implements IPartListener2 {
 
-    public static boolean isHidden = false;
-
     private EnsembleToolViewer ensembleToolViewer = null;
 
     public EnsembleViewPartListener(EnsembleToolViewer fsv) {
@@ -42,47 +40,52 @@ public class EnsembleViewPartListener implements IPartListener2 {
     @Override
     public void partActivated(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            EnsembleToolManager.getInstance().setEditable(true);
+            // TODO
         }
     }
 
     @Override
     public void partDeactivated(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            VizApp.runAsync(new Runnable() {
-                public void run() {
-                    try {
-                        Thread.sleep(10);
-                    } catch (InterruptedException e) {
-                        // ignore
-                    }
-                    if (isHidden) {
-                        EnsembleToolManager.getInstance().setEditable(false);
-                    }
-                }
-            });
+            // TODO
         }
     }
 
+    /*
+     * (non-Javadoc)
+     * 
+     * @see org.eclipse.ui.IPartListener2#partHidden(org.eclipse.ui.
+     * IWorkbenchPartReference)
+     * 
+     * Whenever the ViewPart becomes hidden, then turn off tool layer
+     * editability.
+     */
     @Override
     public void partHidden(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            isHidden = true;
+            EnsembleToolManager.getInstance().setEditable(false);
         }
     }
 
+    /*
+     * (non-Javadoc)
+     * 
+     * @see org.eclipse.ui.IPartListener2#partVisible(org.eclipse.ui.
+     * IWorkbenchPartReference)
+     * 
+     * Whenever the ViewPart becomes visible, then turn on tool layer
+     * editability.
+     */
     @Override
     public void partVisible(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            isHidden = false;
+            EnsembleToolManager.getInstance().setEditable(true);
         }
     }
 
     @Override
     public void partClosed(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-
-            isHidden = false;
 
             VizApp.runAsync(new Runnable() {
                 public void run() {

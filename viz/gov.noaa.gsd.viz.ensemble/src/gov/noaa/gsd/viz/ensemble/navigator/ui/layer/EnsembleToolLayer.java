@@ -17,6 +17,7 @@ import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.NavigatorResourceList;
 import gov.noaa.gsd.viz.ensemble.display.control.EnsembleResourceManager;
 import gov.noaa.gsd.viz.ensemble.display.control.load.GeneratedDataLoader;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.ViewerWindowState;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,6 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jface.viewers.TreePath;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.ui.IEditorPart;
@@ -36,6 +41,7 @@ import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.common.time.DataTime;
 import com.raytheon.uf.viz.core.IExtent;
 import com.raytheon.uf.viz.core.IGraphicsTarget;
+import com.raytheon.uf.viz.core.VizApp;
 import com.raytheon.uf.viz.core.drawables.AbstractDescriptor;
 import com.raytheon.uf.viz.core.drawables.IDescriptor;
 import com.raytheon.uf.viz.core.drawables.IDescriptor.IFrameChangedListener;
@@ -58,6 +64,7 @@ import com.raytheon.uf.viz.core.rsc.tools.GenericToolsResourceData;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.ui.EditorUtil;
 import com.raytheon.viz.ui.editor.AbstractEditor;
+import com.raytheon.viz.ui.input.EditableManager;
 import com.vividsolutions.jts.geom.Coordinate;
 
 /**
@@ -289,18 +296,39 @@ public class EnsembleToolLayer extends
 
     }
 
+    /*
+     * (non-Javadoc)
+     * 
+     * @see
+     * com.raytheon.uf.viz.core.rsc.IResourceDataChanged#resourceChanged(com
+     * .raytheon.uf.viz.core.rsc.IResourceDataChanged.ChangeType,
+     * java.lang.Object)
+     * 
+     * If this tool layer has had its editability turned off, then minimimize
+     * the view. If the editability is turned on, then restore the view.
+     * 
+     * The "viewer state change" is run in an asynchronous Job due to a bug in
+     * Eclipse. If this is not done this way a user's request (e.g. to minimize
+     * the view) can cause a race condition between manually and
+     * programmatically setting the state.
+     */
     @Override
     public void resourceChanged(ChangeType type, Object object) {
-        if (type == ChangeType.DATA_REMOVE) {
-            // TODO
-        }
-        if (type == ChangeType.CAPABILITY) {
-            Class<?> ct = object.getClass();
-            // TODO
-
-            if (getCapability(EditableCapability.class).getClass()
-                    .isAssignableFrom(ct)) {
-                // TODO
+        if (type == ChangeType.CAPABILITY
+                && object instanceof EditableCapability) {
+            EditableCapability editable = (EditableCapability) object;
+            if (editable.isEditable() == false) {
+                SetViewerStateJob ccj = new SetViewerStateJob(
+                        "Minimize Tool View");
+                ccj.setViewerWindowState(ViewerWindowState.MINIMIZED);
+                ccj.setPriority(Job.SHORT);
+                ccj.schedule();
+            } else {
+                SetViewerStateJob ccj = new SetViewerStateJob(
+                        "Restore Tool View");
+                ccj.setViewerWindowState(ViewerWindowState.SHOW_WITHOUT_FOCUS);
+                ccj.setPriority(Job.SHORT);
+                ccj.schedule();
             }
         }
         issueRefresh();
@@ -616,7 +644,7 @@ public class EnsembleToolLayer extends
     }
 
     protected void setEditable(boolean makeEditable) {
-        getCapability(EditableCapability.class).setEditable(makeEditable);
+        EditableManager.makeEditable(this, makeEditable);
     }
 
     @Override
@@ -651,6 +679,57 @@ public class EnsembleToolLayer extends
     @Override
     public ResourceOrder getResourceOrder() {
         return ResourceOrder.HIGHEST;
+    }
+
+    /*
+     * This Job allows the caller to set the viewer state (minimized, restored,
+     * etc) asynchronously.
+     */
+    private class SetViewerStateJob extends Job {
+
+        public SetViewerStateJob(String name) {
+            super(name);
+        }
+
+        private ViewerWindowState state = ViewerWindowState.UNDEFINED;
+
+        private void setViewerWindowState(ViewerWindowState s) {
+            state = s;
+        }
+
+        @Override
+        protected IStatus run(IProgressMonitor monitor) {
+            IStatus status = null;
+
+            if (state == ViewerWindowState.UNDEFINED) {
+                status = Status.CANCEL_STATUS;
+            } else {
+                status = Status.OK_STATUS;
+                VizApp.runAsync(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        EnsembleToolManager.getInstance().setViewerWindowState(
+                                state);
+                    }
+                });
+            }
+
+            return status;
+        }
+    }
+
+    /*
+     * All ensemble tool classes shold make certain they check to see whether
+     * the tool layer is editable before interacting with the user.
+     */
+    public boolean isEditable() {
+
+        boolean isEditable = false;
+        if (!isDisposed) {
+            isEditable = getCapability(EditableCapability.class).isEditable();
+        }
+        return isEditable;
     }
 
 }

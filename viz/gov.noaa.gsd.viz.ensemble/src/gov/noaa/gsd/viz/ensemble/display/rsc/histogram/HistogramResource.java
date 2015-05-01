@@ -1,5 +1,7 @@
 package gov.noaa.gsd.viz.ensemble.display.rsc.histogram;
 
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolManager;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -497,7 +499,13 @@ public class HistogramResource<HistogramResoureData> extends
     protected void paintInternal(IGraphicsTarget target,
             PaintProperties paintProps) throws VizException {
 
-        if (sampleCoord == null) {
+        /*
+         * only show sampling if the ensemble tool is ready and the tool layer
+         * is editable
+         */
+        if ((sampleCoord == null)
+                || !(EnsembleToolManager.getInstance().isReady())
+                || !(EnsembleToolManager.getInstance().isEditable())) {
             return;
         }
 

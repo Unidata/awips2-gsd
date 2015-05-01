@@ -96,12 +96,7 @@ public class EnsembleGEFSColorChooser extends CaveJFACEDialog {
                 cd.setText("Choose GEFS lower color");
                 RGB result = cd.open();
                 if (result != null) {
-                    Color c = SWTResourceManager.getColor(result);
-                    RGB rgb = c.getRGB();
-                    float[] hsb = rgb.getHSB();
-                    hsb[1] = 1.0f;
-                    RGB nrgb = new RGB(hsb[0], hsb[1], hsb[2]);
-                    Color nc = SWTResourceManager.getColor(nrgb);
+                    Color nc = SWTResourceManager.getColor(result);
                     ChosenGEFSColors.getInstance().setColor(nc);
                     label_color_GEFS.setForeground(nc);
                     applyGradientBG(label_color_GEFS);
@@ -114,25 +109,24 @@ public class EnsembleGEFSColorChooser extends CaveJFACEDialog {
 
     }
 
-    private static Image oldImage = null;
+    // private static Image oldImage = null;
 
     public static void applyGradientBG(Composite c) {
 
         Rectangle rect = c.getClientArea();
-        Image newImage = new Image(c.getDisplay(), rect.width, rect.height);
-        GC gc = new GC(newImage);
-        gc.setBackground(SWTResourceManager.WHITE);
-        gc.fillRectangle(0, 0, rect.width, rect.height);
+        Image image = new Image(c.getDisplay(), rect.width, rect.height);
+        GC gc = new GC(image);
         gc.setForeground(c.getForeground());
         gc.setBackground(c.getBackground());
         gc.fillGradientRectangle(0, 0, rect.width, rect.height, false);
-        c.setBackgroundImage(newImage);
+        c.setBackgroundImage(image);
         gc.dispose();
+        image.dispose();
 
-        if (oldImage != null) {
-            oldImage.dispose();
-            oldImage = newImage;
-        }
+        // // if (oldImage != null) {
+        // // oldImage.dispose();
+        // // oldImage = newImage;
+        // }
     }
 
     /**
