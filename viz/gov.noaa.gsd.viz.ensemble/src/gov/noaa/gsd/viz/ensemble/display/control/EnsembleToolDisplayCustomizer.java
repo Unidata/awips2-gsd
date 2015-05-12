@@ -3,6 +3,7 @@ package gov.noaa.gsd.viz.ensemble.display.control;
 import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResource;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolManager;
 
 import java.util.ArrayList;
@@ -22,6 +23,7 @@ import com.raytheon.uf.viz.core.rsc.IInitListener;
 import com.raytheon.uf.viz.core.rsc.ResourceList;
 import com.raytheon.uf.viz.core.rsc.ResourceList.AddListener;
 import com.raytheon.uf.viz.core.rsc.ResourceList.RemoveListener;
+import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
 import com.raytheon.viz.grid.rsc.general.GridResource;
@@ -68,7 +70,6 @@ public class EnsembleToolDisplayCustomizer implements
     @Override
     public void customizeDisplay(IRenderableDisplay display) {
 
-        // TODO: if (EnsembleToolManager.getInstance().isReady()) {
         boolean add = true;
         for (EnsembleToolRscLoadListener listener : listeners) {
             if (display == listener.getDisplay()) {
@@ -89,7 +90,6 @@ public class EnsembleToolDisplayCustomizer implements
     @Override
     public void uncustomizeDisplay(IRenderableDisplay display) {
 
-        // TODO: if (EnsembleToolManager.getInstance().isReady()) {
         EnsembleToolRscLoadListener toRemove = null;
         for (EnsembleToolRscLoadListener listener : listeners) {
             if (listener.getDisplay() == display) {
@@ -178,6 +178,27 @@ public class EnsembleToolDisplayCustomizer implements
          */
         @Override
         public void notifyAdd(ResourcePair rp) throws VizException {
+            /**
+             * TODO: We need to find a way to listen for user actions that will
+             * effect the state of the ensemble tool. This solution may
+             * currently be the only way to know if the user has requested
+             * another editable resource to be turned on.
+             * 
+             * If the ensemble tool is ready and the ensemble tool layer in the
+             * active editor/display is editable then: If the user is loading
+             * another tool layer, that is not an EnsembleToolLayer, then tell
+             * the ensemble tool manager so it can manage the tool viewer state
+             * (minimized or restored).
+             */
+            if ((EnsembleToolManager.getInstance().isReady())
+                    && (EnsembleToolManager.getInstance().isEditable())) {
+                if ((rp.getResource().hasCapability(EditableCapability.class) == true)
+                        && (!(rp.getResource() instanceof EnsembleToolLayer))) {
+                    EnsembleToolManager.getInstance()
+                            .setEditableActionInProcess();
+                }
+
+            }
 
             /**
              * Ignore if this resource is not compatible with the ensemble tool
@@ -258,6 +279,17 @@ public class EnsembleToolDisplayCustomizer implements
         }
 
         private boolean isCompatibleResource(ResourcePair rp) {
+
+            /*
+             * If the ensemble tool is not ready or the ensemble tool layer in
+             * the active editor/display is not editable then all resources that
+             * are loading should be ignored.
+             */
+            if ((!EnsembleToolManager.getInstance().isReady())
+                    || (!EnsembleToolManager.getInstance().isEditable())) {
+                return false;
+            }
+
             AbstractVizResource<?, ?> resource = rp.getResource();
             if (resource == null) {
                 return false;

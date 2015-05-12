@@ -532,22 +532,25 @@ public class EnsembleToolManager extends AbstractTool implements
 
                     if (tmpActiveToolLayer != null) {
                         desc.getResourceList().add(tmpActiveToolLayer);
-                        // This is for a single resource that is referenced in
-                        // a four panel pane
+                        /*
+                         * This is for a single resource that is referenced in a
+                         * four panel pane.
+                         */
                         desc.getTimeMatcher().redoTimeMatching(desc);
                         setActiveToolLayer(tmpActiveToolLayer);
 
+                        /* listen for swap */
                         editor.addRenderableDisplayChangedListener(this);
                         editor.getSite().getPage()
                                 .addPartListener(editorListener);
 
-                        // this is the situation where there are no tool layers
-                        // yet associated
-                        // with the EnsembleToolManager. Let's add the newly
-                        // created tool layer
-                        // into the resource manager, so it will be there even
-                        // if no one loads
-                        // any resources into this editor.
+                        /*
+                         * this is the situation where there are no tool layers
+                         * yet associated with the EnsembleToolManager. Let's
+                         * add the newly created tool layer into the resource
+                         * manager, so it will be there even if no one loads any
+                         * resources into this editor.
+                         */
                         EnsembleResourceManager.getInstance()
                                 .registerToolLayer(editor);
 
@@ -557,9 +560,10 @@ public class EnsembleToolManager extends AbstractTool implements
                     }
                 }
 
-                // Assume getSelectedPanes() has already tried to locate the
-                // editor.
-                // Only do something when editor is found.
+                /*
+                 * Assume getSelectedPanes() has already tried to locate the
+                 * editor. Only do something when editor is found.
+                 */
                 if (editor != null) {
                     for (IDisplayPane pane : editor.getDisplayPanes()) {
                         pane.getDescriptor().getTimeMatcher()
@@ -818,13 +822,16 @@ public class EnsembleToolManager extends AbstractTool implements
      */
     public void close() {
 
-        // there is a situation where the view can already be closed when a
-        // user unloads the only (last remaining) tool layer and it closes
-        // the view programmatically. In this case the flag viewAlreadyClosed
-        // will be set and we will not need to prompt the user ... also, if
-        // there is nothing in the viewer then no need to prompt user with
-        // close dialog.
-
+        if ((!viewAlreadyClosed) && (isEmpty())) {
+            closeEnsembleTool();
+        }
+        /*
+         * There is a situation where the view can already be closed when a user
+         * unloads the only (last remaining) tool layer and it closes the view
+         * programmatically. In this case the flag viewAlreadyClosed will be set
+         * and we will not need to prompt the user ... also, if there is nothing
+         * in the viewer then no need to prompt user with close dialog.
+         */
         if ((!viewAlreadyClosed) && (!isEmpty())) {
 
             Shell shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow()
@@ -844,8 +851,10 @@ public class EnsembleToolManager extends AbstractTool implements
                 VizApp.runAsync(new Runnable() {
                     @Override
                     public void run() {
-                        // running async and sleeping will allow
-                        // EnsembleToolViewer.dispose to happen first
+                        /*
+                         * Running async and sleeping will allow
+                         * EnsembleToolViewer.dispose to happen first
+                         */
                         while (EnsembleToolViewer.isDisposing()) {
                             try {
                                 Thread.sleep(10);
@@ -858,11 +867,13 @@ public class EnsembleToolManager extends AbstractTool implements
                             if (ensembleToolViewer != null)
                                 isReady = true;
                         } catch (VizException e) {
-                            // TODO Auto-generated catch block. Please revise as
-                            // appropriate.
+                            /*
+                             * TODO Auto-generated catch block. Please revise as
+                             * appropriate.
+                             */
                             statusHandler.handle(Priority.PROBLEM,
                                     e.getLocalizedMessage(), e);
-                            return; // Whiskey Tango Foxtrot do we do here?
+                            return;
                         }
                         if (activeToolLayer != null) {
                             AbstractEditor e = findEditor(activeToolLayer);
@@ -942,6 +953,22 @@ public class EnsembleToolManager extends AbstractTool implements
 
         return activeToolLayer.isEditable();
 
+    }
+
+    /*
+     * Has the user requested an editable resource to be loaded? Then tell the
+     * active tool layer.
+     */
+    public void setEditableActionInProcess() {
+        activeToolLayer.setEditabilityChangeInProcess();
+    }
+
+    /*
+     * Did the part listener already handle the view state change based on
+     * editiable state?
+     */
+    public void setViewStateAlreadyModified() {
+        activeToolLayer.setViewStateAlreadyModified();
     }
 
     /*
