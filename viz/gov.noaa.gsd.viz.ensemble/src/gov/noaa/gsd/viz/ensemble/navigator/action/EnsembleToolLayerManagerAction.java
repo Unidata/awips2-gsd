@@ -1,6 +1,6 @@
 package gov.noaa.gsd.viz.ensemble.navigator.action;
 
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
@@ -32,7 +32,7 @@ public class EnsembleToolLayerManagerAction extends AbstractTool {
     @Override
     public Object execute(ExecutionEvent event) throws ExecutionException {
 
-        EnsembleToolManager.getInstance().execute(event);
+        EnsembleTool.getInstance().execute(event);
 
         return null;
 

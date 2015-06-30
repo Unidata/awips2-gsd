@@ -2,6 +2,9 @@ package gov.noaa.gsd.viz.ensemble.display.calculate;
 
 import java.util.Arrays;
 
+import javax.measure.unit.NonSI;
+import javax.measure.unit.Unit;
+
 /**
  * Value of Relative Frequency of an ensemble set. The range values for the
  * calculation, such as minimum, maximum... are in the GUI, should be passed in.
@@ -83,41 +86,79 @@ public class ERFCalculator extends EnsembleCalculator {
     public ERFCalculator(Range r) {
 
         // Set the Calculation flag
-        super(Calculation.RANGE);
+        super(Calculation.ENSEMBLE_RELATIVE_FREQUENCY);
+
+        resultUnit = NonSI.PERCENT;
 
         range = r;
 
-        double minValue = Double.MIN_VALUE;
-        double maxValue = Double.MAX_VALUE;
+        min = Double.MIN_VALUE;
+        max = Double.MAX_VALUE;
 
-        // Convert the range to the minimum and maximum.
-        if ((r.getRangeType() == RangeType.INNER_RANGE)
-                || (r.getRangeType() == RangeType.OUTER_RANGE)) {
-            minValue = r.getLowerRangeThreshold();
-            maxValue = r.getUpperRangeThreshold();
-        } else if (r.getRangeType() == RangeType.ABOVE_THRESHOLD) {
-            minValue = MAX_OR_MIN_NO_VALUE;
-            maxValue = r.getThreshold();
-        } else if (r.getRangeType() == RangeType.BELOW_THRESHOLD) {
-            minValue = r.getThreshold();
-            maxValue = MAX_OR_MIN_NO_VALUE;
+        // Convert the range to the minimum and maximum and process the
+        // condition for ERF
+        if ((range.getRangeType() == RangeType.INNER_RANGE)
+                || (range.getRangeType() == RangeType.OUTER_RANGE)) {
+            min = range.getLowerRangeThreshold();
+            max = range.getUpperRangeThreshold();
+
+            if (range.getRangeType() == RangeType.INNER_RANGE) {
+
+                setRangeDescription("ERF >" + min + " & <" + max);
+            } else {
+
+                setRangeDescription("ERF <" + min + " or >" + max);
+            }
+        } else if (range.getRangeType() == RangeType.ABOVE_THRESHOLD) {
+            min = MAX_OR_MIN_NO_VALUE;
+            max = range.getThreshold();
+            setRangeDescription("ERF >" + max);
+        } else if (range.getRangeType() == RangeType.BELOW_THRESHOLD) {
+            min = range.getThreshold();
+            max = MAX_OR_MIN_NO_VALUE;
+            setRangeDescription("ERF <" + min);
+        } else {
+            min = MAX_OR_MIN_NO_VALUE;
+            max = MAX_OR_MIN_NO_VALUE;
+            setRangeDescription("ERF Median ");
         }
 
-        min = minValue;
-        max = maxValue;
+    }
 
-        // Processing the condition for ERF
-        if (this.min == MAX_OR_MIN_NO_VALUE && this.max == MAX_OR_MIN_NO_VALUE) {
-            setRangeDescription("ERF Median ");
-        } else if (this.min != MAX_OR_MIN_NO_VALUE
-                && this.max == MAX_OR_MIN_NO_VALUE) {
-            setRangeDescription("ERF >" + this.min);
-        } else if (this.min == MAX_OR_MIN_NO_VALUE
-                && this.max != MAX_OR_MIN_NO_VALUE) {
-            setRangeDescription("ERF <" + this.max);
-        } else if (this.min != MAX_OR_MIN_NO_VALUE
-                && this.max != MAX_OR_MIN_NO_VALUE) {
-            setRangeDescription("ERF >" + this.min + " & <" + this.max);
+    /**
+     * The range unit is data display unit entering bu user. Do unit matching by
+     * converting range into the data unit if they are different.
+     */
+    public void matchUnit() {
+        min = Double.MIN_VALUE;
+        max = Double.MAX_VALUE;
+
+        // Convert the range to the minimum and maximum.
+        if ((range.getRangeType() == RangeType.INNER_RANGE)
+                || (range.getRangeType() == RangeType.OUTER_RANGE)) {
+            min = range.getLowerRangeThreshold();
+            max = range.getUpperRangeThreshold();
+
+        } else if (range.getRangeType() == RangeType.ABOVE_THRESHOLD) {
+            min = MAX_OR_MIN_NO_VALUE;
+            max = range.getThreshold();
+        } else if (range.getRangeType() == RangeType.BELOW_THRESHOLD) {
+            min = range.getThreshold();
+            max = MAX_OR_MIN_NO_VALUE;
+        } else {
+            min = MAX_OR_MIN_NO_VALUE;
+            max = MAX_OR_MIN_NO_VALUE;
+        }
+
+        if (dispUnit != null && dataUnit != null && !dispUnit.equals(dataUnit)) {
+
+            if (min != MAX_OR_MIN_NO_VALUE) {
+                min = dispUnit.getConverterTo(dataUnit).convert(min);
+            }
+            if (max != MAX_OR_MIN_NO_VALUE) {
+                max = dispUnit.getConverterTo(dataUnit).convert(max);
+            }
+
         }
     }
 
@@ -157,30 +198,35 @@ public class ERFCalculator extends EnsembleCalculator {
 
         // How many data match with the conditions?
         int matchedNum = 0;
-        float median = 0;
-        if (this.min == MAX_OR_MIN_NO_VALUE && this.max == MAX_OR_MIN_NO_VALUE) {
-            median = getMedian(poitValues);
-        }
-        for (int k = 0; k < totalNum; k++) {
-            if (this.min == MAX_OR_MIN_NO_VALUE
-                    && this.max == MAX_OR_MIN_NO_VALUE
-                    && median == poitValues[k]) {
 
-                // Most close to mean
-                setRangeDescription("ERF Median ");
-            } else if (this.min != MAX_OR_MIN_NO_VALUE
-                    && this.max == MAX_OR_MIN_NO_VALUE
-                    && poitValues[k] > this.min) {
+        /**
+         * The median case, current is not functioned. Need do more proccessing
+         * later, such as unit rematching at hiher level.
+         */
+        // jing float median = 0;
+        if (this.min == MAX_OR_MIN_NO_VALUE && this.max == MAX_OR_MIN_NO_VALUE) {
+            float median = getMedian(poitValues);
+            // Most close to mean
+            setRangeDescription("ERF Median ");
+            return median;
+        }
+
+        for (int k = 0; k < totalNum; k++) {
+            if (range.getRangeType() == RangeType.ABOVE_THRESHOLD
+                    && poitValues[k] > this.max) { // great or above case
                 matchedNum++;
-            } else if (this.min == MAX_OR_MIN_NO_VALUE
-                    && this.max != MAX_OR_MIN_NO_VALUE
-                    && poitValues[k] < this.max) {
+            } else if (range.getRangeType() == RangeType.BELOW_THRESHOLD
+                    && poitValues[k] < this.min) { // less or below case
                 matchedNum++;
-            } else if (this.min != MAX_OR_MIN_NO_VALUE
-                    && this.max != MAX_OR_MIN_NO_VALUE
-                    && poitValues[k] > this.min && poitValues[k] < this.max) {
+            } else if (range.getRangeType() == RangeType.INNER_RANGE
+                    && poitValues[k] >= this.min && poitValues[k] <= this.max) { // inter
                 matchedNum++;
+            } else if (range.getRangeType() == RangeType.OUTER_RANGE
+                    && (poitValues[k] < this.min || poitValues[k] > this.max)) { // outer
+                matchedNum++;
+
             }
+
         }
 
         // ERF of this point in %
@@ -211,4 +257,14 @@ public class ERFCalculator extends EnsembleCalculator {
 
     }
 
+    @Override
+    public String getName() {
+
+        StringBuilder cobbledName = new StringBuilder();
+        if (getCalculation() == Calculation.ENSEMBLE_RELATIVE_FREQUENCY) {
+            cobbledName.append(calculationType.getTitle()).append(" ")
+                    .append(getRangeDescription());
+        }
+        return cobbledName.toString();
+    }
 }

@@ -63,7 +63,7 @@
             allowMultiple="false"
             class="gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.EnsembleToolViewer"
             fastViewWidthRatio="0.26"
-            icon="icons/ensemble-tool-3.gif"
+            icon="icons/ensemble-tool-view-icon.gif"
             id="gov.noaa.gsd.viz.ensemble.tool.viewer"
             name="Ensemble Tool"
             restorable="false">

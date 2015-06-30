@@ -1,19 +1,19 @@
 package gov.noaa.gsd.viz.ensemble.display.rsc;
 
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
+import gov.noaa.gsd.viz.ensemble.display.calculate.ERFCalculator;
+import gov.noaa.gsd.viz.ensemble.display.calculate.EnsembleCalculator;
+import gov.noaa.gsd.viz.ensemble.util.Utilities;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import javax.measure.unit.Unit;
-
 import org.eclipse.swt.graphics.RGB;
 
+import com.raytheon.uf.common.dataplugin.PluginDataObject;
 import com.raytheon.uf.common.dataplugin.grid.GridRecord;
-import com.raytheon.uf.common.dataplugin.grid.dataset.DatasetInfo;
-import com.raytheon.uf.common.dataplugin.grid.dataset.DatasetInfoLookup;
 import com.raytheon.uf.common.dataplugin.grid.util.GridLevelTranslator;
 import com.raytheon.uf.common.geospatial.ReferencedCoordinate;
 import com.raytheon.uf.common.parameter.Parameter;
@@ -27,7 +27,6 @@ import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.map.IMapDescriptor;
 import com.raytheon.uf.viz.core.rsc.AbstractNameGenerator;
 import com.raytheon.uf.viz.core.rsc.AbstractResourceData;
-import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
 import com.raytheon.uf.viz.core.rsc.RenderingOrderFactory.ResourceOrder;
 import com.raytheon.uf.viz.core.rsc.capabilities.ColorableCapability;
@@ -35,8 +34,8 @@ import com.raytheon.uf.viz.core.rsc.capabilities.DisplayTypeCapability;
 import com.raytheon.viz.grid.rsc.GridNameGenerator;
 import com.raytheon.viz.grid.rsc.GridNameGenerator.IGridNameResource;
 import com.raytheon.viz.grid.rsc.GridNameGenerator.LegendParameters;
-import com.raytheon.viz.grid.rsc.GridResourceData;
-import com.raytheon.viz.grid.rsc.general.GeneralGridData;
+import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
+import com.raytheon.uf.viz.core.grid.rsc.data.GeneralGridData;
 import com.raytheon.viz.grid.rsc.general.GridResource;
 import com.raytheon.viz.grid.xml.FieldDisplayTypesFactory;
 
@@ -60,10 +59,12 @@ import com.raytheon.viz.grid.xml.FieldDisplayTypesFactory;
  * Jan 2014        5056     jing    Initial creation
  * 
  * </pre>
+ * @param <T>
  */
-@SuppressWarnings({ "hiding", "rawtypes", "unchecked" })
-public class GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData>
-        extends GridResource implements IGridNameResource {
+@SuppressWarnings("rawtypes")
+public class GeneratedEnsembleGridResource extends
+        AbstractGridResource<GeneratedEnsembleGridResourceData> implements
+        IGridNameResource {
 
     private Parameter parameter = null;
 
@@ -78,9 +79,9 @@ public class GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData>
     protected Random rand;
 
     /**
-     * Calculate method like mean
+     * Calculate loaded ensemble data to generate new data, such as mean.
      */
-    // protected EnsembleCalculator calculator;
+    protected EnsembleCalculator calculator = null;
 
     /**
      * The descriptor for plan view;
@@ -97,11 +98,14 @@ public class GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData>
      */
     public GeneratedEnsembleGridResource(
             GeneratedEnsembleGridResourceData resourceData,
-            LoadProperties loadProperties, IMapDescriptor mapDescriptor) {
+            LoadProperties loadProperties, IMapDescriptor mapDescriptor,
+            EnsembleCalculator c) {
 
-        super((GridResourceData) resourceData, loadProperties);
+        super(resourceData, loadProperties);
+
         this.setDescriptor(mapDescriptor);
 
+        calculator = c;
         // pass name generator. not works, May implement it later
         if (((AbstractResourceData) resourceData).getNameGenerator() == null) {
             ((AbstractResourceData) resourceData)
@@ -113,9 +117,7 @@ public class GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData>
         // Set color
         ColorableCapability colorable = (ColorableCapability) this
                 .getCapability(ColorableCapability.class);
-        rand = new Random();
-        RGB color = new RGB(rand.nextInt(206) + 50, rand.nextInt(206) + 50,
-                rand.nextInt(206) + 50);
+        RGB color = Utilities.getRandomNiceContrastColor();
         colorable.setColor(color);
 
     };
@@ -129,49 +131,15 @@ public class GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData>
      */
     public GeneratedEnsembleGridResource(
             GeneratedEnsembleGridResourceData resourceData,
-            LoadProperties loadProperties) {
+            LoadProperties loadProperties, EnsembleCalculator c) {
 
-        super((GridResourceData) resourceData, loadProperties);
+        super(resourceData, loadProperties);
 
+        calculator = c;
         ColorableCapability colorable = (ColorableCapability) this
                 .getCapability(ColorableCapability.class);
-        RGB color = getRandomColor();
+        RGB color = Utilities.getRandomNiceContrastColor();
         colorable.setColor(color);
-
-    }
-
-    /**
-     * generate a random color
-     * 
-     * @return
-     */
-    private RGB getRandomColor() {
-
-        rand = new Random();
-        final int lowerFilter = 80;
-        final int upperFilter = 200;
-        final int skewToBrightness = 256 - upperFilter;
-
-        int r = rand.nextInt(upperFilter);
-        if (r < lowerFilter) {
-            r = lowerFilter;
-        }
-
-        int g = rand.nextInt(upperFilter);
-        if (g < lowerFilter) {
-            g = lowerFilter;
-        }
-
-        int b = rand.nextInt(upperFilter);
-        if (b < lowerFilter) {
-            b = lowerFilter;
-        }
-
-        r += skewToBrightness;
-        g += skewToBrightness;
-        b += skewToBrightness;
-
-        return new RGB(r, g, b);
 
     }
 
@@ -206,55 +174,8 @@ public class GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData>
      */
     @Override
     public LegendParameters getLegendParameters() {
-        GridRecord record = getCurrentGridRecord();
-        if (record == null) {
-            record = getAnyGridRecord();
-            if (record == null) {
-                return null;
-            }
-        }
-        LegendParameters legendParams = new LegendParameters();
-        DatasetInfo info = DatasetInfoLookup.getInstance().getInfo(
-                record.getDatasetId());
-        if (info == null) {
-            legendParams.model = record.getDatasetId();
-        } else {
-            legendParams.model = info.getTitle();
-        }
-        legendParams.level = record.getLevel();
-        legendParams.parameter = record.getParameter().getName();
-        legendParams.ensembleId = record.getEnsembleId();
-        legendParams.dataTime = descriptor.getFramesInfo().getTimeForResource(
-                this);
 
-        if (stylePreferences != null) {
-            legendParams.unit = stylePreferences.getDisplayUnitLabel();
-        }
-
-        if (legendParams.unit == null || legendParams.unit.isEmpty()) {
-            if (record.getParameter().getUnit().equals(Unit.ONE)) {
-                legendParams.unit = "";
-            } else {
-                legendParams.unit = record.getParameter().getUnitString();
-            }
-        }
-        List<DisplayType> displayTypes = FieldDisplayTypesFactory.getInstance()
-                .getDisplayTypes(record.getParameter().getAbbreviation());
-        DisplayType displayType = getDisplayType();
-        if (displayTypes != null && !displayTypes.isEmpty()
-                && displayTypes.get(0).equals(displayType)) {
-            // The default type does not display in the legend
-            legendParams.type = "";
-        } else if (displayType == DisplayType.STREAMLINE) {
-            legendParams.type = "Streamlines";
-        } else if (displayType == DisplayType.BARB) {
-            legendParams.type = "Wind Barbs";
-        } else if (displayType == DisplayType.ARROW) {
-            legendParams.type = "Arrows";
-        } else if (displayType == DisplayType.IMAGE) {
-            legendParams.type = "Img";
-        }
-        return legendParams;
+        return null;
     }
 
     /*
@@ -264,18 +185,24 @@ public class GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData>
      */
     @Override
     public String getName() {
+        String rscName = null;
         if (resourceData == null) {
-            return super.getName();
-        }
-        AbstractNameGenerator generator = resourceData.getNameGenerator();
-        if (generator == null) {
+            rscName = super.getName();
+        } else {
+            AbstractNameGenerator generator = resourceData.getNameGenerator();
+            if (calculation == Calculation.ENSEMBLE_RELATIVE_FREQUENCY) {
+                rscName = calculator.getName();
+            } else if (generator == null) {
 
-            return (int) (randomRec.getLevel().getLevelonevalue())
-                    + randomRec.getLevel().getMasterLevel().getName() + " "
-                    + calculation.getTitle() + " " + parameter.getName();
-
+                rscName = (int) (randomRec.getLevel().getLevelonevalue())
+                        + randomRec.getLevel().getMasterLevel().getName() + " "
+                        + calculation.getTitle() + " " + parameter.getName();
+            } else {
+                rscName = calculation.getTitle() + " "
+                        + generator.getName(this);
+            }
         }
-        return calculation.getTitle() + " " + generator.getName(this);
+        return rscName;
     }
 
     /**
@@ -332,6 +259,15 @@ public class GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData>
         if (randomRec != null) {
             parameter = randomRec.getParameter();
             this.randomRec = randomRec;
+        }
+
+        /**
+         * Reset the parameter for ERF
+         */
+        if (calculator instanceof ERFCalculator) {
+            parameter.setAbbreviation("ERF");
+            parameter.setName("ERF");
+            parameter.setUnitString("%");
         }
     }
 
@@ -392,6 +328,12 @@ public class GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData>
     @Override
     public ResourceOrder getResourceOrder() {
         return ResourceOrder.HIGHEST;
+    }
+
+    @Override
+    public List<GeneralGridData> getData(DataTime time,
+            List<PluginDataObject> pdos) throws VizException {
+        return null;
     }
 
 }

@@ -1,9 +1,11 @@
 package gov.noaa.gsd.viz.ensemble.display.rsc;
 
+import gov.noaa.gsd.viz.ensemble.display.calculate.ERFCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.EnsembleCalculator;
 import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.Utilities;
 import gov.noaa.gsd.viz.ensemble.display.control.EnsembleResourceManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,21 +15,21 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.measure.unit.Unit;
+
 import com.raytheon.uf.common.dataquery.requests.RequestConstraint;
 import com.raytheon.uf.common.time.DataTime;
 import com.raytheon.uf.viz.core.drawables.IDescriptor;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
+import com.raytheon.uf.viz.core.grid.rsc.data.GeneralGridData;
 import com.raytheon.uf.viz.core.map.MapDescriptor;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
 import com.raytheon.uf.viz.core.rsc.ResourceProperties;
 import com.raytheon.viz.grid.rsc.GridResourceData;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
-import com.raytheon.viz.grid.rsc.general.GeneralGridData;
 import com.raytheon.viz.grid.rsc.general.GridResource;
-import com.raytheon.viz.ui.EditorUtil;
-import com.raytheon.viz.ui.editor.AbstractEditor;
 
 /**
  * Construct the GeneratedEnsembleGridResource and provide data for it by
@@ -79,7 +81,7 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
      * List<GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData>>
      * resources.
      */
-    protected GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData> resource = null;
+    protected GeneratedEnsembleGridResource resource = null;
 
     // like "500MB", "" is not available or don't care.
     protected String level = "";
@@ -90,6 +92,8 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
     // create an empty metadata map
     protected HashMap<String, RequestConstraint> metadataMap = new HashMap<String, RequestConstraint>();
 
+    private EnsembleToolLayer toolLayer = null;
+
     public GeneratedEnsembleGridResourceData() {
         super();
 
@@ -97,8 +101,8 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
         setRetrieveData(false);
     }
 
-    public GeneratedEnsembleGridResourceData(EnsembleCalculator calculator,
-            IDescriptor md) {
+    public GeneratedEnsembleGridResourceData(EnsembleToolLayer tl,
+            EnsembleCalculator calculator, IDescriptor md) {
 
         super();
         this.mapDescriptor = md;
@@ -107,21 +111,38 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
         // No time request in time matching
         this.setRequeryNecessaryOnTimeMatch(false);
         this.setMetadataMap(metadataMap);
+        toolLayer = tl;
     }
 
-    public GeneratedEnsembleGridResourceData(EnsembleCalculator calculator,
-            IDescriptor md, String level, String unit) {
+    public GeneratedEnsembleGridResourceData(EnsembleToolLayer tl,
+            EnsembleCalculator calculator, IDescriptor md, String level,
+            String unit) {
 
         super();
         this.mapDescriptor = md;
         this.calculator = calculator;
         this.level = level;
         this.unit = unit;
+
         // the interface to disable the request
         this.setRetrieveData(false);
         // No time request in time matching
         this.setRequeryNecessaryOnTimeMatch(false);
         this.setMetadataMap(metadataMap);
+        toolLayer = tl;
+    }
+
+    protected GeneratedEnsembleGridResourceData(
+            GeneratedEnsembleGridResourceData resourceData) {
+        this.mapDescriptor = resourceData.mapDescriptor;
+        this.calculator = resourceData.calculator;
+        this.level = resourceData.level;
+        this.unit = resourceData.unit;
+        this.setRetrieveData(resourceData.retrieveData);
+        this.setRequeryNecessaryOnTimeMatch(resourceData.isRequeryNecessaryOnTimeMatch);
+        this.setMetadataMap(resourceData.metadataMap);
+        this.toolLayer = resourceData.toolLayer;
+
     }
 
     /**
@@ -133,8 +154,9 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
 
         AbstractVizResource<?, ?> rsc = null;
 
-        rsc = new GeneratedEnsembleGridResource<Object>(this, loadProperties);
-        resource = (GeneratedEnsembleGridResource<GeneratedEnsembleGridResourceData>) rsc;
+        rsc = new GeneratedEnsembleGridResource(this, loadProperties,
+                calculator);
+        resource = (GeneratedEnsembleGridResource) rsc;
 
         resource.setCalculation(calculator.getCalculation());
 
@@ -146,12 +168,8 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
         pair.setProperties(rp);
         descriptor.getResourceList().add(pair);
 
-        // TODO: Is this the correct way to associate the editor with the
-        // resource?
-        AbstractEditor editor = EditorUtil
-                .getActiveEditorAs(AbstractEditor.class);
         EnsembleResourceManager.getInstance().registerGenerated(
-                (AbstractVizResource<?, ?>) resource, editor);
+                (AbstractVizResource<?, ?>) resource);
 
         return rsc;
     }
@@ -161,10 +179,7 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
      * 
      * @return
      */
-    @SuppressWarnings("unchecked")
     public Map<DataTime, List<GeneralGridData>> calculate() {
-
-        // searchDataHolders();
 
         // Do calculation with members of all models by looping
         Map<DataTime, List<GeneralGridData>> dataMap = new ConcurrentHashMap<DataTime, List<GeneralGridData>>();
@@ -177,6 +192,17 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
             List<List<GeneralGridData>> inputData = getAllData(time);
             if (inputData == null || inputData.size() < 1) {
                 continue;
+            }
+
+            /**
+             * Do units matching for ERF calculator.
+             */
+            if (calculator != null && unit != null && !unit.isEmpty()
+                    && calculator instanceof ERFCalculator) {
+                calculator.setDataUnit(inputData.get(0).get(0).getDataUnit());
+                calculator.setDispUnit(Unit.valueOf(unit));
+                ((ERFCalculator) (this.calculator)).matchUnit();
+
             }
 
             List<GeneralGridData> grids = calculator.calculate(inputData);
@@ -192,8 +218,9 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
     }
 
     /**
-     * Search ensemble members resources grouped by model used for test
+     * TODO: Search ensemble members resources grouped by model used for test
      */
+    @SuppressWarnings("unused")
     private void searchDataHolders() {
         // search models of ensemble
         List<String> models = Utilities.getEnsembleModels();
@@ -218,12 +245,15 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
             }
         }
 
-        // Add loaded product(s) which are not ensemble product(s)
-        // but same level and type of data(same unit) into the dataHolders
+        /*
+         * Add loaded product(s) which are not ensemble product(s) but same
+         * level and type of data(same unit) into the dataHolders
+         */
 
-        // We can load same model with different run time to treat it as
-        // an ensemble products. Add the members in the dataHolders too.
-
+        /*
+         * We can load same model with different run time to treat it as an
+         * ensemble products. Add the members in the dataHolders too.
+         */
     }
 
     /**
@@ -342,7 +372,7 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
     }
 
     /**
-     * Update by checking on the loaded ensemble product resources Re-calculate
+     * Update by checking on the loaded ensemble product resources. Re-calculate
      * with the ensemble calculator to generate a new product(like mean), update
      * the dataMap in the AbstractGridResource Is it possible to update the
      * dataMap? The AbstractGridResource methods can be over written?
@@ -352,33 +382,25 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
      */
     public void update() throws VizException {
 
-        // TODO: Is this the correct way to associate the editor with the
-        // resource?
-        AbstractEditor editor = EditorUtil
-                .getActiveEditorAs(AbstractEditor.class);
-
         if (level != null && !level.equals("") && unit != null
                 && !unit.equals("")) {
             // Same level and unit case
             dataHolders = EnsembleResourceManager
                     .getInstance()
-                    .getResourceList(editor)
+                    .getResourceList(toolLayer)
                     .getUserLoadedRscs((IDescriptor) new MapDescriptor(), true,
                             level, unit);
-            // dataHolders =
-            // ResourceManager.getInstance().getResourceList(editor).getCalculationLoadedRscs((IDescriptor)new
-            // MapDescriptor(), true);
         } else if (unit != null && !unit.equals("")) {
             // same unit whatever level case
             dataHolders = EnsembleResourceManager
                     .getInstance()
-                    .getResourceList(editor)
+                    .getResourceList(toolLayer)
                     .getUserLoadedRscs((IDescriptor) new MapDescriptor(), true,
                             unit);
         } else {
             // whatever level or unit,for test only
             dataHolders = EnsembleResourceManager.getInstance()
-                    .getResourceList(editor)
+                    .getResourceList(toolLayer)
                     .getUserLoadedRscs((IDescriptor) new MapDescriptor(), true);
         }
 

@@ -6,7 +6,6 @@ import gov.noaa.gsd.viz.ensemble.util.Utilities;
 import com.raytheon.uf.common.style.level.SingleLevel;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.d2d.xy.adapters.timeseries.GridTimeSeriesAdapter;
-import com.raytheon.uf.viz.xy.timeseries.adapter.AbstractTimeSeriesAdapter;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.vividsolutions.jts.geom.Coordinate;
 
@@ -84,8 +83,6 @@ public class TimeSeriesResourceHolder extends GenericResourceHolder {
             if (!isHeight) {
                 SingleLevel level = currRsc.getAdapter().getLevel();
                 levelKey = (int) level.getValue() + level.getTypeString();
-            } else {
-                levelKey = "";
             }
         } else {
             levelKey = "";
@@ -124,20 +121,15 @@ public class TimeSeriesResourceHolder extends GenericResourceHolder {
 
         if (currRsc.getAdapter() instanceof GridTimeSeriesAdapter) {
             try {
-                AbstractTimeSeriesAdapter<?> adapter = currRsc.getAdapter();
-                if ((((GridTimeSeriesAdapter) adapter) != null)
-                        && ((((GridTimeSeriesAdapter) adapter)
-                                .getArbitraryRecord()) != null)
-                        && ((((GridTimeSeriesAdapter) adapter)
-                                .getArbitraryRecord().getInfo()) != null)) {
+                GridTimeSeriesAdapter adapter = (GridTimeSeriesAdapter) currRsc
+                        .getAdapter();
+                if (((adapter) != null)
+                        && (((adapter).getArbitraryRecord()) != null)
+                        && (((adapter).getArbitraryRecord().getInfo()) != null)) {
 
-                    if (((GridTimeSeriesAdapter) adapter)
-                            .getArbitraryRecord().getInfo()
-                            .getEnsembleId() != null) {
-                        ensId = ((GridTimeSeriesAdapter) adapter)
-                                .getArbitraryRecord().getInfo()
-                                .getEnsembleId();
-                    } else {
+                    ensId = adapter.getArbitraryRecord().getInfo()
+                            .getEnsembleId();
+                    if (ensId == null) {
                         ensId = currRsc.getName();
                     }
 
@@ -217,6 +209,11 @@ public class TimeSeriesResourceHolder extends GenericResourceHolder {
     @Override
     public int hashCode() {
         return getUniqueName().hashCode();
+    }
+
+    @Override
+    public boolean requiresLoadCheck() {
+        return false;
     }
 
 }

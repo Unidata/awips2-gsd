@@ -24,8 +24,7 @@ public enum Calculation {
     COMBINED_ENS_REL_FREQ("Combined ERF"), //
     DIFFERENCE("Diff"), //
     ENSEMBLE_RELATIVE_FREQUENCY("Ens Rel Freq"), //
-    HISTOGRAM_SAMPLING("Sampling"), //
-    HISTOGRAM_TEXT("Histogram Sampling"), //
+    HISTOGRAM_SAMPLING("Histogram Sampling"), //
     MAX("Max"), //
     MEAN("Mean"), //
     MIN("Min"), //
@@ -35,7 +34,8 @@ public enum Calculation {
     RANGE("Range"), //
     SUMMATION("Sum"), //
     STANDARD_DEVIATION("Std dev"), //
-    TRIPLET_ENS_REL_FREQ("Triplet ERF"); //
+    TRIPLET_ENS_REL_FREQ("Triplet ERF"), //
+    VALUE_SAMPLING("Sampling"); //
 
     private String title;
 

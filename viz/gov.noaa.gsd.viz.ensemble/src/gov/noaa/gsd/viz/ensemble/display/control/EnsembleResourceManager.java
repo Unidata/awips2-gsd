@@ -3,22 +3,36 @@ package gov.noaa.gsd.viz.ensemble.display.control;
 import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.NavigatorResourceList;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.jobs.Job;
+import org.eclipse.swt.graphics.RGB;
 
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
+import com.raytheon.uf.viz.core.IDisplayPaneContainer;
 import com.raytheon.uf.viz.core.drawables.IDescriptor;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.core.rsc.IDisposeListener;
+import com.raytheon.uf.viz.core.rsc.IRefreshListener;
 import com.raytheon.uf.viz.core.rsc.ResourceList;
+import com.raytheon.uf.viz.core.rsc.capabilities.ColorableCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.DensityCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.DisplayTypeCapability;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
-import com.raytheon.viz.grid.rsc.general.AbstractGridResource;
+import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
 import com.raytheon.viz.ui.editor.AbstractEditor;
 
 /**
@@ -55,20 +69,52 @@ public class EnsembleResourceManager implements IDisposeListener {
      * The ensemble marked resource list holds the loaded and generated
      * resources and flags, is used by ensemble display, GUI and calculation.
      */
-    private ConcurrentHashMap<AbstractEditor, NavigatorResourceList> ensembleToolResourcesMap;
+    private ConcurrentHashMap<EnsembleToolLayer, NavigatorResourceList> ensembleToolResourcesMap;
 
-    /**
+    private ArrayBlockingQueue<AbstractVizResource<?, ?>> incomingSpooler = null;
+
+    /*
      * The instance of the manager, a singleton.
      */
     public static EnsembleResourceManager instance = null;
+
+    protected PollForIncomingResources registerIncomingResources = null;
+
+    private List<VisibilityAndColorChangedListener> visibilityAndColorChangedListeners = null;
 
     /**
      * The listeners to any resource, GUI... change event Register to any bus or
      * event list for to catch interesting events
      */
     private EnsembleResourceManager() {
-        ensembleToolResourcesMap = new ConcurrentHashMap<AbstractEditor, NavigatorResourceList>();
+        ensembleToolResourcesMap = new ConcurrentHashMap<EnsembleToolLayer, NavigatorResourceList>();
+        visibilityAndColorChangedListeners = new CopyOnWriteArrayList<>();
 
+        incomingSpooler = new ArrayBlockingQueue<>(500);
+
+    }
+
+    public void startSpooler() {
+        registerIncomingResources = new PollForIncomingResources(
+                "Ensemble Resource Spooler");
+        registerIncomingResources.setSystem(true);
+        registerIncomingResources.setPriority(Job.LONG);
+        registerIncomingResources.schedule();
+    }
+
+    public void stopSpooler() {
+        if (registerIncomingResources != null) {
+            registerIncomingResources.cancel();
+        }
+        registerIncomingResources = null;
+    }
+
+    /*
+     * Viz resources register with the ensemble tool via this thread-safe FIFO
+     * queue.
+     */
+    protected void addResourceForRegistration(AbstractVizResource<?, ?> rsc) {
+        incomingSpooler.add(rsc);
     }
 
     /**
@@ -84,32 +130,18 @@ public class EnsembleResourceManager implements IDisposeListener {
     }
 
     /**
-     * call this, for example, at EnsembleToolManager initialization time when a
-     * new tool layer is created but there are no resources yet added to it.
-     * 
-     * @param editor
-     *            - The product is loaded into which editor/window.
-     */
-    public void registerToolLayer(AbstractEditor editor) {
-        if (ensembleToolResourcesMap.get(editor) == null) {
-            ensembleToolResourcesMap.put(editor, new NavigatorResourceList(
-                    editor));
-        }
-    }
-
-    /**
      * Get the resources in an editor.
      * 
      * @param editor
      *            - The product is loaded into which editor/window.
      * @return - list of resources.
      */
-    public NavigatorResourceList getResourceList(AbstractEditor editor) {
+    public NavigatorResourceList getResourceList(EnsembleToolLayer toolLayer) {
 
         NavigatorResourceList list = null;
 
-        if (editor != null) {
-            list = ensembleToolResourcesMap.get(editor);
+        if (toolLayer != null) {
+            list = ensembleToolResourcesMap.get(toolLayer);
         }
         return list;
     }
@@ -125,6 +157,21 @@ public class EnsembleResourceManager implements IDisposeListener {
     }
 
     /**
+     * Find a visible and color listener by resource.
+     */
+    protected VisibilityAndColorChangedListener findListenerByResource(
+            AbstractVizResource<?, ?> rsc) {
+        VisibilityAndColorChangedListener foundListener = null;
+        for (VisibilityAndColorChangedListener vccl : visibilityAndColorChangedListeners) {
+            if (vccl.resource == rsc) {
+                foundListener = vccl;
+                break;
+            }
+        }
+        return foundListener;
+    }
+
+    /**
      * Register a loaded model product in ensemble status
      * 
      * @param rsc
@@ -132,26 +179,26 @@ public class EnsembleResourceManager implements IDisposeListener {
      * @param guiUpdate
      *            - if need update GUI
      */
-    public synchronized void registerResource(AbstractVizResource<?, ?> rsc,
-            AbstractEditor editor, boolean guiUpdate) {
+    public synchronized void registerResource(AbstractVizResource<?, ?> rsc) {
 
-        if ((rsc == null) || (!EnsembleToolManager.getInstance().isReady()))
+        if ((rsc == null) || (!EnsembleTool.getInstance().isToolAvailable())) {
             return;
+        }
+
+        EnsembleToolLayer toolLayer = EnsembleTool.getInstance()
+                .getActiveToolLayer();
 
         // if this is the first resource ever registered using this editor
         // then create the resource list and map it to the editor ...
-        if (ensembleToolResourcesMap.get(editor) == null) {
-            ensembleToolResourcesMap.put(editor, new NavigatorResourceList(
-                    editor));
-
-            if (!EnsembleToolManager.getInstance().hasToolLayer(editor)) {
-                EnsembleToolManager.getInstance().addToolLayer(editor);
-            }
+        if (ensembleToolResourcesMap.get(toolLayer) == null) {
+            ensembleToolResourcesMap.put(toolLayer, new NavigatorResourceList(
+                    toolLayer));
         }
 
         // no duplicates
         if (rsc == null
-                || (ensembleToolResourcesMap.get(editor).containsResource(rsc))) {
+                || (ensembleToolResourcesMap.get(toolLayer)
+                        .containsResource(rsc))) {
             return;
         }
 
@@ -176,18 +223,20 @@ public class EnsembleResourceManager implements IDisposeListener {
         GenericResourceHolder ensToolResource = GenericResourceHolder
                 .createResourceHolder(rsc, true);
         ensToolResource.setGenerated(false);
-        ensembleToolResourcesMap.get(editor).add(ensToolResource);
+        ensembleToolResourcesMap.get(toolLayer).add(ensToolResource);
 
-        syncRegisteredResource(editor);
+        checkExistingRegisteredResources(toolLayer);
 
-        if (guiUpdate) {
-            notifyClientListChanged();
-            // now update the calculation ensemble resource, if not already
-            // set ... there can only be one, and it will be the first
-            // ensemble resource loaded into this editor ...
-            ensembleToolResourcesMap.get(editor)
-                    .updateEnsembleCalculationResource();
-        }
+        notifyClientListChanged();
+
+        visibilityAndColorChangedListeners
+                .add(new VisibilityAndColorChangedListener(rsc));
+
+        // now update the calculation ensemble resource, if not already
+        // set ... there can only be one, and it will be the first
+        // ensemble resource loaded into this editor ...
+        ensembleToolResourcesMap.get(toolLayer)
+                .updateEnsembleCalculationResource();
     }
 
     /**
@@ -201,15 +250,23 @@ public class EnsembleResourceManager implements IDisposeListener {
      *            - if update the GUI.
      */
     public synchronized void unregisterResource(GenericResourceHolder gr,
-            AbstractEditor editor, boolean notifyGUI) {
-        if (gr == null
-                || ensembleToolResourcesMap.get(editor).getResourceHolders()
+            EnsembleToolLayer toolLayer, boolean notifyGUI) {
+        if (toolLayer == null
+                || gr == null
+                || ensembleToolResourcesMap.get(toolLayer).getResourceHolders()
                         .isEmpty())
             return;
-        ensembleToolResourcesMap.get(editor).remove(gr);
+
+        VisibilityAndColorChangedListener vccl = findListenerByResource(gr
+                .getRsc());
+        if (vccl != null) {
+            visibilityAndColorChangedListeners.remove(vccl);
+        }
+
+        ensembleToolResourcesMap.get(toolLayer).remove(gr);
         gr.getRsc().unregisterListener((IDisposeListener) this);
 
-        syncRegisteredResource(editor);
+        checkExistingRegisteredResources(toolLayer);
 
         // if requested, notify client the known loaded resources have changed
         if (notifyGUI) {
@@ -225,64 +282,71 @@ public class EnsembleResourceManager implements IDisposeListener {
      * @param rsc
      *            - the generated resource by calculation.
      */
-    public synchronized void registerGenerated(AbstractVizResource<?, ?> rsc,
-            AbstractEditor editor) {
+    public synchronized void registerGenerated(AbstractVizResource<?, ?> rsc) {
 
-        if ((rsc == null) || (!EnsembleToolManager.getInstance().isReady()))
+        if ((rsc == null) || (!EnsembleTool.getInstance().isToolAvailable())) {
             return;
+        }
+
+        EnsembleToolLayer toolLayer = EnsembleTool.getInstance()
+                .getActiveToolLayer();
 
         // This may be the first resource ever registered using this editor. If
         // so, then create the resource list and associate it with the editor
         // using the map ...
 
-        if (ensembleToolResourcesMap.get(editor) == null) {
-            ensembleToolResourcesMap.put(editor, new NavigatorResourceList(
-                    editor));
+        if (ensembleToolResourcesMap.get(toolLayer) == null) {
+            ensembleToolResourcesMap.put(toolLayer, new NavigatorResourceList(
+                    toolLayer));
         }
 
         // Only one instance of a generated resource is saved. If a duplicate is
         // created then have it overwrite the existing one.
-        for (GenericResourceHolder gr : ensembleToolResourcesMap.get(editor)
+        for (GenericResourceHolder gr : ensembleToolResourcesMap.get(toolLayer)
                 .getUserGeneratedRscs()) {
 
             // Remove any resource in this list, since it was unloaded/ isn't
             // existing.
             if (!gr.getRsc().getDescriptor().getResourceList()
                     .containsRsc(gr.getRsc())) {
-                ensembleToolResourcesMap.get(editor).remove(gr);
+                ensembleToolResourcesMap.get(toolLayer).remove(gr);
 
             } else if (rsc.getClass().cast(rsc).getName()
                     .equals(gr.getRsc().getClass().cast(gr.getRsc()).getName())) {
                 // Same generated resource name, unload old one
-                ensembleToolResourcesMap.get(editor).remove(gr);
+                ensembleToolResourcesMap.get(toolLayer).remove(gr);
                 gr.getRsc().getDescriptor().getResourceList()
                         .removeRsc(gr.getRsc());
             }
-
         }
 
         // Set to default density for all loaded resources if can
         // But it may be unmatched with current display. Fix it later
 
-        // TODO: why are we testing for this for tool layer ready yet again?
         // Set resource as a system resource so we don't show the legend
         // in the main map, because we will display it in the ensemble
         // navigator view.
-        if (EnsembleToolManager.getInstance().isReady()) {
-            // TODO: Must refactor so we don't use setSystemResource(boolean)
-            // method.
-            rsc.getProperties().setSystemResource(true);
-            rsc.registerListener((IDisposeListener) this);
+
+        // TODO: Must refactor so we don't use setSystemResource(boolean)
+        // method.
+        rsc.getProperties().setSystemResource(true);
+        rsc.registerListener((IDisposeListener) this);
+
+        if (rsc.hasCapability(DisplayTypeCapability.class)) {
+            rsc.getCapability(DisplayTypeCapability.class)
+                    .setSuppressingMenuItems(true);
         }
 
         GenericResourceHolder ensToolResource = GenericResourceHolder
                 .createResourceHolder(rsc, true);
         ensToolResource.setGenerated(true);
-        ensembleToolResourcesMap.get(editor).add(ensToolResource);
+        ensembleToolResourcesMap.get(toolLayer).add(ensToolResource);
 
-        syncRegisteredResource(editor);
+        checkExistingRegisteredResources(toolLayer);
 
-        // notify any client?
+        visibilityAndColorChangedListeners
+                .add(new VisibilityAndColorChangedListener(rsc));
+
         notifyClientListChanged();
     }
 
@@ -297,17 +361,25 @@ public class EnsembleResourceManager implements IDisposeListener {
      *            - if update the GUI.
      */
     public synchronized void unregisterGenerated(GenericResourceHolder gr,
-            AbstractEditor editor, boolean notifyGUI) {
+            EnsembleToolLayer toolLayer, boolean notifyGUI) {
         if (gr == null
-                || ensembleToolResourcesMap.get(editor).getResourceHolders()
-                        .isEmpty())
+                || ensembleToolResourcesMap.get(toolLayer).getResourceHolders()
+                        .isEmpty()) {
             return;
-        ensembleToolResourcesMap.get(editor).remove(gr);
+        }
+
+        VisibilityAndColorChangedListener vccl = findListenerByResource(gr
+                .getRsc());
+        if (vccl != null) {
+            visibilityAndColorChangedListeners.remove(vccl);
+        }
+
+        ensembleToolResourcesMap.get(toolLayer).remove(gr);
         gr.getRsc().unregisterListener((IDisposeListener) this);
 
         // notify client the generated resource change?
 
-        syncRegisteredResource(editor);
+        checkExistingRegisteredResources(toolLayer);
 
         // if requested, notify client the known loaded resources have changed
         if (notifyGUI) {
@@ -316,30 +388,52 @@ public class EnsembleResourceManager implements IDisposeListener {
     }
 
     /**
+     * Get the time series point location
+     * 
+     * @param activeToolLayer
+     *            - the time series tool layer
+     * 
+     * @return - point location as a String
+     */
+    public String getTimeSeriesPoint(EnsembleToolLayer toolLayer) {
+        String s = "";
+        if (toolLayer != null && getResourceList(toolLayer) != null) {
+            s = getResourceList(toolLayer).getTimeSeriesPoint();
+        }
+        return s;
+    }
+
+    /**
      * Get the resource name string
      * 
-     * @param editor
-     *            - resource editor
+     * @param activeToolLayer
+     *            - the time series tool layer
+     * 
      * @return- resource name
      */
-    public String getTimeBasisResourceName(AbstractEditor editor) {
+    public String getTimeBasisResourceName(EnsembleToolLayer toolLayer) {
 
-        return getResourceList(editor).getTimeBasisResourceName();
+        String s = "";
+        if (toolLayer != null && getResourceList(toolLayer) != null) {
+            s = getResourceList(toolLayer).getTimeBasisResourceName();
+        }
+        return s;
 
     }
 
     /**
      * Get the resource legend time
      * 
-     * @param editorr
-     *            - resource editor
+     * @param activeToolLayer
+     *            - the time series tool layer
+     * 
      * @return- legend time
      */
-    public String getTimeBasisLegendTime(AbstractEditor editor) {
+    public String getTimeBasisLegendTime(EnsembleToolLayer toolLayer) {
 
         String s = "";
-        if ((editor != null) && (getResourceList(editor) != null)) {
-            s = getResourceList(editor).getTimeBasisLegendTime();
+        if (toolLayer != null && getResourceList(toolLayer) != null) {
+            s = getResourceList(toolLayer).getTimeBasisLegendTime();
         }
         return s;
 
@@ -350,33 +444,32 @@ public class EnsembleResourceManager implements IDisposeListener {
      * 
      * @param editor
      */
-    public void updateFrameChanges(AbstractEditor editor) {
-        syncRegisteredResource(editor);
-
+    public void updateFrameChanges(EnsembleToolLayer toolLayer) {
+        checkExistingRegisteredResources(toolLayer);
         // update generated ensemble Resource if need
-        updateGenerated(editor);
+        updateGenerated(toolLayer);
     }
 
     /**
-     * Synchronize the registered resource list within editor(s) and GUI.
-     * --verify if the resources in the list are existing. --Remove any resource
-     * in this list, if it was unloaded. --notify GUI if there is any change.
+     * Match up the registered resource list within editor(s) and GUI. Verify if
+     * the resources in the list exist. Remove any resource in this list, if it
+     * was unloaded. Notify GUI if there is any change.
      */
-    public void syncRegisteredResource(AbstractEditor editor) {
+    public void checkExistingRegisteredResources(EnsembleToolLayer toolLayer) {
 
-        if (!EnsembleToolManager.getInstance().isReady()) {
+        if (!EnsembleTool.getInstance().isToolAvailable()) {
             return;
         }
-        if (ensembleToolResourcesMap.get(editor) == null) {
+        if (ensembleToolResourcesMap.get(toolLayer) == null) {
             return;
         }
 
-        if (ensembleToolResourcesMap.get(editor).getAllRscsAsList() == null
-                || ensembleToolResourcesMap.get(editor).getAllRscsAsList()
+        if (ensembleToolResourcesMap.get(toolLayer).getAllRscsAsList() == null
+                || ensembleToolResourcesMap.get(toolLayer).getAllRscsAsList()
                         .isEmpty())
             return;
 
-        for (GenericResourceHolder gr : ensembleToolResourcesMap.get(editor)
+        for (GenericResourceHolder gr : ensembleToolResourcesMap.get(toolLayer)
                 .getAllRscsAsList()) {
             // verify if the resources in the list are existing.
             if (!gr.getRsc().getDescriptor().getResourceList()
@@ -384,10 +477,10 @@ public class EnsembleResourceManager implements IDisposeListener {
 
                 // Remove any resource in this list, since it was unloaded/
                 // isn't existing.
-                ensembleToolResourcesMap.get(editor).remove(gr);
+                ensembleToolResourcesMap.get(toolLayer).remove(gr);
 
-                // notify GUI if there is any change.
-                notifyClientListChanged();
+                // TODO: notify GUI if there is any change.
+                // notifyClientListChanged();
             } else {
                 /*
                  * don't show legend when the ensemble tool is controlling the
@@ -407,14 +500,17 @@ public class EnsembleResourceManager implements IDisposeListener {
     }
 
     /**
-     * * check for all ensemble interested resources if they are out of control
-     * by the ensemble resource manager. Current interested resources are
-     * AbstractGridResource ETimeSeriesResouece, HistogramResource
+     * Return all ensemble-related resources not currently registered with this
+     * resource manager.
+     * 
+     * This method will allow the Ensemble Tool to read any given editor and
+     * find the resources not yet registered, so, for example, we can then
+     * register those resources.
      * 
      * @param editor
      * @return
      */
-    public ResourceList searchUnryncRegisteredResource(AbstractEditor editor) {
+    public ResourceList getUnregisteredResources(IDisplayPaneContainer editor) {
 
         ResourceList unRegisteredResources = new ResourceList();
 
@@ -450,18 +546,22 @@ public class EnsembleResourceManager implements IDisposeListener {
      * 
      * @param editor
      */
-    public void updateGenerated(AbstractEditor editor) {
-        if (ensembleToolResourcesMap.get(editor) == null) {
+    public void updateGenerated(EnsembleToolLayer toolLayer) {
+        if (toolLayer == null
+                || ensembleToolResourcesMap.get(toolLayer) == null) {
             return;
         }
-        if (ensembleToolResourcesMap.get(editor).getUserGeneratedRscs() == null
-                || ensembleToolResourcesMap.get(editor).getUserGeneratedRscs()
-                        .isEmpty())
+        if (ensembleToolResourcesMap.get(toolLayer).getUserGeneratedRscs() == null
+                || ensembleToolResourcesMap.get(toolLayer)
+                        .getUserGeneratedRscs().isEmpty())
             return;
         // Check each resource if need update
-        for (GenericResourceHolder rsc : ensembleToolResourcesMap.get(editor)
-                .getUserGeneratedRscs()) {
-            // TODO
+        for (GenericResourceHolder rsc : ensembleToolResourcesMap
+                .get(toolLayer).getUserGeneratedRscs()) {
+            /**
+             * TODO : Generated resources will not get auto-updated by the
+             * server, so leave this for future use.
+             */
         }
     }
 
@@ -482,10 +582,10 @@ public class EnsembleResourceManager implements IDisposeListener {
      * Marked ResourceList change event should be sent to client by the event
      * bus. The client can be GUI, calculator, etc, ...
      */
-    private void notifyClientListChanged() {
+    protected void notifyClientListChanged() {
 
-        if (EnsembleToolManager.getInstance().isReady()) {
-            EnsembleToolManager.getInstance().refreshView();
+        if (EnsembleTool.getInstance().isToolAvailable()) {
+            EnsembleTool.getInstance().refreshView();
         }
     }
 
@@ -543,6 +643,111 @@ public class EnsembleResourceManager implements IDisposeListener {
                     .getEnsembleCalculationResource();
         }
         return name;
+    }
+
+    /**
+     * This job sleeps for a poll-period and is only active when there are
+     * resources being registered.
+     * 
+     * It runs for as long as the Ensemble Tool is open (i.e. not disposed). It
+     * wakes when new resources need to be registered.
+     * 
+     */
+    private class PollForIncomingResources extends Job {
+
+        private IStatus status = Status.OK_STATUS;
+
+        private AbstractVizResource<?, ?> nextRsc = null;
+
+        public PollForIncomingResources(String name) {
+            super(name);
+            status = Status.OK_STATUS;
+        }
+
+        @Override
+        protected IStatus run(IProgressMonitor monitor) {
+
+            final List<AbstractVizResource<?, ?>> items = new ArrayList<>();
+            try {
+                items.clear();
+                nextRsc = incomingSpooler.poll(60, TimeUnit.SECONDS);
+                if (!monitor.isCanceled()) {
+                    if (nextRsc != null) {
+                        EnsembleResourceManager.getInstance().registerResource(
+                                nextRsc);
+                    }
+                }
+                if (!monitor.isCanceled() && (!incomingSpooler.isEmpty())) {
+                    incomingSpooler.drainTo(items);
+                    if (!monitor.isCanceled()) {
+                        for (AbstractVizResource<?, ?> r : items) {
+                            EnsembleResourceManager.getInstance()
+                                    .registerResource(r);
+                        }
+                    }
+                }
+            } catch (InterruptedException e) {
+                /* ignore */
+            }
+
+            if (!monitor.isCanceled()) {
+                setPriority(Job.LONG);
+                schedule();
+            } else {
+                status = Status.CANCEL_STATUS;
+            }
+
+            return status;
+
+        }
+    }
+
+    protected class VisibilityAndColorChangedListener implements
+            IRefreshListener, IDisposeListener {
+
+        public final AbstractVizResource<?, ?> resource;
+
+        private boolean visible;
+
+        private RGB color;
+
+        protected VisibilityAndColorChangedListener(
+                AbstractVizResource<?, ?> resource) {
+            this.resource = resource;
+            this.visible = resource.getProperties().isVisible();
+            this.color = resource.getCapability(ColorableCapability.class)
+                    .getColor();
+            resource.registerListener((IRefreshListener) this);
+            resource.registerListener((IDisposeListener) this);
+        }
+
+        @Override
+        public void disposed(AbstractVizResource<?, ?> rsc) {
+            if (rsc == resource && resource != null) {
+                resource.unregisterListener((IRefreshListener) this);
+                resource.unregisterListener((IDisposeListener) this);
+            }
+        }
+
+        @Override
+        public void refresh() {
+            boolean visible = resource.getProperties().isVisible();
+            if (this.visible != visible) {
+                notifyClientListChanged();
+                this.visible = visible;
+            }
+            RGB color = resource.getCapability(ColorableCapability.class)
+                    .getColor();
+            if (!this.color.equals(color)) {
+                notifyClientListChanged();
+                this.color = color;
+            }
+        }
+
+    }
+
+    public void removeMapping(EnsembleToolLayer toolLayer) {
+        ensembleToolResourcesMap.remove(toolLayer);
     }
 
 }

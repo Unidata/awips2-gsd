@@ -1,13 +1,10 @@
 package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer;
 
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 
 import org.eclipse.ui.IPartListener2;
 import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.IWorkbenchPartReference;
-import org.eclipse.ui.PlatformUI;
-
-import com.raytheon.uf.viz.core.VizApp;
 
 /**
  * The part listener for the EnsembleToolViewer class (ViewPart). The most
@@ -40,14 +37,14 @@ public class EnsembleViewPartListener implements IPartListener2 {
     @Override
     public void partActivated(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            // TODO
+            /* TODO */
         }
     }
 
     @Override
     public void partDeactivated(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            // TODO
+            /* TODO */
         }
     }
 
@@ -63,8 +60,7 @@ public class EnsembleViewPartListener implements IPartListener2 {
     @Override
     public void partHidden(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            EnsembleToolManager.getInstance().setEditable(false);
-            EnsembleToolManager.getInstance().setViewStateAlreadyModified();
+            /* TODO */
         }
     }
 
@@ -74,49 +70,46 @@ public class EnsembleViewPartListener implements IPartListener2 {
      * @see org.eclipse.ui.IPartListener2#partVisible(org.eclipse.ui.
      * IWorkbenchPartReference)
      * 
-     * Whenever the ViewPart becomes visible, then turn on tool layer
-     * editability.
+     * Whenever the ViewPart becomes visible, then, if the user preference is
+     * set for it, turn on tool layer editability.
      */
     @Override
     public void partVisible(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            EnsembleToolManager.getInstance().setEditable(true);
-            EnsembleToolManager.getInstance().setViewStateAlreadyModified();
+            if (EnsembleTool.getInstance().isToolAvailable()
+                    && EnsembleTool.getInstance()
+                            .isMakeEditableOnRestorePreference()) {
+                EnsembleTool.getInstance().setEditable(true);
+            }
         }
     }
 
     @Override
     public void partClosed(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-
-            VizApp.runAsync(new Runnable() {
-                public void run() {
-                    if (!PlatformUI.getWorkbench().isClosing()) {
-                        EnsembleToolManager.getInstance().close();
-                    }
-                }
-            });
+            /* TODO */
         }
     }
 
     @Override
     public void partBroughtToTop(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            // TODO
+            /* TODO */
         }
     }
 
     @Override
     public void partOpened(IWorkbenchPartReference partRef) {
+
         if (isThisPart(partRef)) {
-            // TODO
+            /* TODO */
         }
     }
 
     @Override
     public void partInputChanged(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            // TODO
+            /* TODO */
         }
     }
 

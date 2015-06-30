@@ -4,12 +4,10 @@ import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResource;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
@@ -18,6 +16,7 @@ import com.raytheon.uf.viz.core.drawables.IRenderableDisplay;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+import com.raytheon.uf.viz.core.rsc.AbstractVizResource.ResourceStatus;
 import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.uf.viz.core.rsc.IInitListener;
 import com.raytheon.uf.viz.core.rsc.ResourceList;
@@ -27,8 +26,6 @@ import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
 import com.raytheon.viz.grid.rsc.general.GridResource;
-import com.raytheon.viz.ui.EditorUtil;
-import com.raytheon.viz.ui.editor.AbstractEditor;
 import com.raytheon.viz.ui.perspectives.IRenderableDisplayCustomizer;
 
 /**
@@ -62,9 +59,7 @@ public class EnsembleToolDisplayCustomizer implements
     private final transient IUFStatusHandler statusHandler = UFStatus
             .getHandler(EnsembleToolDisplayCustomizer.class);
 
-    static final private List<ResourcePair> batchedPairs = new CopyOnWriteArrayList<ResourcePair>();
-
-    /** List of listeners we have for renderable displays */
+    /* List of listeners we have for renderable displays */
     private final List<EnsembleToolRscLoadListener> listeners = new ArrayList<EnsembleToolRscLoadListener>();
 
     @Override
@@ -82,8 +77,8 @@ public class EnsembleToolDisplayCustomizer implements
             listeners.add(new EnsembleToolRscLoadListener(display));
         }
 
-        if (EnsembleToolManager.getInstance().isReady()) {
-            EnsembleToolManager.getInstance().prepareForNewEditor();
+        if (EnsembleTool.getInstance().isToolAvailable()) {
+            EnsembleTool.getInstance().prepareForNewEditor();
         }
     }
 
@@ -105,29 +100,6 @@ public class EnsembleToolDisplayCustomizer implements
 
     private static class EnsembleToolRscLoadListener implements AddListener,
             RemoveListener, IInitListener {
-
-        /*
-         * For batching purposes, keep track of the amount of time spent between
-         * requests
-         */
-        private static long LAST_TIME = 0;
-
-        /*
-         * TODO: This is a minimal working capability for batching large
-         * requests. We need to re-address this in the next release for a
-         * cleaner solution.
-         * 
-         * Maximum wait period for batching; this value was chosen as the
-         * minimum necessary wait time for a two-ensemble load (e.g. 500MB and
-         * 850MB Heights). By waiting this long, both full products sets will
-         * get batched into one load (at least on a typically performant
-         * machine).
-         */
-
-        private final int ALLOW_FOR_BUNCHED_REQUESTS_PERIOD = 2500;
-
-        // thread which acts upon batched requests
-        private Thread forceReset = null;
 
         // the display we are listening to
         private final IRenderableDisplay display;
@@ -163,10 +135,10 @@ public class EnsembleToolDisplayCustomizer implements
                 /**
                  * Remove it from the resource manager and update GUI.
                  */
-                if (getEditor() != null) {
-                    EnsembleResourceManager.getInstance()
-                            .syncRegisteredResource(getEditor());
-                }
+                // DR Jing - Polster: How do we find the ensemble tool layer for
+                // the sync call?
+                // EnsembleResourceManager.getInstance().syncRegisteredResource(null);
+                EnsembleResourceManager.getInstance().notifyClientListChanged();
             }
         }
 
@@ -178,104 +150,38 @@ public class EnsembleToolDisplayCustomizer implements
          */
         @Override
         public void notifyAdd(ResourcePair rp) throws VizException {
-            /**
-             * TODO: We need to find a way to listen for user actions that will
-             * effect the state of the ensemble tool. This solution may
-             * currently be the only way to know if the user has requested
-             * another editable resource to be turned on.
-             * 
-             * If the ensemble tool is ready and the ensemble tool layer in the
-             * active editor/display is editable then: If the user is loading
-             * another tool layer, that is not an EnsembleToolLayer, then tell
-             * the ensemble tool manager so it can manage the tool viewer state
-             * (minimized or restored).
-             */
-            if ((EnsembleToolManager.getInstance().isReady())
-                    && (EnsembleToolManager.getInstance().isEditable())) {
+
+            if (EnsembleTool.getInstance().isToolAvailable()) {
                 if ((rp.getResource().hasCapability(EditableCapability.class) == true)
                         && (!(rp.getResource() instanceof EnsembleToolLayer))) {
-                    EnsembleToolManager.getInstance()
-                            .setEditableActionInProcess();
+                    EnsembleTool.getInstance()
+                            .setForeignEditableToolLoading();
                 }
-
             }
 
-            /**
-             * Ignore if this resource is not compatible with the ensemble tool
-             */
-
-            if (!isCompatibleResource(rp)) {
-                return;
-            }
-
-            /**
-             * Only buffer the resources which are ensemble members.
-             * 
-             * Otherwise, individual resources will get processed immediately.
-             */
-            String ensembleId = "";
-            if (rp.getResource() instanceof GridResource) {
-                ensembleId = ((GridResource<?>) (rp.getResource()))
-                        .getAnyGridRecord().getEnsembleId();
-            } else if (rp.getResource() instanceof TimeSeriesResource) {
-                ensembleId = ((TimeSeriesResource) (rp.getResource()))
-                        .getAdapter().getEnsembleId();
-            }
-
-            if (ensembleId != null && ensembleId != "") {
-                // add the resource pair to the batching list ...
-                rp.getResource().registerListener((IInitListener) this);
-                synchronized (batchedPairs) {
-                    batchedPairs.add(rp);
-
+            AbstractVizResource<?, ?> rsc = rp.getResource();
+            if ((rsc != null) && (isCompatibleResource(rp))) {
+                rsc.registerListener(this);
+                if (rsc.getStatus() == ResourceStatus.INITIALIZED) {
+                    EnsembleResourceManager.getInstance()
+                            .addResourceForRegistration(rsc);
                 }
-            } else {
-                // register immediately to the resource manager
-                EnsembleResourceManager.getInstance().registerResource(
-                        rp.getResource(), getEditor(), true);
-
-            }
-
-        }
-
-        /**
-         * Pass a resource into the ensemble resource manager.
-         * 
-         * @param resourcePairs
-         */
-        private void addBatchedResourcesToManager() {
-
-            synchronized (batchedPairs) {
-                Iterator<ResourcePair> pairsIter = null;
-
-                pairsIter = batchedPairs.iterator();
-                ResourcePair rp = null;
-
-                while (pairsIter.hasNext()) {
-
-                    rp = pairsIter.next();
-                    if (pairsIter.hasNext()) {
-                        EnsembleResourceManager.getInstance().registerResource(
-                                rp.getResource(), getEditor(), false);
-
-                    } else {
-                        EnsembleResourceManager.getInstance().registerResource(
-                                rp.getResource(), getEditor(), true);
-                    }
-                }
-                batchedPairs.clear();
             }
         }
 
-        /**
-         * Get the current Editor.
+        /*
+         * (non-Javadoc)
          * 
-         * @return
+         * @see
+         * com.raytheon.uf.viz.core.rsc.IInitListener#inited(com.raytheon.uf
+         * .viz.core.rsc.AbstractVizResource)
          */
-        private static AbstractEditor getEditor() {
-            AbstractEditor editor = (AbstractEditor) EditorUtil
-                    .getActiveEditor();
-            return editor;
+        @Override
+        public synchronized void inited(AbstractVizResource<?, ?> rsc) {
+            if (rsc != null) {
+                EnsembleResourceManager.getInstance()
+                        .addResourceForRegistration(rsc);
+            }
         }
 
         private boolean isCompatibleResource(ResourcePair rp) {
@@ -285,8 +191,11 @@ public class EnsembleToolDisplayCustomizer implements
              * the active editor/display is not editable then all resources that
              * are loading should be ignored.
              */
-            if ((!EnsembleToolManager.getInstance().isReady())
-                    || (!EnsembleToolManager.getInstance().isEditable())) {
+            if (!EnsembleTool.getInstance().isToolEditable()) {
+                return false;
+            }
+
+            if (rp.getResource() instanceof EnsembleToolLayer) {
                 return false;
             }
 
@@ -322,78 +231,6 @@ public class EnsembleToolDisplayCustomizer implements
             }
 
             return false;
-        }
-
-        /*
-         * (non-Javadoc)
-         * 
-         * @see
-         * com.raytheon.uf.viz.core.rsc.IInitListener#inited(com.raytheon.uf
-         * .viz.core.rsc.AbstractVizResource)
-         */
-        @Override
-        public synchronized void inited(AbstractVizResource<?, ?> rsc) {
-
-            int wait_period = 0;
-            /*
-             * ensemble resources can come in a bunch ... wait for some time to
-             * pass to batch them ... also, give a couplpe of extra seconds to
-             * resources derived from the TimeSeries class.
-             */
-            if (rsc instanceof TimeSeriesResource) {
-                wait_period = ALLOW_FOR_BUNCHED_REQUESTS_PERIOD + 2000;
-            } else {
-                wait_period = ALLOW_FOR_BUNCHED_REQUESTS_PERIOD;
-            }
-
-            if (((LAST_TIME == 0) || ((System.currentTimeMillis() - LAST_TIME) > wait_period))) {
-
-                /**
-                 * Register the resource in to the resource manager
-                 */
-                if (forceReset != null) {
-                    synchronized (forceReset) {
-                        // restart the timer for another interval to pass
-                        // before forcing a "final" refresh
-                        if (forceReset.isAlive()) {
-                            forceReset.interrupt();
-                        }
-                        forceReset = null;
-                        forceReset = new Thread(new ForceRefreshIfNecessary(
-                                wait_period));
-                        forceReset.start();
-                    }
-                } else {
-                    forceReset = new Thread(new ForceRefreshIfNecessary(
-                            wait_period));
-                    forceReset.start();
-                }
-            } else {
-                LAST_TIME = System.currentTimeMillis();
-            }
-
-        }
-
-        private class ForceRefreshIfNecessary implements Runnable {
-
-            int waitForReset = 0;
-
-            ForceRefreshIfNecessary(int waitTime) {
-                waitForReset = waitTime;
-            }
-
-            @Override
-            public void run() {
-
-                try {
-
-                    Thread.sleep(waitForReset);
-                    addBatchedResourcesToManager();
-
-                } catch (InterruptedException e) {
-                    /* ignore */
-                }
-            }
         }
 
         /**

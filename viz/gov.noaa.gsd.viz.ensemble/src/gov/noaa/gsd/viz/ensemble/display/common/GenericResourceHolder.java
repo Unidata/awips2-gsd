@@ -4,6 +4,9 @@ import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResource;
 
+import com.raytheon.uf.common.time.DataTime;
+import com.raytheon.uf.viz.core.drawables.IDescriptor;
+import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.grid.rsc.GridNameGenerator;
@@ -120,5 +123,51 @@ public abstract class GenericResourceHolder extends
     public void setGenerated(boolean isEnsGenerated) {
         this.isGenerated = isEnsGenerated;
     }
+
+    @Override
+    public boolean isLoadedAtFrame(FramesInfo info) {
+
+        if (getRsc() == null) {
+            return false;
+        }
+
+        AbstractVizResource<?, ?> resource = getRsc();
+        String name = resource.getName();
+        if (name == null) {
+            return false;
+        }
+
+        if (!resource.isTimeAgnostic()) {
+            boolean hasTimes = false;
+            DataTime[] times = info.getTimeMap().get(resource);
+            if (times != null) {
+                for (DataTime dt : times) {
+                    if (dt != null) {
+                        hasTimes = true;
+                        break;
+                    }
+                }
+            }
+            if (!hasTimes) {
+                return false;
+            }
+
+            DataTime time = getDataTimeForResource(getRsc(), getRsc()
+                    .getDescriptor(), info);
+
+            if (time == null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private DataTime getDataTimeForResource(AbstractVizResource<?, ?> rsc,
+            IDescriptor descriptor, FramesInfo info) {
+        return info.getTimeForResource(rsc);
+    }
+
+    public abstract boolean requiresLoadCheck();
 
 }

@@ -19,7 +19,7 @@
  **/
 package gov.noaa.gsd.viz.ensemble.display.rsc.histogram;
 
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
@@ -196,8 +196,7 @@ public class EnsSamplingResource extends
          * is editable
          */
         if (sampleCoord == null || isSampling() == false
-                || !(EnsembleToolManager.getInstance().isReady())
-                || !(EnsembleToolManager.getInstance().isEditable())) {
+                || !(EnsembleTool.getInstance().isToolEditable())) {
             return;
         }
 

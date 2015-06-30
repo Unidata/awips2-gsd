@@ -1,6 +1,6 @@
 package gov.noaa.gsd.viz.ensemble.display.rsc.histogram;
 
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,6 +24,7 @@ import com.raytheon.uf.viz.core.drawables.IDescriptor;
 import com.raytheon.uf.viz.core.drawables.PaintProperties;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
+import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.core.rsc.IInputHandler;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
@@ -32,10 +33,10 @@ import com.raytheon.uf.viz.core.rsc.ResourceProperties;
 import com.raytheon.uf.viz.core.rsc.capabilities.BlendableCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.ColorableCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.MagnificationCapability;
-import com.raytheon.viz.grid.rsc.general.AbstractGridResource;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
 import com.raytheon.viz.ui.editor.IMultiPaneEditor;
 import com.raytheon.viz.ui.input.preferences.MousePreferenceManager;
+
 
 /**
  * D2D ensemble sampling resources, supports all pane sampling and long left
@@ -61,7 +62,7 @@ public class HistogramResource<HistogramResoureData> extends
         EnsSamplingResource {
 
     public enum DisplayMode {
-        SAMPLING, TEXT_HISTGRAM, COLOR_TEXT_HISTGRAM, GRAPHIC_HISTGRAM
+        POINT_SAMPLING, HISTOGRAM_SAMPLING, COLOR_TEXT_HISTGRAM, GRAPHIC_HISTGRAM
     }
 
     // Level+name:500MB
@@ -235,9 +236,9 @@ public class HistogramResource<HistogramResoureData> extends
     protected SampleResult doHover(ReferencedCoordinate coord,
             ResourceList resources) throws VizException {
         SampleResult result = new SampleResult();
-        if (this.mode == DisplayMode.SAMPLING) {
+        if (mode == DisplayMode.POINT_SAMPLING) {
             result = doHoverSampling(coord, resources);
-        } else if (this.mode == DisplayMode.TEXT_HISTGRAM) {
+        } else if (mode == DisplayMode.HISTOGRAM_SAMPLING) {
             result = doHoverText(coord, resources);
         }
         return result;
@@ -482,7 +483,7 @@ public class HistogramResource<HistogramResoureData> extends
 
     @Override
     public String getName() {
-        if (mode == DisplayMode.SAMPLING)
+        if (mode == DisplayMode.POINT_SAMPLING)
             return level + " " + unit + " Ensemble Sampling";
         else
             return level + " " + unit + " Histogram Text";
@@ -504,8 +505,7 @@ public class HistogramResource<HistogramResoureData> extends
          * is editable
          */
         if ((sampleCoord == null)
-                || !(EnsembleToolManager.getInstance().isReady())
-                || !(EnsembleToolManager.getInstance().isEditable())) {
+                || !(EnsembleTool.getInstance().isToolEditable())) {
             return;
         }
 

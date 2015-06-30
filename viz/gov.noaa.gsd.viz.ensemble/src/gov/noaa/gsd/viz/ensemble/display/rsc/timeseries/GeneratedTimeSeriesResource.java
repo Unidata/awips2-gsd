@@ -292,14 +292,12 @@ public class GeneratedTimeSeriesResource<T extends AbstractResourceData>
 
             // Make legend for point data
             StringBuilder sb = new StringBuilder(String.format(
-                    "%s pt%s %s%s %s%s", source, resourceData.getPointLetter(),
+                    "%s %s pt%s %s%s %s%s", source, resourceData.getLevelKey(),
+                    resourceData.getPointLetter(), lat, y >= 0 ? "N" : "S",
                     lat, y >= 0 ? "N" : "S", lon, x >= 0 ? "E" : "W"));
 
             if (stnID != null) {
                 sb.append(" ").append(stnID);
-            }
-            if (!isHeight) {
-                sb.append(" ").append(resourceData.getLevelKey());
             }
             sb.append(String.format(" %s %s %s", parameterName, "TSer",
                     units != null && units.equals("") == false ? "(" + units
@@ -311,4 +309,13 @@ public class GeneratedTimeSeriesResource<T extends AbstractResourceData>
 
     }
 
+    @Override
+    public void remove(DataTime dataTime) {
+        /**
+         * Does nothing currently, to avoid calling the remove() interface in
+         * the TimeSerieResource. Need not remove any record from here becouse
+         * the adapter is borrowed from a member for get metadata.
+         **/
+        ;
+    }
 }

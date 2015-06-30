@@ -31,13 +31,13 @@ import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 
 public class GeneratedGridResourceHolder extends GenericResourceHolder {
 
-    GeneratedEnsembleGridResource<?> currRsc = null;
+    GeneratedEnsembleGridResource currRsc = null;
 
     protected GeneratedGridResourceHolder(AbstractVizResource<?, ?> rsc,
             boolean isSelected) {
 
         super(rsc, isSelected);
-        currRsc = (GeneratedEnsembleGridResource<?>) rsc;
+        currRsc = (GeneratedEnsembleGridResource) rsc;
     }
 
     @Override
@@ -144,6 +144,11 @@ public class GeneratedGridResourceHolder extends GenericResourceHolder {
             grd.getCalculator();
         }
         return r;
+    }
+
+    @Override
+    public boolean requiresLoadCheck() {
+        return false;
     }
 
 }

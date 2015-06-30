@@ -2,6 +2,8 @@ package gov.noaa.gsd.viz.ensemble.display.common;
 
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
 
+import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
+
 /**
  * Force implementers of derived concrete classes to provide the metadata
  * getters for all the common meteorological components of a resource.
@@ -53,6 +55,8 @@ public abstract class AbstractLegendComponentsProvider {
     abstract public String getStationId();
 
     abstract public Calculation getCalculation();
+
+    abstract public boolean isLoadedAtFrame(FramesInfo info);
 
     /*
      * An abstract place to put the SREF prettifier.

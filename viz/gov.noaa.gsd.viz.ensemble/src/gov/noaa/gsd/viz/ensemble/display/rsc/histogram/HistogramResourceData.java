@@ -2,6 +2,7 @@ package gov.noaa.gsd.viz.ensemble.display.rsc.histogram;
 
 import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.control.EnsembleResourceManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,15 +15,13 @@ import com.raytheon.uf.common.time.DataTime;
 import com.raytheon.uf.viz.core.drawables.IDescriptor;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
+import com.raytheon.uf.viz.core.grid.rsc.data.GeneralGridData;
 import com.raytheon.uf.viz.core.map.MapDescriptor;
 import com.raytheon.uf.viz.core.rsc.AbstractResourceData;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
 import com.raytheon.uf.viz.core.rsc.ResourceProperties;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
-import com.raytheon.viz.grid.rsc.general.GeneralGridData;
-import com.raytheon.viz.ui.EditorUtil;
-import com.raytheon.viz.ui.editor.AbstractEditor;
 
 /**
  * Construct D2D ensamle Sampling resources and provide data.
@@ -75,18 +74,16 @@ public class HistogramResourceData extends AbstractResourceData {
     // Display mode
     protected HistogramResource.DisplayMode mode;
 
-    public HistogramResourceData(HistogramResource.DisplayMode mode) {
-        super();
-        this.mode = mode;
-    }
+    private EnsembleToolLayer toolLayer = null;
 
-    public HistogramResourceData(IDescriptor md, String level, String unit,
-            HistogramResource.DisplayMode mode) {
+    public HistogramResourceData(EnsembleToolLayer tl, String level,
+            String unit, HistogramResource.DisplayMode mode) {
 
-        this.mapDescriptor = md;// need not at here?
         this.level = level;
         this.unit = unit;
         this.mode = mode;
+        toolLayer = tl;
+        mapDescriptor = toolLayer.getDescriptor();
     }
 
     /**
@@ -113,10 +110,8 @@ public class HistogramResourceData extends AbstractResourceData {
         descriptor.getResourceList().add(pair);
 
         // Register to the ensemble resource manager
-        AbstractEditor editor = EditorUtil
-                .getActiveEditorAs(AbstractEditor.class);
         EnsembleResourceManager.getInstance().registerGenerated(
-                (AbstractVizResource<?, ?>) resource, editor);
+                (AbstractVizResource<?, ?>) resource);
 
         return rsc;
     }
@@ -198,14 +193,12 @@ public class HistogramResourceData extends AbstractResourceData {
      * @throws VizException
      */
     public void update() throws VizException {
-        AbstractEditor editor = EditorUtil
-                .getActiveEditorAs(AbstractEditor.class);
         if (level != null && !level.equals("") && unit != null
                 && !unit.equals("")) {
             // Same level and unit case
             dataHolders = EnsembleResourceManager
                     .getInstance()
-                    .getResourceList(editor)
+                    .getResourceList(toolLayer)
                     .getUserLoadedRscs((IDescriptor) new MapDescriptor(), true,
                             level, unit);
 

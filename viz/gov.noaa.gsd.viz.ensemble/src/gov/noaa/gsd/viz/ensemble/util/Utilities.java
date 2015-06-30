@@ -1,22 +1,5 @@
 package gov.noaa.gsd.viz.ensemble.util;
 
-/**
- <pre>
- * 
- *  SOFTWARE HISTORY
- * 
- *  Date         Ticket#     Engineer    Description
- *  ------------ ----------  ----------- --------------------------
- *  Nov-20-2011              epolster    Initial Creation. 
- *  
- * </pre>
- * 
- * @author epolster
- * @version 1 
- * 
- *
- */
-
 import java.util.Random;
 
 import org.eclipse.swt.graphics.Color;
@@ -67,28 +50,45 @@ public class Utilities {
         return pqs;
     }
 
-    public static RGB getRandomColor() {
+    /**
+     * generate a random color that is visbily not too dark nor light.
+     * 
+     * @return
+     */
+    public static RGB getRandomNiceContrastColor() {
 
+        final int darkestShadeLowerThreshold = 160;
+        final int darkestShadeUpperThreshold = 185;
+        final int lightestShadeLowerThreshold = 195;
+        final int lightestShadeUpperThreshold = 235;
+
+        /**
+         * For each of Red, Green, and Bluse components:
+         * 
+         * Find a random lower and upper thresholds to calculate the darkest and
+         * lightest possible values of the color's component.
+         */
         Random rand = new Random();
-        final int lowerFilter = 80;
-        final int upperFilter = 200;
-        final int skewToBrightness = 256 - upperFilter;
+        final int r_darkestShade = Math.max(darkestShadeLowerThreshold,
+                rand.nextInt(darkestShadeUpperThreshold));
+        final int r_lightestShade = Math.max(lightestShadeLowerThreshold,
+                rand.nextInt(lightestShadeUpperThreshold));
+        final int g_darkestShade = Math.max(darkestShadeLowerThreshold,
+                rand.nextInt(darkestShadeUpperThreshold));
+        final int g_lightestShade = Math.max(lightestShadeLowerThreshold,
+                rand.nextInt(lightestShadeUpperThreshold));
+        final int b_darkestShade = Math.max(darkestShadeLowerThreshold,
+                rand.nextInt(darkestShadeUpperThreshold));
+        final int b_lightestShade = Math.max(lightestShadeLowerThreshold,
+                rand.nextInt(lightestShadeUpperThreshold));
 
-        int r = rand.nextInt(upperFilter);
-        if (r < lowerFilter)
-            r = lowerFilter;
-
-        int g = rand.nextInt(upperFilter);
-        if (g < lowerFilter)
-            g = lowerFilter;
-
-        int b = rand.nextInt(upperFilter);
-        if (b < lowerFilter)
-            b = lowerFilter;
-
-        r += skewToBrightness;
-        g += skewToBrightness;
-        b += skewToBrightness;
+        /**
+         * Now use the thresholds to create the random color value for each rgb
+         * component.
+         */
+        int r = Math.min(r_darkestShade, rand.nextInt(r_lightestShade));
+        int g = Math.min(g_darkestShade, rand.nextInt(g_lightestShade));
+        int b = Math.min(b_darkestShade, rand.nextInt(b_lightestShade));
 
         return new RGB(r, g, b);
 
@@ -153,4 +153,36 @@ public class Utilities {
         return nc;
     }
 
+    public static RGB brighten(RGB c) {
+
+        float[] hsb = c.getHSB();
+        hsb[2] = 0.75f;
+        RGB nc = new RGB(hsb[0], hsb[1], hsb[2]);
+        return nc;
+    }
+
+    /**
+     * This method prints an Object reference as a series of eight (8) upper
+     * case hexidecimal values.
+     * 
+     * @param o
+     *            - An object reference
+     * @return - A string containing the hex representation of an Object
+     *         reference
+     */
+    public static String getReference(Object o) {
+
+        String es = null;
+        if (o == null) {
+            es = "@00000000";
+        } else {
+            es = o.toString();
+        }
+        int atSignIndex = es.indexOf("@");
+        if (atSignIndex > 0) {
+            es = es.substring(atSignIndex);
+        }
+        es = es.toUpperCase();
+        return es;
+    }
 }

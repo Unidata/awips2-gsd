@@ -188,4 +188,9 @@ public class GridResourceHolder extends GenericResourceHolder {
         return getUniqueName().hashCode();
     }
 
+    @Override
+    public boolean requiresLoadCheck() {
+        return true;
+    }
+
 }

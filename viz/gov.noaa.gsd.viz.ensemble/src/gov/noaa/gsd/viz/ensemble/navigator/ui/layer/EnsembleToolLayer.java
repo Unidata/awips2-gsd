@@ -63,8 +63,6 @@ import com.raytheon.uf.viz.core.rsc.ResourceProperties;
 import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
 import com.raytheon.uf.viz.core.rsc.tools.GenericToolsResourceData;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
-import com.raytheon.viz.ui.EditorUtil;
-import com.raytheon.viz.ui.editor.AbstractEditor;
 import com.raytheon.viz.ui.input.EditableManager;
 import com.vividsolutions.jts.geom.Coordinate;
 
@@ -72,7 +70,7 @@ import com.vividsolutions.jts.geom.Coordinate;
  * The EnsembleToolLayer is an AbstractVizResource that the user can turn on or
  * off (i.e. make editable or not). Typically there is one instance of this
  * class per AbstractEditor window. This class is meant to be controlled by the
- * EnsembleToolManager. Though this class is decoupled from the other classes in
+ * EnsembleTool. Though this class is decoupled from the other classes in
  * this plug-in, the idea is that the EnsembleToolLayer is the class which knows
  * how to have access to its virtually contained resources and how to act upon
  * them. In the greater picture, the tool layer controls the entire state of the
@@ -96,13 +94,15 @@ import com.vividsolutions.jts.geom.Coordinate;
  */
 public class EnsembleToolLayer extends
         AbstractVizResource<AbstractResourceData, AbstractDescriptor> implements
-        IInputHandler, IResourceDataChanged, IRefreshListener,
+        IInputHandler, IRefreshListener, IResourceDataChanged,
         IFrameChangedListener, IInitListener {
 
     private static final transient IUFStatusHandler statusHandler = UFStatus
             .getHandler(EnsembleToolLayer.class);
 
     public static final String DEFAULT_NAME = "Ensembles";
+
+    private String innerName = null;
 
     protected Coordinate initialDragPos = null;
 
@@ -114,17 +114,15 @@ public class EnsembleToolLayer extends
 
     private boolean isDisposed = true;
 
-    private boolean userRequestedEditableToggleViaLegend = false;
-
-    private boolean userRequestedNewEditableTool = false;
-
-    private boolean viewStateAlreadyModified = false;
+    private boolean isEditable = true;
 
     private List<String> expandedElements = new ArrayList<String>();
 
     private TreePath[] expandedTreePaths = new TreePath[0];
 
-    private Map<String, List<GenericResourceHolder>> ensemblesTree = new HashMap<String, List<GenericResourceHolder>>();
+    private Map<String, List<GenericResourceHolder>> ensemblesTree = null;
+
+    private List<IToolLayerChanged> changeListeners = null;
 
     public EnsembleToolLayer(
             GenericToolsResourceData<EnsembleToolLayer> resourceData,
@@ -132,31 +130,29 @@ public class EnsembleToolLayer extends
         super(resourceData, loadProperties);
         registerListener((IInitListener) this);
 
-        resourceData
-                .setNameGenerator(new EnsembleToolLayerNameGeneratorWithTimeStampBasis());
+        changeListeners = new ArrayList<IToolLayerChanged>();
 
     }
 
     synchronized public Map<String, List<GenericResourceHolder>> getEnsembleResources() {
 
-        AbstractEditor editor = EnsembleToolManager.getInstance().findEditor(
-                this);
-
-        if (EnsembleResourceManager.getInstance().getResourceList(editor) != null) {
+        if (EnsembleResourceManager.getInstance().getResourceList(this) != null) {
             ensemblesTree = EnsembleResourceManager.getInstance()
-                    .getResourceList(editor).getAllRscsAsMap(ensemblesTree);
+                    .getResourceList(this).getAllRscsAsMap(ensemblesTree);
         } else {
-            ensemblesTree = null;
+            if (ensemblesTree == null) {
+                ensemblesTree = new HashMap<String, List<GenericResourceHolder>>();
+            }
         }
 
         return ensemblesTree;
     }
 
-    public synchronized List<String> getExpandedElements() {
+    public List<String> getExpandedElements() {
         return expandedElements;
     }
 
-    public synchronized void setExpandedElements(List<String> ee) {
+    public void setExpandedElements(List<String> ee) {
         expandedElements = ee;
     }
 
@@ -168,12 +164,13 @@ public class EnsembleToolLayer extends
         this.expandedTreePaths = expandedTreePaths;
     }
 
-    public void unloadAllResources(AbstractEditor editor) {
+    public void unloadAllResources() {
 
-        if (EnsembleResourceManager.getInstance().getResourceList(editor) == null)
+        if (EnsembleResourceManager.getInstance().getResourceList(this) == null) {
             return;
+        }
         Map<String, List<GenericResourceHolder>> allRscs = EnsembleResourceManager
-                .getInstance().getResourceList(editor).getAllRscsAsMap();
+                .getInstance().getResourceList(this).getAllRscsAsMap();
 
         List<GenericResourceHolder> currEnsembleMembers = null;
         Set<String> keySet = allRscs.keySet();
@@ -184,7 +181,7 @@ public class EnsembleToolLayer extends
             for (GenericResourceHolder gr : currEnsembleMembers) {
                 if (gr.getRsc() instanceof TimeSeriesResource) {
                     gr.getRsc().unload(
-                            editor.getActiveDisplayPane().getDescriptor()
+                            getEditor().getActiveDisplayPane().getDescriptor()
                                     .getResourceList());
                     gr.getRsc().dispose();
                 } else {
@@ -192,11 +189,11 @@ public class EnsembleToolLayer extends
                     gr.getRsc().dispose();
                 }
                 EnsembleResourceManager.getInstance().unregisterResource(gr,
-                        editor, false);
+                        this, false);
             }
         }
 
-        EnsembleResourceManager.getInstance().updateFrameChanges(editor);
+        EnsembleResourceManager.getInstance().updateFrameChanges(this);
         if ((getResourceContainer() != null)
                 && (getResourceContainer().getActiveDisplayPane() != null)) {
             getResourceContainer().getActiveDisplayPane().refresh();
@@ -210,7 +207,7 @@ public class EnsembleToolLayer extends
         ResourceList rscList = null;
 
         if (TimeSeriesResource.class.isAssignableFrom(rsc.getClass())) {
-            AbstractEditor editor = EnsembleToolManager.getInstance()
+            IDisplayPaneContainer editor = EnsembleTool.getInstance()
                     .findEditor(this);
             rscList = editor.getActiveDisplayPane().getDescriptor()
                     .getResourceList();
@@ -231,10 +228,8 @@ public class EnsembleToolLayer extends
 
     public void unloadAllResourcesByName(String ensembleName) {
 
-        AbstractEditor editor = EnsembleToolManager.getInstance().findEditor(
-                this);
         List<GenericResourceHolder> ensembleMembers = EnsembleResourceManager
-                .getInstance().getResourceList(editor)
+                .getInstance().getResourceList(this)
                 .getUserLoadedRscs(ensembleName);
         int total = ensembleMembers.size();
         int count = 0;
@@ -242,15 +237,15 @@ public class EnsembleToolLayer extends
             count++;
             if (count < total) {
                 EnsembleResourceManager.getInstance().unregisterResource(gr,
-                        editor, false);
+                        this, false);
             } else {
                 EnsembleResourceManager.getInstance().unregisterResource(gr,
-                        editor, true);
+                        this, true);
             }
             gr.getRsc().unload();
         }
 
-        EnsembleResourceManager.getInstance().updateFrameChanges(editor);
+        EnsembleResourceManager.getInstance().updateFrameChanges(this);
 
         getResourceContainer().getActiveDisplayPane().refresh();
 
@@ -264,23 +259,24 @@ public class EnsembleToolLayer extends
         return isDisposed;
     }
 
+    public IDisplayPaneContainer getEditor() {
+        IDisplayPaneContainer editor = EnsembleTool.getInstance()
+                .findEditor(this);
+        return editor;
+    }
+
     @Override
     protected void disposeInternal() {
 
         descriptor.removeFrameChangedListener(this);
+        resourceData.removeChangeListener((IResourceDataChanged) this);
 
-        AbstractEditor editor = EnsembleToolManager.getInstance().findEditor(
-                this);
-        unloadAllResources(editor);
-        EnsembleToolManager.getInstance().removeToolLayer(this);
+        unloadAllResources();
 
         IDisplayPaneContainer container = getResourceContainer();
         if (container != null) {
             container.unregisterMouseHandler(this);
         }
-
-        // TODO: Investigate if this updateFrameChanges call is necessary.
-        // EnsembleResourceManager.getInstance().updateFrameChanges(editor);
         isDisposed = true;
 
     }
@@ -302,121 +298,17 @@ public class EnsembleToolLayer extends
     public void inited(AbstractVizResource<?, ?> initedRsc) {
 
         descriptor.addFrameChangedListener(this);
-        resourceData.addChangeListener(this);
         registerListener((IRefreshListener) this);
+        resourceData.addChangeListener((IResourceDataChanged) this);
+        resourceData
+                .setNameGenerator(new EnsembleToolLayerNameGeneratorWithTimeStampBasis(
+                        this));
 
     }
 
     @Override
     protected void paintInternal(IGraphicsTarget target,
             PaintProperties paintProps) throws VizException {
-
-    }
-
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * com.raytheon.uf.viz.core.rsc.IResourceDataChanged#resourceChanged(com
-     * .raytheon.uf.viz.core.rsc.IResourceDataChanged.ChangeType,
-     * java.lang.Object)
-     * 
-     * The sole purpose of this method is to minimize or restore the ensemble
-     * tool viewer (ViewPart) when its editability is turned off or on,
-     * respectively (if it is not already done).
-     */
-    @Override
-    public void resourceChanged(ChangeType type, Object object) {
-        if (type == ChangeType.CAPABILITY
-                && object instanceof EditableCapability) {
-
-            EditableCapability editable = (EditableCapability) object;
-
-            /* *
-             * The editable state of an instance of the active ensemble tool
-             * layer (i.e. this class) can be changed in one of four ways: the
-             * first is by minimizing or restoring the ensemble tool view, the
-             * second by swapping a display (that contains this instance) into
-             * or out of the active editor, the third by right-clicking on this
-             * (viz resource's) legend and toggling editability from there, or
-             * the fourth by opening another tool which causes the
-             * EditableManager to turn off any other tool layer that is
-             * editable.
-             * 
-             * In the first case, when the ensemble viewer (part listener)
-             * listens for a 'minimize' or 'restore' of the ensemble tool view
-             * the view then gets automatically minimized or restored and the
-             * active tool layer is set to 'not editable' or to 'editable',
-             * respectively; this method intentionally ignores this first case
-             * as the view is already automatically minimized or restored.
-             * 
-             * In the second case, the EnsembleToolManager listens for the
-             * IRenderableDisplayChangedListener.renderableDisplayChanged event
-             * which occurs when a swap happens. When a display with an ensemble
-             * tool layer is swapped in or out, the EnsembleToolManager restores
-             * or minimizes the viewer and, in turn, the viewer's part listener
-             * sets this tool layer to be 'editable' or 'not editable',
-             * respectively. This method intentionally ignores this second case
-             * as the view is already automatically minimized or restored.
-             * 
-             * In the third case, the user changes the editable state via the
-             * legend pop-up menu (right-clicking on a legend). This class
-             * currently listens for a right-click mouse event and sets a flag.
-             * If the flag is true then the ensemble tool view is restored. If
-             * the flag is false then the view is minimized.
-             * 
-             * In the fourth case, the user has opened another editable tool
-             * layer which will make this layer 'not editable'. This method will
-             * then minimize the view.
-             * 
-             * The "viewer state change" is run in an asynchronous Job due to a
-             * bug in Eclipse. If this is not done this way a user's request
-             * (e.g. to minimize the view) can cause a race condition between
-             * manually and programmatically setting the state. The problem is
-             * when the part listener is told of the view becoming hidden before
-             * the ViewPart view state is actually set to minimized.
-             */
-            if ((userRequestedEditableToggleViaLegend == true)
-                    || (userRequestedNewEditableTool == true)) {
-                if (editable.isEditable() == false) {
-                    SetViewerStateJob ccj = new SetViewerStateJob(
-                            "Minimize Tool View");
-                    ccj.setViewerWindowState(ViewerWindowState.MINIMIZED);
-                    ccj.setPriority(Job.SHORT);
-                    ccj.schedule();
-                } else {
-                    SetViewerStateJob ccj = new SetViewerStateJob(
-                            "Restore Tool View");
-                    ccj.setViewerWindowState(ViewerWindowState.SHOW_WITHOUT_FOCUS);
-                    ccj.setPriority(Job.SHORT);
-                    ccj.schedule();
-                }
-            }
-            /*
-             * This condition handles when the ensemble tool layer is not
-             * editable and therefore would not be able to listen for the
-             * right-click mouse event so would not be able to set the
-             * respective flag.
-             * 
-             * Don't change the view state if it has already been done.
-             */
-            else if (viewStateAlreadyModified == false) {
-                if (editable.isEditable() == true) {
-                    SetViewerStateJob ccj = new SetViewerStateJob(
-                            "Restore Tool View");
-                    ccj.setViewerWindowState(ViewerWindowState.SHOW_WITHOUT_FOCUS);
-                    ccj.setPriority(Job.SHORT);
-                    ccj.schedule();
-                } else {
-                    SetViewerStateJob ccj = new SetViewerStateJob(
-                            "Minimize Tool View");
-                    ccj.setViewerWindowState(ViewerWindowState.MINIMIZED);
-                    ccj.setPriority(Job.SHORT);
-                    ccj.schedule();
-                }
-            }
-        }
-        issueRefresh();
     }
 
     public void transferFocusToEditor() {
@@ -441,49 +333,37 @@ public class EnsembleToolLayer extends
 
     @Override
     public boolean handleMouseMove(int x, int y) {
-        boolean handledMouseAction = false;
-        // TODO
-        return handledMouseAction;
+        // TODO Auto-generated method stub
+        return false;
     }
 
     @Override
     public boolean handleMouseDownMove(int x, int y, int mouseButton) {
-        boolean handledMouseAction = false;
-        // TODO
-        return handledMouseAction;
+        // TODO Auto-generated method stub
+        return false;
     }
 
     @Override
     public boolean handleMouseUp(int x, int y, int mouseButton) {
-        boolean alreadyHandled = false;
-        // TODO
-        return alreadyHandled;
+        // TODO Auto-generated method stub
+        return false;
     }
 
     @Override
     public boolean handleKeyUp(int keyCode) {
-
-        boolean handledKeyAction = false;
-        // TODO
-        return handledKeyAction;
+        // TODO Auto-generated method stub
+        return false;
     }
 
     @Override
     public boolean handleMouseDown(int x, int y, int mouseButton) {
-        if (mouseButton == 3) {
-            /*
-             * TODO: need a better solution to know of the user has requested an
-             * action from right-clicking on the the legend.
-             */
-            userRequestedEditableToggleViaLegend = true;
-        }
-
+        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public boolean handleMouseHover(int x, int y) {
-        // TODO
+        // TODO Auto-generated method stub
         return false;
     }
 
@@ -519,18 +399,18 @@ public class EnsembleToolLayer extends
 
     public void calculate(Calculation algorithm, final Range range) {
 
-        final AbstractEditor editor = EnsembleToolManager.getInstance()
-                .findEditor(this);
+        final EnsembleToolLayer thisToolLayer = this;
+
         if (algorithm == Calculation.ENSEMBLE_RELATIVE_FREQUENCY) {
             Thread t = null;
             t = new Thread() {
                 public void run() {
 
-                    ERFCalculator erfRsc = new ERFCalculator(range);
+                    ERFCalculator erfCalculation = new ERFCalculator(range);
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
-                    loader.load(erfRsc);
+                    loader.load(erfCalculation);
 
                 }
             };
@@ -541,8 +421,7 @@ public class EnsembleToolLayer extends
 
     public void calculate(Calculation algorithm) {
 
-        final AbstractEditor editor = EnsembleToolManager.getInstance()
-                .findEditor(this);
+        final EnsembleToolLayer thisToolLayer = this;
         if (algorithm == Calculation.MEAN) {
 
             Thread t = null;
@@ -553,7 +432,7 @@ public class EnsembleToolLayer extends
                     // Load the mean overlay
                     MeanCalculator meanRsc = new MeanCalculator();
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(meanRsc);
 
@@ -570,7 +449,7 @@ public class EnsembleToolLayer extends
                     // Load the min overlay
                     MinCalculator minRsc = new MinCalculator();
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(minRsc);
 
@@ -587,7 +466,7 @@ public class EnsembleToolLayer extends
                     // Load the max overlay
                     MaxCalculator maxRsc = new MaxCalculator();
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(maxRsc);
 
@@ -603,7 +482,7 @@ public class EnsembleToolLayer extends
                     // Load the median overlay
                     MedianCalculator medianRsc = new MedianCalculator();
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(medianRsc);
 
@@ -619,7 +498,7 @@ public class EnsembleToolLayer extends
                     // Load the median overlay
                     ModeCalculator modeRsc = new ModeCalculator();
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(modeRsc);
 
@@ -635,7 +514,7 @@ public class EnsembleToolLayer extends
                     // Load the range overlay
                     RangeCalculator rangeRsc = new RangeCalculator();
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(rangeRsc);
 
@@ -651,7 +530,7 @@ public class EnsembleToolLayer extends
                     // Load the sum overlay
                     SumCalculator sumRsc = new SumCalculator();
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(sumRsc);
 
@@ -667,7 +546,7 @@ public class EnsembleToolLayer extends
                     // Load the sum overlay
                     StddevCalculator stddevRsc = new StddevCalculator();
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(stddevRsc);
 
@@ -683,7 +562,7 @@ public class EnsembleToolLayer extends
                     // Load the sum overlay
                     AvgM1StddevCalculator m1StddevRsc = new AvgM1StddevCalculator();
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(m1StddevRsc);
 
@@ -699,36 +578,36 @@ public class EnsembleToolLayer extends
                     // Load the sum overlay
                     AvgP1StddevCalculator p1StddevRsc = new AvgP1StddevCalculator();
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(p1StddevRsc);
 
                 }
             };
             t.start();
-        } else if (algorithm == Calculation.HISTOGRAM_SAMPLING) {
+        } else if (algorithm == Calculation.VALUE_SAMPLING) {
             Thread t = null;
             t = new Thread() {
                 public void run() {
 
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
-                    loader.loadOverlay(Calculation.HISTOGRAM_SAMPLING);
+                    loader.loadOverlay(Calculation.VALUE_SAMPLING);
 
                 }
             };
             t.start();
-        } else if (algorithm == Calculation.HISTOGRAM_TEXT) {
+        } else if (algorithm == Calculation.HISTOGRAM_SAMPLING) {
 
             Thread t = null;
             t = new Thread() {
                 public void run() {
 
                     GeneratedDataLoader loader = new GeneratedDataLoader(
-                            editor,
+                            thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
-                    loader.loadOverlay(Calculation.HISTOGRAM_TEXT);
+                    loader.loadOverlay(Calculation.HISTOGRAM_SAMPLING);
                 }
             };
             t.start();
@@ -736,6 +615,7 @@ public class EnsembleToolLayer extends
     }
 
     protected void setEditable(boolean makeEditable) {
+        isEditable = makeEditable;
         EditableManager.makeEditable(this, makeEditable);
     }
 
@@ -743,26 +623,31 @@ public class EnsembleToolLayer extends
     public void frameChanged(IDescriptor descriptor, DataTime oldTime,
             DataTime newTime) {
 
-        EnsembleToolManager.getInstance().updateLegendTimeInfo();
+        EnsembleTool.getInstance().frameChanged(
+                descriptor.getFramesInfo());
 
     }
 
     class EnsembleToolLayerNameGeneratorWithTimeStampBasis extends
             AbstractNameGenerator {
 
+        EnsembleToolLayer toolLayer = null;
+
+        EnsembleToolLayerNameGeneratorWithTimeStampBasis(EnsembleToolLayer tl) {
+            toolLayer = tl;
+        }
+
         @Override
         public String getName(AbstractVizResource<?, ?> resource) {
-            String timeBasis = EnsembleToolManager.getInstance()
+            String timeBasis = EnsembleTool.getInstance()
                     .getTimeBasisLegendTime();
             if (NavigatorResourceList.isTimeEmpty(timeBasis)) {
                 timeBasis = "";
             } else {
                 timeBasis = " (" + timeBasis + ") ";
             }
-            AbstractEditor editor = (AbstractEditor) EditorUtil
-                    .getActiveEditor();
-            String fullName = EnsembleToolLayer.DEFAULT_NAME + " "
-                    + editor.getTitle().trim() + timeBasis;
+
+            String fullName = innerName + " " + timeBasis;
             return fullName;
         }
 
@@ -801,9 +686,10 @@ public class EnsembleToolLayer extends
 
                     @Override
                     public void run() {
-                        EnsembleToolManager.getInstance().setViewerWindowState(
+                        EnsembleTool.getInstance().setViewerWindowState(
                                 state);
-                        clearEditableToggleFlags();
+                        EnsembleTool.getInstance()
+                                .clearEditableToggleFlags();
                     }
                 });
             }
@@ -817,26 +703,47 @@ public class EnsembleToolLayer extends
      * the tool layer is editable before interacting with the user.
      */
     public boolean isEditable() {
-
-        boolean isEditable = false;
-        if (!isDisposed) {
-            isEditable = getCapability(EditableCapability.class).isEditable();
-        }
         return isEditable;
     }
 
-    public void setEditabilityChangeInProcess() {
-        userRequestedNewEditableTool = true;
+    public String getInnerName() {
+        return innerName;
     }
 
-    public void clearEditableToggleFlags() {
-        userRequestedEditableToggleViaLegend = false;
-        userRequestedNewEditableTool = false;
-        viewStateAlreadyModified = false;
+    public void setInnerName(String innerName) {
+        this.innerName = innerName;
     }
 
-    public void setViewStateAlreadyModified() {
-        viewStateAlreadyModified = true;
+    /**
+     * Allow the caller to register for tool editability state change events.
+     * 
+     * @param listener
+     *            the dispose listener
+     */
+    public final void registerListener(IToolLayerChanged listener) {
+        changeListeners.add(listener);
+    }
+
+    public final void unregisterListener(IToolLayerChanged listener) {
+        changeListeners.remove(listener);
+    }
+
+    public boolean hasListener(IToolLayerChanged listener) {
+        return changeListeners.contains(listener);
+    }
+
+    @Override
+    public void resourceChanged(ChangeType type, Object object) {
+
+        if (type == ChangeType.CAPABILITY
+                && object instanceof EditableCapability) {
+            EditableCapability editability = (EditableCapability) object;
+            isEditable = editability.isEditable();
+            // issueRefresh();
+        }
+        for (IToolLayerChanged etl : changeListeners) {
+            etl.resourceChanged(this, type, object);
+        }
     }
 
 }

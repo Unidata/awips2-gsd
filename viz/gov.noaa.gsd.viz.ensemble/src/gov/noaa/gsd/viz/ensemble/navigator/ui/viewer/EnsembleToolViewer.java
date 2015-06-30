@@ -1,20 +1,17 @@
 package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer;
 
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
-import gov.noaa.gsd.viz.ensemble.display.calculate.Range;
-import gov.noaa.gsd.viz.ensemble.display.calculate.RangeType;
 import gov.noaa.gsd.viz.ensemble.display.common.GeneratedGridResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.GeneratedTimeSeriesResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.GridResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.HistogramGridResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.TimeSeriesResourceHolder;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.util.ChosenGEFSColors;
 import gov.noaa.gsd.viz.ensemble.util.ChosenSREFColors;
 import gov.noaa.gsd.viz.ensemble.util.EnsembleGEFSColorChooser;
 import gov.noaa.gsd.viz.ensemble.util.EnsembleSREFColorChooser;
-import gov.noaa.gsd.viz.ensemble.util.ImageResourceManager;
 import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
 import gov.noaa.gsd.viz.ensemble.util.Utilities;
 
@@ -28,6 +25,10 @@ import java.util.Set;
 
 import org.eclipse.core.commands.Command;
 import org.eclipse.core.commands.ExecutionEvent;
+import org.eclipse.core.commands.ExecutionException;
+import org.eclipse.core.commands.NotEnabledException;
+import org.eclipse.core.commands.NotHandledException;
+import org.eclipse.core.commands.common.NotDefinedException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
@@ -55,7 +56,7 @@ import org.eclipse.swt.events.KeyListener;
 import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseListener;
-import org.eclipse.swt.events.MouseTrackListener;
+import org.eclipse.swt.events.MouseTrackAdapter;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
@@ -83,25 +84,30 @@ import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.swt.widgets.Spinner;
 import org.eclipse.swt.widgets.TabFolder;
 import org.eclipse.swt.widgets.TabItem;
-import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swt.widgets.ToolItem;
 import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.ui.IPartService;
+import org.eclipse.ui.ISaveablePart2;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.commands.ICommandService;
 import org.eclipse.ui.part.ViewPart;
 import org.eclipse.ui.services.IServiceLocator;
 
+import com.raytheon.uf.common.status.IUFStatusHandler;
+import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.viz.core.VizApp;
+import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
-import com.raytheon.uf.viz.core.rsc.IRefreshListener;
 import com.raytheon.uf.viz.core.rsc.ResourceType;
 import com.raytheon.uf.viz.core.rsc.capabilities.ColorableCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.OutlineCapability;
+import com.raytheon.uf.viz.xy.timeseries.TimeSeriesEditor;
+import com.raytheon.viz.ui.EditorUtil;
+import com.raytheon.viz.ui.editor.AbstractEditor;
 
 /**
  * This class represents the Ensemble Tool navigator widget, which is an RCP
@@ -112,7 +118,7 @@ import com.raytheon.uf.viz.core.rsc.capabilities.OutlineCapability;
  * Features in this class include the ability to:
  * 
  * 1) Behave as proxy for the current active CAVE "editable" ensemble tool; this
- * class is an RCP CAVE view that is coupled to the EnsembleToolManager which
+ * class is an RCP CAVE view that is coupled to the EnsembleTool which
  * associates an active RCP CAVE editor ("Map", "TimeSeries", etc.) to an
  * EnsembleToolLayer. This view will display the resources for the active
  * EnsembleToolLayer.
@@ -152,7 +158,10 @@ import com.raytheon.uf.viz.core.rsc.capabilities.OutlineCapability;
  * @version 1.0
  */
 
-public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
+public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
+
+    private static final transient IUFStatusHandler statusHandler = UFStatus
+            .getHandler(EnsembleToolViewer.class);
 
     public static final String ID = "gov.noaa.gsd.viz.ensemble.tool.viewer";
 
@@ -162,15 +171,19 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
     private static int CLIENT_BODY_AREA_HEIGHT = 739;
 
-    private TreeViewer ensemblesTreeViewer = null;
+    private boolean isDisabled = false;
+
+    private TreeViewer ensembleTreeViewer = null;
 
     private Tree ensembleTree = null;
 
     private ArrayList<ColumnLabelProvider> columnLabelProviders = new ArrayList<ColumnLabelProvider>();
 
-    private ScrolledComposite tabContainer = null;
+    private ScrolledComposite rootTabComposite = null;
 
-    private CTabFolder tabEnsemblesMain = null;
+    private CTabFolder tabEnsemblesMainTabFolder = null;
+
+    private Composite lowerSashComposite = null;
 
     private ToolBar toolBar = null;
 
@@ -178,65 +191,102 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
     private Font smallViewFont = null;
 
-    private TabFolder tabFolder_lowerSash = null;
+    private Composite planViewInfoTabComposite = null;
 
-    private TabItem tabPreferences = null;
+    private Composite timeSeriesInfoTabComposite = null;
 
-    private TabItem tabResourceInfo = null;
+    private Label timeSeriesPointLabelLbl = null;
 
-    private TabItem tabERFLayerControl = null;
+    private Label timeSeriesPointValueLbl = null;
 
-    private TabItem lastSelectedNonTransientTabItem = null;
+    private Label primaryRscTimeLbl = null;
 
-    private Text lowerRangeEntryTextBox_1 = null;
+    private Label frameTimeUsingBasisLbl = null;
 
-    private Text lowerRangeEntryTextBox_2 = null;
+    private Label timeMatchResourceLbl = null;
 
-    private Text lowerRangeEntryTextBox_3 = null;
+    private Label primaryRscLbl = null;
 
-    private Text lowerRangeEntryTextBox_4 = null;
+    private Composite thickenOnSelectionComposite = null;
 
-    private Text upperRangeEntryTextBox_1 = null;
+    private Composite smallFlagsComposite = null;
 
-    private Text upperRangeEntryTextBox_2 = null;
+    private Button thickenOnSelectionBtn = null;
 
-    private Button radioChooserRange_1 = null;
+    private Button useResourceColorRdo = null;
 
-    private Button radioChooserRange_2 = null;
+    private Button chooseColorRdo = null;
 
-    private Button radioChooserRange_3 = null;
+    private Label colorChooserLbl = null;
 
-    private Button radioChooserRange_4 = null;
+    private Label thicknessChooserLbl = null;
 
-    private Button btn_cancelERF = null;
+    private Spinner thicknessChooserSpinner = null;
 
-    private Button btn_computeERF = null;
+    private Button editableOnRestoreBtn = null;
+
+    private Button editableOnSwapInBtn = null;
+
+    private Button uneditableOnMinimizeBtn = null;
+
+    private Button minimizeOnForeignToolBtn = null;
+
+    private Button minimizeOnToggleUneditableBtn = null;
+
+    private Button createToolLayerOnNewEditorBtn = null;
+
+    private Button autoHidePreferencesBtn = null;
+
+    private boolean editableOnRestore = false;
+
+    private boolean editableOnSwapIn = false;
+
+    private boolean uneditableOnMinimize = false;
+
+    private boolean minimizeOnForeignToolLoad = false;
+
+    protected boolean minimizeOnToggleUneditable = false;
+
+    protected boolean createToolLayerOnNewEditor = false;
+
+    protected boolean autoHidePreferences = false;
+
+    private CTabItem itemLegendsTabItem = null;
+
+    private CTabItem itemMatrixTabItem = null;
+
+    private TabFolder lowerSashTabFolder = null;
+
+    private TabItem preferencesTabItem = null;
+
+    private TabItem resourceInfoTabItem = null;
 
     private MenuItem addERFLayerMenuItem = null;
 
-    private Label label_ensembleProductName = null;
-
     private EnsembleViewPartListener viewPartListener = null;
 
-    private boolean viewEnabled = true;
+    private ToolItem browserToolItem = null;
 
-    private ResourceType editorType = ResourceType.PLAN_VIEW;
+    private ToolItem powerToggleToolItem = null;
+
+    /*
+     * the current frame index based on the frameChanged event.
+     */
+    private FramesInfo currentFramesInfo;
+
+    private ToolItem runToolItem = null;
+
+    private boolean viewEditable = true;
+
+    private ResourceType editorResourceType = ResourceType.PLAN_VIEW;
 
     private SashForm sashForm = null;
-
-    static private Image GEAR_ICON = null;
-
-    static private Image ALPHANUMERIC_SORT_ICON = null;
-
-    static private Image INFO_ICON = null;
 
     public static int FEATURE_SET_COLUMN_INDEX = 1;
 
     public static int VISIBLE_COLUMN_INDEX = 2;
 
     public static int SAMPLING_COLUMN_INDEX = 3;
-
-    private static String BUNDLE_CMD_TITLE = "Bundle";
 
     private AbstractVizResource<?, ?> currentEnsembleRsc = null;
 
@@ -256,29 +306,19 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
     private int thickenWidth = 4;
 
-    private boolean autoFocus = true;
-
-    private boolean volumeBrowserJustOpened = false;
-
-    private boolean userRequestedERF = false;
-
-    private long ignoreFocusStartTime = 0;
-
-    private static final long IGNORE_FOCUS_PERIOD_MILLIS = 4000;
-
-    final TransferFocusListener trackMouseEntryExit = new TransferFocusListener();
-
-    protected Composite owner = null;
+    protected Composite ownerComposite = null;
 
     final private ITreeViewerListener expandCollapseListener = new EnsembleTreeExpandCollapseListener();
+
+    private ERFProductDialog_Modal erfDialog = null;
 
     private static final Color ENABLED_FOREGROUND_COLOR = SWTResourceManager.BLACK;
 
     private static final Color DISABLED_FOREGROUND_COLOR = SWTResourceManager.MEDIUM_GRAY;
 
-    private Label label_frameTimeUsingBasis = null;
+    protected TreeItem calculationSelectedTreeItem = null;
 
-    private Label label_TimeMatchResourceLabel = null;
+    private Menu calculationMenu = null;
 
     private Cursor selectionModeCursor = null;
 
@@ -286,21 +326,15 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
     private Cursor waitCursor = null;
 
+    private List<Image> imageCache = null;
+
     private final long elegantWaitPeriod = 100;
 
     /* class scope for accessibility from inner anonymous class */
-    protected TreeItem foundItem = null;
+    protected TreeItem foundTreeItem = null;
 
     /* class scope for accessibility from inner anonymous class */
     protected TreeItem[] directDescendants = null;
-
-    private Job refreshJob = null;
-
-    private static boolean RefreshRequested = false;
-
-    private static final long LONGEST_REFRESH_WAIT = 1750;
-
-    private static long IGNORE_INTERIM_REFRESH_REQUEST_PERIOD = LONGEST_REFRESH_WAIT;
 
     private static boolean isDisposing = false;
 
@@ -314,15 +348,11 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
     public EnsembleToolViewer() {
 
-        /*
-         * As long as this ViewPart is not disposed, run a Job which refreshes
-         * the Tree control after a lazy wait period.
-         */
-        refreshJob = new ConstantlyCheckForRefreshJob("");
-        refreshJob.setSystem(true);
-        refreshJob.setPriority(Job.SHORT);
-        /* no need to start it immediately */
-        refreshJob.schedule(LONGEST_REFRESH_WAIT);
+        minimizeOnForeignToolLoad = true;
+        editableOnRestore = true;
+        autoHidePreferences = true;
+
+        imageCache = new ArrayList<>();
 
     }
 
@@ -332,107 +362,112 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
      * 
      * @param parent
      */
-
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * org.eclipse.ui.part.WorkbenchPart#createPartControl(org.eclipse.swt.widgets
-     * .Composite)
-     */
     public void createPartControl(Composite parent) {
 
-        owner = parent;
+        ownerComposite = parent;
+
+        /*
+         * TODO: This colorized backdrop should happen not by being hard-coded
+         * but via state change (ie. by calling setEnabled).
+         */
+        ownerComposite.setBackground(SWTResourceManager.PALE_DULL_AZURE);
 
         /* create the defaut icons when the view is initially opened */
-        constructImages();
+        EnsembleToolViewerImageStore.constructImages();
 
         viewFont = SWTResourceManager.getFont("Dialog", 9, SWT.NONE);
         smallViewFont = SWTResourceManager.getFont("Dialog", 8, SWT.NONE);
 
-        GridLayout gridLayout1 = new GridLayout(1, false);
-        parent.setLayout(gridLayout1);
+        GridLayout parent_gl = new GridLayout(1, false);
+        parent_gl.marginHeight = 2;
+        parent_gl.marginWidth = 2;
+        parent.setLayout(parent_gl);
 
-        GridData gridData1 = new GridData(SWT.FILL, SWT.CENTER, true, true, 2,
+        GridData parent_gd = new GridData(SWT.FILL, SWT.CENTER, true, true, 2,
                 3);
-        parent.setLayoutData(gridData1);
-
-        /* spacer component */
-        Composite dummySpacerContainer = new Composite(parent, SWT.NONE);
-        GridLayout gl_dummySpacerContainer = new GridLayout();
-        dummySpacerContainer.setLayout(gl_dummySpacerContainer);
+        parent.setLayoutData(parent_gd);
 
         /* the main container holds the resource "legends" and is scrollable */
-        tabContainer = new ScrolledComposite(parent, SWT.BORDER | SWT.H_SCROLL
-                | SWT.V_SCROLL);
+        rootTabComposite = new ScrolledComposite(parent, SWT.BORDER
+                | SWT.H_SCROLL | SWT.V_SCROLL);
 
         /* this is the root grid layout of all grid layouts */
-        GridLayout gl_scrolledContainer = new GridLayout();
-        GridData gd_tabContainer = new GridData(SWT.FILL, SWT.FILL, true, true,
+        GridLayout tabContainer_gl = new GridLayout();
+        tabContainer_gl.marginWidth = 2;
+        tabContainer_gl.marginHeight = 2;
+        GridData tabContainer_gd = new GridData(SWT.FILL, SWT.FILL, true, true,
                 1, 1);
-        gd_tabContainer.heightHint = CLIENT_BODY_AREA_HEIGHT;
-        tabContainer.setLayout(gl_scrolledContainer);
-        tabContainer.setLayoutData(gd_tabContainer);
+        tabContainer_gd.heightHint = CLIENT_BODY_AREA_HEIGHT;
+        rootTabComposite.setLayout(tabContainer_gl);
+        rootTabComposite.setLayoutData(tabContainer_gd);
 
         /*
          * main tab container to allow user to switch between legends, matrix,
          * and future ideas ...
          */
-        tabEnsemblesMain = new CTabFolder(tabContainer, SWT.TOP | SWT.BORDER);
-        tabEnsemblesMain.setFont(viewFont);
-        tabEnsemblesMain
+        tabEnsemblesMainTabFolder = new CTabFolder(rootTabComposite, SWT.TOP
+                | SWT.BORDER);
+        tabEnsemblesMainTabFolder.setFont(viewFont);
+        tabEnsemblesMainTabFolder
                 .setSelectionBackground(SWTResourceManager.PALE_LIGHT_AZURE);
 
         /* here's the toolbar */
-        Composite toolbarContainer = new Composite(tabEnsemblesMain, SWT.NONE);
-        toolbarContainer.setBackground(SWTResourceManager.WHITE);
+        Composite toolbarComposite = new Composite(tabEnsemblesMainTabFolder,
+                SWT.NONE);
+        toolbarComposite.setBackground(SWTResourceManager.WHITE);
 
-        FillLayout fl_toolbarContainer = new FillLayout(SWT.HORIZONTAL);
-        fl_toolbarContainer.marginWidth = 1;
-        fl_toolbarContainer.marginHeight = 1;
-        toolbarContainer.setLayout(fl_toolbarContainer);
+        FillLayout toolbarContainer_fl = new FillLayout(SWT.HORIZONTAL);
+        toolbarContainer_fl.marginWidth = 1;
+        toolbarContainer_fl.marginHeight = 1;
+        toolbarComposite.setLayout(toolbarContainer_fl);
 
         /* fill the tool bar */
-        toolBar = makeToolBar(toolbarContainer);
-        Rectangle r = toolbarContainer.getBounds();
+        toolBar = makeToolBar(toolbarComposite);
+        Rectangle r = toolbarComposite.getBounds();
         r.height = r.height + 32;
-        toolbarContainer.setBounds(r);
+        toolbarComposite.setBounds(r);
 
-        tabEnsemblesMain.setTabHeight(42);
-        tabEnsemblesMain.setTopRight(toolbarContainer);
-        tabEnsemblesMain.setFont(SWTResourceManager.getFont("SansSerif", 10,
-                SWT.NONE));
+        tabEnsemblesMainTabFolder.setTabHeight(42);
+        tabEnsemblesMainTabFolder.setTopRight(toolbarComposite);
+        tabEnsemblesMainTabFolder.setFont(SWTResourceManager.getFont(
+                "SansSerif", 10, SWT.NONE));
+
+        tabEnsemblesMainTabFolder
+                .addSelectionListener(new UpperTabSelectionListener());
 
         /* tab entry for Legends */
-        CTabItem tbtmLegends = new CTabItem(tabEnsemblesMain, SWT.NONE);
-        tbtmLegends.setText("  Legends  ");
+        itemLegendsTabItem = new CTabItem(tabEnsemblesMainTabFolder, SWT.NONE);
+        itemLegendsTabItem
+                .setImage(EnsembleToolViewerImageStore.TAB_LEGENDS_ENABLED_UNSELECTED_IMG);
+        // tabItemLegends.setText("  Legends  ");
 
         /* tab entry for Matrix */
-        CTabItem tbtmMatrix = new CTabItem(tabEnsemblesMain, SWT.NONE);
-        tbtmMatrix.setText("  Matrix  ");
-
+        itemMatrixTabItem = new CTabItem(tabEnsemblesMainTabFolder, SWT.NONE);
+        itemMatrixTabItem
+                .setImage(EnsembleToolViewerImageStore.TAB_MATRIX_ENABLED_UNSELECTED_IMG);
+        // tabItemMatrix.setText("  Matrix  ");
         /*
          * let's have an upper sash and lower sash that the user can resize
          * vertically (see SWT concept of sash)
          */
 
-        sashForm = new SashForm(tabEnsemblesMain, SWT.BORDER);
+        sashForm = new SashForm(tabEnsemblesMainTabFolder, SWT.BORDER);
         sashForm.setOrientation(SWT.VERTICAL);
 
-        tabContainer.setContent(tabEnsemblesMain);
-        tabContainer.setMinSize(tabEnsemblesMain.computeSize(SWT.DEFAULT,
-                SWT.DEFAULT));
+        rootTabComposite.setContent(tabEnsemblesMainTabFolder);
+        rootTabComposite.setMinSize(tabEnsemblesMainTabFolder.computeSize(
+                SWT.DEFAULT, SWT.DEFAULT));
 
         /* upper sash contains the resource "legend" tree. */
         ensembleTree = new Tree(sashForm, SWT.BORDER | SWT.H_SCROLL
                 | SWT.V_SCROLL | SWT.SINGLE | SWT.FULL_SELECTION);
         ensembleTree.setLinesVisible(true);
         ensembleTree.setHeaderVisible(false);
-        ensemblesTreeViewer = new TreeViewer(ensembleTree);
-        createColumns(ensemblesTreeViewer);
+        ensembleTreeViewer = new TreeViewer(ensembleTree);
+        createColumns(ensembleTreeViewer);
 
         /* keep track of the collapse/expand state */
-        ensemblesTreeViewer.addTreeListener(expandCollapseListener);
+        ensembleTreeViewer.addTreeListener(expandCollapseListener);
 
         /* recognize when the user clicks on something in the tree */
         ensembleTree.addMouseListener(new EnsembleTreeMouseListener());
@@ -441,39 +476,44 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
          * the lower sash contains a composite which itself contains a tab
          * folder (i.e. set of tabs in one container) ...
          */
-        Composite lowerSash = new Composite(sashForm, SWT.BORDER_SOLID);
-        lowerSash.setBackground(SWTResourceManager.LIGHT_GRAY);
-        GridLayout gl_lowerSash = new GridLayout();
-        lowerSash.setLayout(gl_lowerSash);
-        GridData gd_lowerSash = new GridData(SWT.FILL, SWT.FILL, true, true, 1,
+        lowerSashComposite = new Composite(sashForm, SWT.BORDER_SOLID);
+        lowerSashComposite.setBackground(SWTResourceManager.LIGHT_GRAY);
+        GridLayout lowerSash_gl = new GridLayout();
+        lowerSashComposite.setLayout(lowerSash_gl);
+        GridData lowerSash_gd = new GridData(SWT.FILL, SWT.FILL, true, true, 1,
                 1);
-        gd_lowerSash.horizontalIndent = 1;
-        gd_lowerSash.verticalIndent = 1;
-        lowerSash.setLayoutData(gd_lowerSash);
+        lowerSash_gd.horizontalIndent = 1;
+        lowerSash_gd.verticalIndent = 1;
+        lowerSashComposite.setLayoutData(lowerSash_gd);
 
         /*
          * put the Info, ERF, and Preferences tabs in the lower sash container
          */
-        fillLowerSash(lowerSash);
+        fillLowerSash(lowerSashComposite);
 
         /* what is the best ratio of visibility of upper vs. lower sash */
-        sashForm.setWeights(new int[] { 54, 46 });
+        sashForm.setWeights(new int[] { 66, 33 });
 
-        tbtmLegends.setControl(sashForm);
-
-        /* keep track of which lower tab was last selected */
-        tabFolder_lowerSash
-                .addSelectionListener(new LowerSashTabSelectionListener());
+        itemLegendsTabItem.setControl(sashForm);
 
         /* fill the contents of the tree with */
-        ensemblesTreeViewer
+        ensembleTreeViewer
                 .setContentProvider(new EnsembleTreeContentProvider());
-        ensemblesTreeViewer.setSorter(new EnsembleTreeSorter());
+        ensembleTreeViewer.setSorter(new EnsembleTreeSorter());
 
-        tabContainer.setExpandHorizontal(true);
-        tabContainer.setExpandVertical(true);
+        ensembleTree.addMouseTrackListener(new MouseTrackAdapter() {
 
-        tabEnsemblesMain.setSelection(tbtmLegends);
+            @Override
+            public void mouseEnter(MouseEvent e) {
+                switchToInfoTabIfAutoHide();
+            }
+
+        });
+
+        rootTabComposite.setExpandHorizontal(true);
+        rootTabComposite.setExpandVertical(true);
+
+        tabEnsemblesMainTabFolder.setSelection(itemLegendsTabItem);
 
         parent.pack();
 
@@ -485,15 +525,14 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             service.addPartListener(viewPartListener);
         }
 
-        ensemblesTreeViewer.getControl().addMouseTrackListener(
-                trackMouseEntryExit);
-
-        selectionModeCursor = owner.getDisplay().getSystemCursor(
+        selectionModeCursor = ownerComposite.getDisplay().getSystemCursor(
                 SWT.CURSOR_HAND);
 
-        normalCursor = owner.getDisplay().getSystemCursor(SWT.CURSOR_ARROW);
+        normalCursor = ownerComposite.getDisplay().getSystemCursor(
+                SWT.CURSOR_ARROW);
 
-        waitCursor = owner.getDisplay().getSystemCursor(SWT.CURSOR_WAIT);
+        waitCursor = ownerComposite.getDisplay().getSystemCursor(
+                SWT.CURSOR_WAIT);
 
         ensembleTree.addKeyListener(new EnsembleTreeKeyListener());
         updateCursor(normalCursor);
@@ -501,41 +540,10 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
     }
 
     /*
-     * Let's keep track of only the Tab items which contain long-standing
-     * information (currently the meta-data and preferences tab items. Ignore,
-     * for example, the probability tab which is used as a either a creation
-     * widget (i.e. to create ERF products) or as a info widget (only when the
-     * ERF product is specifically selected).
-     */
-
-    private class LowerSashTabSelectionListener implements SelectionListener {
-
-        @Override
-        public void widgetSelected(SelectionEvent e) {
-            TabItem[] tabItem = tabFolder_lowerSash.getSelection();
-            TabItem cti = tabItem[0];
-            if ((cti == tabPreferences) || (cti == tabResourceInfo)) {
-                lastSelectedNonTransientTabItem = cti;
-            }
-        }
-
-        @Override
-        public void widgetDefaultSelected(SelectionEvent e) {
-            TabItem[] tabItem = tabFolder_lowerSash.getSelection();
-            TabItem cti = tabItem[0];
-            if ((cti == tabPreferences) || (cti == tabResourceInfo)) {
-                lastSelectedNonTransientTabItem = cti;
-            }
-        }
-
-    }
-
-    /*
      * Keep track of the resource type of the current editor
      */
     public void setEditorType(ResourceType rt) {
-        editorType = rt;
-
+        editorResourceType = rt;
     }
 
     /*
@@ -588,16 +596,30 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
      * children resources of a given parent are invisible then the parent tree
      * item should be grayed out.
      */
-    protected void matchParentToChildrenVisibility(final TreeItem childItem) {
+    protected void matchParentToChildrenVisibility(TreeItem ci) {
 
+        final TreeItem childItem = ci;
         VizApp.runSync(new Runnable() {
 
             @Override
             public void run() {
 
-                final TreeItem parentItem = childItem.getParentItem();
-                if (parentItem == null)
+                if (!isViewerTreeReady()) {
                     return;
+                }
+                if (childItem == null) {
+                    return;
+                }
+                if (childItem.isDisposed()) {
+                    return;
+                }
+                if (childItem.getParentItem() == null) {
+                    return;
+                }
+                if (childItem.getParentItem().isDisposed()) {
+                    return;
+                }
+                final TreeItem parentItem = childItem.getParentItem();
 
                 final Object d = parentItem.getData();
                 if (d instanceof String) {
@@ -626,7 +648,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                         parentItem
                                 .setForeground(EnsembleToolViewer.DISABLED_FOREGROUND_COLOR);
                         if (isViewerTreeReady()) {
-                            ensemblesTreeViewer.getTree().deselectAll();
+                            ensembleTreeViewer.getTree().deselectAll();
                         }
                     }
                     /*
@@ -638,13 +660,11 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                         parentItem
                                 .setForeground(EnsembleToolViewer.ENABLED_FOREGROUND_COLOR);
                         if (isViewerTreeReady()) {
-                            ensemblesTreeViewer.getTree().deselectAll();
+                            ensembleTreeViewer.getTree().deselectAll();
                         }
                     }
                 }
-
             }
-
         });
     }
 
@@ -664,16 +684,14 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     if (ti.getData() instanceof String) {
                         String treeItemLabelName = (String) ti.getData();
                         if (treeItemLabelName.equals(name)) {
-                            foundItem = ti;
+                            foundTreeItem = ti;
                             break;
                         }
                     }
                 }
-
             }
-
         });
-        return foundItem;
+        return foundTreeItem;
 
     }
 
@@ -740,9 +758,8 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
         EnsembleToolViewer.setDisposing(true);
 
-        /* no need to listen for refresh events any more */
-        if (refreshJob != null) {
-            ((ConstantlyCheckForRefreshJob) refreshJob).cancelJob();
+        for (Image img : imageCache) {
+            img.dispose();
         }
 
         if (columnLabelProviders != null) {
@@ -750,13 +767,17 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 clp.dispose();
             }
         }
+        if (erfDialog != null) {
+            erfDialog.close();
+        }
+
         if (isViewerTreeReady()) {
             ensembleTree.removeAll();
             ensembleTree.dispose();
             ensembleTree = null;
         }
-        if (ensemblesTreeViewer != null) {
-            ensemblesTreeViewer = null;
+        if (ensembleTreeViewer != null) {
+            ensembleTreeViewer = null;
         }
 
         SWTResourceManager.dispose();
@@ -765,66 +786,133 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
     }
 
-    /*
-     * This allows the tree widget to take the focus when, for example, the user
-     * moves the mouse pointer anywhere over this ViewPart.
-     * 
-     * @see org.eclipse.ui.part.WorkbenchPart#setFocus()
-     */
-    @Override
-    public void setFocus() {
-
-        if (isViewerTreeReady()) {
-            ensemblesTreeViewer.getControl().setFocus();
-        }
+    public void disableTool() {
+        setViewEditable(false);
+        powerToggleToolItem.setEnabled(false);
+        isDisabled = true;
     }
 
-    /*
-     * We implemented this so that we would (re-)grab the focus after the Volume
-     * Browser was opened.
-     */
-    public void grabFocus() {
-
-        if (isViewerTreeReady()) {
-            ensemblesTreeViewer.getControl().forceFocus();
-        }
+    public boolean isDisabled() {
+        return isDisabled;
     }
 
     synchronized public boolean isEnabled() {
-        return viewEnabled;
+        return viewEditable;
     }
 
     /*
      * The ViewPart should be enabled when an ensemble tool layer is editable in
-     * the currently active editor.
+     * the currently active editor, and disabled when the tool layer is set to
+     * 'not editable'.
      */
-    synchronized public void setEnabled(boolean enabled) {
+    synchronized public void setViewEditable(boolean enabled) {
 
-        viewEnabled = enabled;
-        tabEnsemblesMain.setEnabled(enabled);
-        toolBar.setEnabled(enabled);
+        isDisabled = false;
+        viewEditable = enabled;
 
+        VizApp.runSync(new Runnable() {
+
+            @Override
+            public void run() {
+                if (viewEditable) {
+                    powerToggleToolItem
+                            .setImage(EnsembleToolViewerImageStore.POWER_ON_IMG);
+                    powerToggleToolItem.setToolTipText("Tool Off");
+                    ownerComposite
+                            .setBackground(SWTResourceManager.PALE_DULL_AZURE);
+                    tabEnsemblesMainTabFolder.setSelection(itemLegendsTabItem);
+                    resourceInfoTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_INFO_ENABLED_IMG);
+                    preferencesTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_OPTIONS_ENABLED_IMG);
+                    itemLegendsTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_LEGENDS_ENABLED_SELECTED_IMG);
+                    itemMatrixTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_MATRIX_ENABLED_UNSELECTED_IMG);
+                    lowerSashComposite
+                            .setBackground(SWTResourceManager.PALE_DULL_AZURE);
+
+                } else {
+                    powerToggleToolItem
+                            .setImage(EnsembleToolViewerImageStore.POWER_OFF_IMG);
+                    powerToggleToolItem.setToolTipText("Tool On");
+                    ownerComposite.setBackground(SWTResourceManager.LIGHT_GRAY);
+                    resourceInfoTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_INFO_DISABLED_IMG);
+                    preferencesTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_OPTIONS_DISABLED_IMG);
+                    itemLegendsTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_LEGENDS_DISABLED_IMG);
+                    itemMatrixTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_MATRIX_DISABLED_IMG);
+                    ensembleTreeViewer.getTree().deselectAll();
+                    lowerSashComposite
+                            .setBackground(SWTResourceManager.LIGHT_GRAY);
+                }
+
+                thickenOnSelectionComposite.setEnabled(viewEditable);
+                smallFlagsComposite.setEnabled(viewEditable);
+                thickenOnSelectionBtn.setEnabled(viewEditable);
+                useResourceColorRdo.setEnabled(viewEditable);
+                chooseColorRdo.setEnabled(viewEditable);
+                colorChooserLbl.setEnabled(viewEditable);
+                thicknessChooserLbl.setEnabled(viewEditable);
+                thicknessChooserSpinner.setEnabled(viewEditable);
+
+                editableOnRestoreBtn.setEnabled(viewEditable);
+                // btnEditableOnSwapIn.setEnabled(viewEditable);
+                // btnUneditableOnMinimize.setEnabled(viewEditable);
+                // btnCreateToolLayerOnNewEditor.setEnabled(viewEditable);
+                minimizeOnForeignToolBtn.setEnabled(viewEditable);
+                minimizeOnToggleUneditableBtn.setEnabled(viewEditable);
+                autoHidePreferencesBtn.setEnabled(viewEditable);
+
+                createToolLayerOnNewEditorBtn.setEnabled(false);
+                editableOnSwapInBtn.setEnabled(false);
+                uneditableOnMinimizeBtn.setEnabled(false);
+
+                primaryRscLbl.setEnabled(viewEditable);
+                primaryRscTimeLbl.setEnabled(viewEditable);
+                timeMatchResourceLbl.setEnabled(viewEditable);
+                frameTimeUsingBasisLbl.setEnabled(viewEditable);
+                lowerSashComposite.setEnabled(viewEditable);
+                ensembleTreeViewer.getTree().setEnabled(viewEditable);
+                browserToolItem.setEnabled(viewEditable);
+                runToolItem.setEnabled(viewEditable);
+
+                /* Always on items */
+                toolBar.setEnabled(true);
+                powerToggleToolItem.setEnabled(true);
+
+                if (isViewerTreeReady()) {
+                    // ensemblesTreeViewer.refresh(true);
+                    tabEnsemblesMainTabFolder.getSelection().reskin(SWT.ALL);
+                    tabEnsemblesMainTabFolder.redraw();
+                }
+            }
+        });
     }
 
     /*
      * Given a tree item, find the item in the tree and toggle it's visibility
      * state.
      */
-    private void toggleItemVisible(final TreeItem item) {
+    private void toggleItemVisible(TreeItem item) {
 
-        final IRefreshListener viewer = this;
+        final TreeItem finalItem = item;
+
         VizApp.runSync(new Runnable() {
 
             @Override
             public void run() {
 
-                if (item.isDisposed()) {
+                if (finalItem.isDisposed()) {
                     return;
                 }
-                final Object mousedItem = item.getData();
+                final Object mousedItem = finalItem.getData();
                 if (mousedItem instanceof String) {
 
-                    Color fg = item.getForeground();
+                    Color fg = finalItem.getForeground();
                     boolean isVisible = false;
 
                     /*
@@ -840,23 +928,24 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
                     /* if it was on turn it off */
                     if (isVisible) {
-                        item.setForeground(EnsembleToolViewer.DISABLED_FOREGROUND_COLOR);
+                        finalItem
+                                .setForeground(EnsembleToolViewer.DISABLED_FOREGROUND_COLOR);
                         if (isViewerTreeReady()) {
-                            ensemblesTreeViewer.getTree().deselectAll();
+                            ensembleTreeViewer.getTree().deselectAll();
                         }
                     }
                     /* if it was off turn it on */
                     else {
-                        item.setForeground(EnsembleToolViewer.ENABLED_FOREGROUND_COLOR);
+                        finalItem
+                                .setForeground(EnsembleToolViewer.ENABLED_FOREGROUND_COLOR);
                         if (isViewerTreeReady()) {
-                            ensemblesTreeViewer.getTree().deselectAll();
+                            ensembleTreeViewer.getTree().deselectAll();
                         }
                     }
 
                 } else if (mousedItem instanceof GenericResourceHolder) {
 
                     GenericResourceHolder gr = (GenericResourceHolder) mousedItem;
-                    gr.getRsc().registerListener(viewer);
                     boolean isVisible = gr.getRsc().getProperties().isVisible();
                     /* toggle visibility */
                     isVisible = !isVisible;
@@ -864,23 +953,23 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     gr.getRsc().issueRefresh();
                     /* update tree item to reflect new state */
                     if (isVisible) {
-                        item.setForeground(EnsembleToolViewer.ENABLED_FOREGROUND_COLOR);
+                        finalItem
+                                .setForeground(EnsembleToolViewer.ENABLED_FOREGROUND_COLOR);
                     } else {
-                        item.setForeground(EnsembleToolViewer.DISABLED_FOREGROUND_COLOR);
+                        finalItem
+                                .setForeground(EnsembleToolViewer.DISABLED_FOREGROUND_COLOR);
                     }
                     if (isViewerTreeReady()) {
-                        ensemblesTreeViewer.getTree().deselectAll();
+                        ensembleTreeViewer.getTree().deselectAll();
                     }
                 }
             }
-
         });
-
-        refresh();
     }
 
-    protected TreeItem[] getDirectDescendants(final TreeItem rootItem) {
+    protected TreeItem[] getDirectDescendants(TreeItem ri) {
 
+        final TreeItem rootItem = ri;
         VizApp.runSync(new Runnable() {
 
             @Override
@@ -922,10 +1011,6 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         @SuppressWarnings("unchecked")
         public Object[] getElements(Object inputElement) {
 
-            if (!EnsembleToolManager.getInstance().isReady()) {
-                return new Object[0];
-            }
-
             // The root elements of the tree are all strings representing
             // the grid product name ... we get the map from the Ensemble-
             // ToolManager. Create a primitive array of Objects having
@@ -966,16 +1051,12 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         @Override
         public Object[] getChildren(Object parentElement) {
 
-            if (!EnsembleToolManager.getInstance().isReady()) {
-                return new Object[0];
-            }
-
             // The children of a top-level product are currently only
             // perturbation members of an ensemble product. Find all
             // children, which are guaranteed to be of Class type
             // GenericResourceHolder, and return them in a primitive
             // array of Objects.
-            Map<String, List<GenericResourceHolder>> ensembles = EnsembleToolManager
+            Map<String, List<GenericResourceHolder>> ensembles = EnsembleTool
                     .getInstance().getEnsembleResources();
 
             if ((ensembles == null) || (ensembles.size() == 0)) {
@@ -1004,9 +1085,6 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         @Override
         public Object getParent(Object element) {
 
-            if (!EnsembleToolManager.getInstance().isReady()) {
-                return null;
-            }
             // Given an item from the tree, return its parent
             // in the tree. Currently, only perturbation members
             // can have parents, so the Object that gets returned
@@ -1018,14 +1096,14 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             if (GenericResourceHolder.class
                     .isAssignableFrom(element.getClass())) {
                 GenericResourceHolder targetRsc = (GenericResourceHolder) element;
-                Map<String, List<GenericResourceHolder>> ensembles = EnsembleToolManager
+                Map<String, List<GenericResourceHolder>> ensembles = EnsembleTool
                         .getInstance().getEnsembleResources();
                 Set<Entry<String, List<GenericResourceHolder>>> entries = ensembles
                         .entrySet();
                 Iterator<Entry<String, List<GenericResourceHolder>>> iterator = entries
                         .iterator();
                 Entry<String, List<GenericResourceHolder>> currChild = null;
-                for (int i = 0; iterator.hasNext() && !parentFound; i++) {
+                while (iterator.hasNext() && !parentFound) {
                     currChild = iterator.next();
                     List<GenericResourceHolder> resources = currChild
                             .getValue();
@@ -1043,16 +1121,13 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         @Override
         public boolean hasChildren(Object element) {
 
-            if (!EnsembleToolManager.getInstance().isReady()) {
-                return false;
-            }
             // Currently, if the given element has children than it is
             // an ensemble product. Get the map of resources from the
-            // EnsembleToolManager and see whether the element
+            // EnsembleTool and see whether the element
             // given is an ensemble product (by having an associated
             // "not empty" list ...
             boolean hasChildren = false;
-            Map<String, List<GenericResourceHolder>> ensembles = EnsembleToolManager
+            Map<String, List<GenericResourceHolder>> ensembles = EnsembleTool
                     .getInstance().getEnsembleResources();
             if (String.class.isAssignableFrom(element.getClass())) {
                 String ensembleName = (String) element;
@@ -1069,7 +1144,14 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
         @Override
         public void dispose() {
-            // nothing needs to be disposed
+        }
+    }
+
+    private void switchToInfoTabIfAutoHide() {
+        if (lowerSashTabFolder != null && !lowerSashTabFolder.isDisposed()) {
+            if (autoHidePreferences) {
+                lowerSashTabFolder.setSelection(resourceInfoTabItem);
+            }
         }
     }
 
@@ -1078,39 +1160,44 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
      */
     private ToolBar makeToolBar(Composite parent) {
 
-        final ToolBar toolBar = new ToolBar(parent, SWT.BORDER_SOLID);
+        toolBar = new ToolBar(parent, SWT.BORDER_SOLID);
 
-        final ToolItem browserItem = new ToolItem(toolBar, SWT.PUSH);
-        browserItem.setImage(INFO_ICON);
-        browserItem.setToolTipText("Volume Browser");
-        browserItem.addSelectionListener(new SelectionListener() {
+        browserToolItem = new ToolItem(toolBar, SWT.PUSH);
+        browserToolItem
+                .setImage(EnsembleToolViewerImageStore.VOLUME_BROWSER_IMG);
+        browserToolItem.setToolTipText("Volume Browser");
+        browserToolItem.addSelectionListener(new SelectionAdapter() {
 
             @Override
             public void widgetSelected(SelectionEvent e) {
-                volumeBrowserJustOpened = true;
 
                 IServiceLocator serviceLocator = PlatformUI.getWorkbench();
                 ICommandService commandService = (ICommandService) serviceLocator
                         .getService(ICommandService.class);
 
+                Command command = commandService
+                        .getCommand("com.raytheon.viz.volumebrowser.volumeBrowserRef");
+
+                /**
+                 * Optionally pass a ExecutionEvent instance, default (empty)
+                 * signature creates blank event
+                 */
                 try {
-                    Command command = commandService
-                            .getCommand("com.raytheon.viz.volumebrowser.volumeBrowserRef");
-
-                    // Optionally pass a ExecutionEvent instance, default
-                    // (empty)
-                    // signature creates blank event
                     command.executeWithChecks(new ExecutionEvent());
-
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+                } catch (ExecutionException e1) {
+                    statusHandler.warn(e1.getLocalizedMessage()
+                            + "; Unable to open Volume Browser");
+                } catch (NotDefinedException e1) {
+                    statusHandler.warn(e1.getLocalizedMessage()
+                            + "; Unable to open Volume Browser");
+                } catch (NotEnabledException e1) {
+                    statusHandler.warn(e1.getLocalizedMessage()
+                            + "; Unable to open Volume Browser");
+                } catch (NotHandledException e1) {
+                    statusHandler.warn(e1.getLocalizedMessage()
+                            + "; Unable to open Volume Browser");
                 }
-                ignoreFocusStartTime = System.currentTimeMillis();
 
-            }
-
-            @Override
-            public void widgetDefaultSelected(SelectionEvent e) {
             }
 
         });
@@ -1118,58 +1205,124 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         ToolItem separator_00 = new ToolItem(toolBar, SWT.SEPARATOR);
         separator_00.setWidth(2);
 
-        final ToolItem runItem = new ToolItem(toolBar, SWT.DROP_DOWN);
-        runItem.setImage(GEAR_ICON);
-        runItem.setToolTipText("Run Calculation");
+        runToolItem = new ToolItem(toolBar, SWT.DROP_DOWN);
+        runToolItem.setImage(EnsembleToolViewerImageStore.GEAR_IMG);
+        runToolItem.setToolTipText("Run Calculation");
+        runToolItem.addSelectionListener(new SelectionAdapter() {
+
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+
+                AbstractEditor editor = EditorUtil
+                        .getActiveEditorAs(AbstractEditor.class);
+
+                boolean isTimeSeries = (editor instanceof TimeSeriesEditor);
+
+                if (calculationMenu != null) {
+                    MenuItem[] items = calculationMenu.getItems();
+                    for (MenuItem item : items) {
+                        if ((item.getText().compareTo(
+                                Calculation.STANDARD_DEVIATION.getTitle()) == 0)
+                                || (item.getText().compareTo(
+                                        Calculation.HISTOGRAM_SAMPLING
+                                                .getTitle()) == 0)
+                                || (item.getText().compareTo(
+                                        Calculation.VALUE_SAMPLING.getTitle()) == 0)) {
+                            if (isTimeSeries) {
+                                item.setEnabled(false);
+                            } else {
+                                item.setEnabled(true);
+                            }
+                        }
+                    }
+                }
+            }
+
+        });
 
         ToolItem separator_3 = new ToolItem(toolBar, SWT.SEPARATOR);
         separator_3.setWidth(0);
 
         EnsembleToolItemActionListener ecl = new EnsembleToolItemActionListener(
-                runItem);
+                runToolItem);
 
-        ecl.add(BUNDLE_CMD_TITLE, false);
         ecl.addSeparator();
         ecl.add(Calculation.MEAN.getTitle(), true);
         ecl.add(Calculation.MIN.getTitle(), true);
         ecl.add(Calculation.MAX.getTitle(), true);
         ecl.add(Calculation.MEDIAN.getTitle(), true);
-        ecl.add(Calculation.MODE.getTitle(), false);
         ecl.add(Calculation.RANGE.getTitle(), true);
         ecl.add(Calculation.SUMMATION.getTitle(), true);
         ecl.add(Calculation.STANDARD_DEVIATION.getTitle(), true);
-        ecl.add(Calculation.AVG_MINUS_STD_DEV.getTitle(), false);
-        ecl.add(Calculation.AVG_PLUS_STD_DEV.getTitle(), false);
-        ecl.add(Calculation.COMBINED_ENS_REL_FREQ.getTitle(), false);
-        ecl.add(Calculation.TRIPLET_ENS_REL_FREQ.getTitle(), false);
-        ecl.add(Calculation.ENSEMBLE_RELATIVE_FREQUENCY.getTitle(), false);
+        ecl.add(Calculation.VALUE_SAMPLING.getTitle(), true);
         ecl.add(Calculation.HISTOGRAM_SAMPLING.getTitle(), true);
-        ecl.add(Calculation.HISTOGRAM_TEXT.getTitle(), true);
 
-        runItem.addSelectionListener(ecl);
+        runToolItem.addSelectionListener(ecl);
+
+        powerToggleToolItem = new ToolItem(toolBar, SWT.PUSH);
+        powerToggleToolItem.setImage(EnsembleToolViewerImageStore.POWER_ON_IMG);
+        powerToggleToolItem.setToolTipText("Tool Off");
+        powerToggleToolItem.setSelection(viewEditable);
+        powerToggleToolItem.addSelectionListener(new SelectionAdapter() {
+
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                viewEditable = !viewEditable;
+                EnsembleTool.getInstance().setEditable(viewEditable);
+            }
+
+        });
 
         parent.pack();
 
         return toolBar;
     }
 
-    private void constructImages() {
+    private class EnsembleToolItemActionListener extends SelectionAdapter {
+        private ToolItem dropdown;
 
-        if (ALPHANUMERIC_SORT_ICON == null) {
-            ALPHANUMERIC_SORT_ICON = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble", "icons/a-to-z-sort.gif");
-        }
-        if (GEAR_ICON == null) {
-            GEAR_ICON = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble",
-                    "icons/calculate-gear-40x24px.gif");
-        }
-        if (INFO_ICON == null) {
-            INFO_ICON = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble",
-                    "icons/volume-browser-lower-case-40x24px.gif");
+        public EnsembleToolItemActionListener(ToolItem dd) {
+            dropdown = dd;
+            calculationMenu = new Menu(dropdown.getParent().getShell());
         }
 
+        public void addSeparator() {
+            new MenuItem(calculationMenu, SWT.SEPARATOR);
+        }
+
+        public void add(String item, boolean isEnabled) {
+            MenuItem mi = new MenuItem(calculationMenu, SWT.NONE);
+            mi.setText(item);
+            mi.setEnabled(isEnabled);
+            mi.addSelectionListener(new SelectionAdapter() {
+
+                public void widgetSelected(SelectionEvent event) {
+                    MenuItem selected = (MenuItem) event.widget;
+
+                    for (Calculation c : Calculation.values()) {
+                        if (c.getTitle().equals(selected.getText())) {
+                            EnsembleTool.getInstance().calculate(c);
+                        }
+                    }
+                }
+            });
+        }
+
+        public void widgetSelected(SelectionEvent event) {
+            // display the menu
+            if ((event.detail == SWT.ARROW) || (event.detail == SWT.MENU_MOUSE)) {
+                ToolItem item = (ToolItem) event.widget;
+                Rectangle rect = item.getBounds();
+                Point pt = item.getParent()
+                        .toDisplay(new Point(rect.x, rect.y));
+                calculationMenu.setLocation(pt.x, pt.y + rect.height);
+                calculationMenu.setVisible(true);
+            }
+        }
+
+        public void widgetDefaultSelected(SelectionEvent e) {
+            widgetSelected(e);
+        }
     }
 
     /*
@@ -1178,7 +1331,27 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
     private class EnsembleTreeColumnLabelProvider extends ColumnLabelProvider {
 
         public Font getFont(Object element) {
-            Font f = SWTResourceManager.getFont("courier new", 10, SWT.BOLD);
+
+            Font f = null;
+            if (viewEditable) {
+                if (element instanceof String) {
+                    f = SWTResourceManager.getFont("courier new", 10, SWT.BOLD);
+                }
+                if (element instanceof GenericResourceHolder) {
+                    GenericResourceHolder gr = (GenericResourceHolder) element;
+                    if (!gr.requiresLoadCheck()
+                            || (gr.isLoadedAtFrame(currentFramesInfo))) {
+                        f = SWTResourceManager.getFont("courier new", 10,
+                                SWT.BOLD);
+                    } else {
+                        f = SWTResourceManager.getFont("courier new", 9,
+                                SWT.BOLD);
+                    }
+                }
+
+            } else {
+                f = SWTResourceManager.getFont("courier new", 10, SWT.NONE);
+            }
             return f;
         }
 
@@ -1188,11 +1361,12 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 String productName = (String) element;
                 int imageWidth = 46;
                 int imageHeight = 18;
+
                 ImageData imageData = new ImageData(imageWidth, imageHeight,
                         24, new PaletteData(255, 255, 255));
                 imageData.transparentPixel = imageData.palette
                         .getPixel(new RGB(255, 255, 255));
-                image = new Image(owner.getDisplay(), imageData);
+                image = new Image(ownerComposite.getDisplay(), imageData);
                 GC gc = new GC(image);
                 gc.setBackground(SWTResourceManager.WHITE);
                 gc.fillRectangle(0, 0, imageWidth, imageHeight);
@@ -1256,7 +1430,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                         24, new PaletteData(255, 255, 255));
                 imageData.transparentPixel = imageData.palette
                         .getPixel(new RGB(255, 255, 255));
-                image = new Image(owner.getDisplay(), imageData);
+                image = new Image(ownerComposite.getDisplay(), imageData);
                 GC gc = new GC(image);
                 gc.setBackground(SWTResourceManager.WHITE);
                 gc.fillRectangle(0, 0, imageWidth, imageHeight);
@@ -1270,6 +1444,10 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     // color of the resource inside a black bordered rectangle.
                     gc.fillRectangle(4, imageHeight - colorHeight - 2,
                             colorWidth, colorHeight);
+
+                    if (element instanceof GeneratedGridResourceHolder) {
+                        color = Utilities.brighten(color);
+                    }
                     gc.setBackground(SWTResourceManager.getColor(color));
                     gc.fillRectangle(4 + ((colorWidth - innerColorWidth) / 2),
                             (imageHeight - colorHeight)
@@ -1283,7 +1461,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 } else {
                     // need the following tweaking integers which cosmetic
                     // center things nicely
-                    gc.setBackground(SWTResourceManager.DARKER_GRAY);
+                    gc.setBackground(SWTResourceManager.BLACK);
 
                     // the icon for a hidden individual grid resources put the
                     // color of the resource inside a greyed bordered rectangle.
@@ -1300,8 +1478,26 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     gc.fillRectangle(colorWidth + bulletUpperLeftMargin_x,
                             bulletUpperLeft_y, bulletSize + 2, bulletSize - 1);
                 }
+                if (gr.requiresLoadCheck()
+                        && (!gr.isLoadedAtFrame(currentFramesInfo))) {
+                    gc.setBackground(SWTResourceManager.DARKER_GRAY);
+
+                    // the icon for a hidden individual grid resources put the
+                    // color of the resource inside a greyed bordered rectangle.
+                    gc.fillRectangle(4, imageHeight - colorHeight - 2,
+                            colorWidth, colorHeight);
+                    gc.setBackground(SWTResourceManager.getColor(Utilities
+                            .desaturate(color)));
+                    gc.fillRectangle(4 + ((colorWidth - innerColorWidth) / 2),
+                            (imageHeight - colorHeight)
+                                    + ((colorHeight - innerColorHeight) / 2)
+                                    - 2, innerColorWidth, innerColorHeight);
+                }
                 gc.dispose();
 
+            }
+            if (image != null) {
+                imageCache.add(image);
             }
             return image;
         }
@@ -1358,13 +1554,19 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     } else {
                         treeItem.setForeground(EnsembleToolViewer.DISABLED_FOREGROUND_COLOR);
                     }
-                    matchParentToChildrenVisibility(treeItem);
+                    // matchParentToChildrenVisibility(treeItem);
+                }
+                if (nodeLabel != null) {
+                    nodeLabel = nodeLabel.trim();
+                    if (gr != null && currentFramesInfo != null
+                            && gr.requiresLoadCheck()
+                            && !gr.isLoadedAtFrame(currentFramesInfo)) {
+                        nodeLabel = nodeLabel.concat(" (Not Loaded)");
+                    }
                 }
             }
-
             return nodeLabel;
         }
-
     }
 
     // TODO we need come up with a more intuitive solution
@@ -1478,98 +1680,6 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         }
     }
 
-    private class EnsembleToolItemActionListener extends SelectionAdapter {
-        private ToolItem dropdown;
-
-        private Menu calculationMenu;
-
-        public EnsembleToolItemActionListener(ToolItem dd) {
-            dropdown = dd;
-            calculationMenu = new Menu(dropdown.getParent().getShell());
-        }
-
-        public void addSeparator() {
-            new MenuItem(calculationMenu, SWT.SEPARATOR);
-        }
-
-        public void add(String item, boolean isEnabled) {
-            MenuItem mi = new MenuItem(calculationMenu, SWT.NONE);
-            mi.setText(item);
-            mi.setEnabled(isEnabled);
-            mi.addSelectionListener(new SelectionAdapter() {
-
-                public void widgetSelected(SelectionEvent event) {
-                    MenuItem selected = (MenuItem) event.widget;
-                    if (selected.getText().compareTo(
-                            Calculation.MEAN.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.MEAN);
-                    } else if (selected.getText().compareTo(
-                            Calculation.MIN.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.MIN);
-                    } else if (selected.getText().compareTo(
-                            Calculation.MAX.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.MAX);
-                    } else if (selected.getText().compareTo(
-                            Calculation.SUMMATION.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.SUMMATION);
-                    } else if (selected.getText().compareTo(
-                            Calculation.MEDIAN.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.MEDIAN);
-                    } else if (selected.getText().compareTo(
-                            Calculation.MODE.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.MODE);
-                    } else if (selected.getText().compareTo(
-                            Calculation.STANDARD_DEVIATION.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.STANDARD_DEVIATION);
-                    } else if (selected.getText().compareTo(
-                            Calculation.RANGE.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.RANGE);
-                    } else if (selected.getText().compareTo(
-                            Calculation.AVG_MINUS_STD_DEV.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.AVG_MINUS_STD_DEV);
-                    } else if (selected.getText().compareTo(
-                            Calculation.AVG_PLUS_STD_DEV.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.AVG_PLUS_STD_DEV);
-                    } else if (selected.getText().compareTo(
-                            Calculation.HISTOGRAM_SAMPLING.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.HISTOGRAM_SAMPLING);
-                    } else if (selected.getText().compareTo(
-                            Calculation.HISTOGRAM_TEXT.getTitle()) == 0) {
-                        EnsembleToolManager.getInstance().calculate(
-                                Calculation.HISTOGRAM_TEXT);
-                    }
-                }
-            });
-        }
-
-        public void widgetSelected(SelectionEvent event) {
-            // display the menu
-            if ((event.detail == SWT.ARROW) || (event.detail == SWT.MENU_MOUSE)) {
-                ToolItem item = (ToolItem) event.widget;
-                Rectangle rect = item.getBounds();
-                Point pt = item.getParent()
-                        .toDisplay(new Point(rect.x, rect.y));
-                calculationMenu.setLocation(pt.x, pt.y + rect.height);
-                calculationMenu.setVisible(true);
-            }
-        }
-
-        public void widgetDefaultSelected(SelectionEvent e) {
-            widgetSelected(e);
-        }
-    }
-
     static boolean CTRL_KEY_DEPRESSED = false;
 
     /*
@@ -1628,7 +1738,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             /*
              * if the ensemble tool isn't open then ignore user mouse clicks ...
              */
-            if (!EnsembleToolManager.getInstance().isReady()
+            if (!EnsembleTool.getInstance().isToolEditable()
                     || !isViewerTreeReady()) {
                 return;
             }
@@ -1659,7 +1769,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                  * the Ensemble product.
                  */
                 if (mousedItem instanceof String) {
-                    final Menu legendMenu = new Menu(owner.getShell(),
+                    final Menu legendMenu = new Menu(ownerComposite.getShell(),
                             SWT.POP_UP);
                     final String mousedEnsembleName = (String) mousedItem;
 
@@ -1673,10 +1783,10 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     addERFLayerMenuItem.setText("Relative Frequency");
 
                     /* only enable the RF menu item if we are in plan view */
-                    if (editorType == ResourceType.TIME_SERIES) {
+                    if (editorResourceType == ResourceType.TIME_SERIES) {
                         addERFLayerMenuItem.setEnabled(false);
                     }
-                    if (editorType == ResourceType.PLAN_VIEW) {
+                    if (editorResourceType == ResourceType.PLAN_VIEW) {
                         addERFLayerMenuItem.setEnabled(true);
                     }
 
@@ -1691,11 +1801,6 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
                                 }
                             });
-
-                    /*
-                     * TODO Need to have a easy access Mean calculation on an
-                     * Ensemble product ...
-                     */
 
                     /*
                      * This menu item allows the user to choose a color gradient
@@ -1726,14 +1831,14 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                                 public void handleEvent(Event event) {
 
                                     boolean proceed = MessageDialog.openConfirm(
-                                            owner.getShell(),
+                                            ownerComposite.getShell(),
                                             "Unload Ensemble Members",
                                             "Are you sure you want to unload all members of "
                                                     + mousedEnsembleName + "?");
 
                                     if (proceed) {
 
-                                        EnsembleToolManager.getInstance()
+                                        EnsembleTool.getInstance()
                                                 .unloadResourcesByName(
                                                         userClickedTreeItem
                                                                 .getText());
@@ -1759,30 +1864,12 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                                             "Toggle Product Visibility");
                                     ccj.setPriority(Job.INTERACTIVE);
                                     ccj.setTargetTreeItem(userClickedTreeItem);
-                                    /*
-                                     * interactive, yes, but don't race other
-                                     * Jobs
-                                     */
                                     ccj.schedule(elegantWaitPeriod);
 
                                 }
                             });
 
                     legendMenu.setVisible(true);
-
-                    /*
-                     * Show the last selected non-transient tab ... the only
-                     * transient tab is the ERF tab. The other two tabs are Info
-                     * and Preferences. If one of the latter two tabs were
-                     * previously chosen, then reopen that previously selected
-                     * tab.
-                     */
-                    if (lastSelectedNonTransientTabItem != null) {
-                        tabFolder_lowerSash
-                                .setSelection(lastSelectedNonTransientTabItem);
-                    } else {
-                        tabFolder_lowerSash.setSelection(tabResourceInfo);
-                    }
 
                 } else if (mousedItem instanceof GenericResourceHolder) {
 
@@ -1799,7 +1886,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                     /* The popup menu is generated by the ContextMenuManager */
                     menuMgr.addMenuListener(new IMenuListener() {
                         public void menuAboutToShow(IMenuManager manager) {
-                            ResourcePair rp = EnsembleToolManager.getInstance()
+                            ResourcePair rp = EnsembleTool.getInstance()
                                     .getResourcePair(gr.getRsc());
                             if (rp != null) {
                                 com.raytheon.viz.ui.cmenu.ContextMenuManager
@@ -1808,31 +1895,11 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                                                 .getResourceContainer());
                             }
                         }
-
                     });
 
-                    final Menu legendMenu = menuMgr.createContextMenu(owner);
+                    final Menu legendMenu = menuMgr
+                            .createContextMenu(ownerComposite);
                     legendMenu.setVisible(true);
-
-                    if (isViewerTreeReady()) {
-                        ensemblesTreeViewer.refresh();
-                    }
-
-                    /* disable the ui components on the ERF tab ... */
-                    disableERFTabWidgets();
-                    /*
-                     * show the last selected non-transient tab ... the only
-                     * transient tab is the ERF tab. The other two tabs are Info
-                     * and Preferences. If one of the latter two tabs were
-                     * previously chosen, then reopen that previously selected
-                     * tab.
-                     */
-                    if (lastSelectedNonTransientTabItem != null) {
-                        tabFolder_lowerSash
-                                .setSelection(lastSelectedNonTransientTabItem);
-                    } else {
-                        tabFolder_lowerSash.setSelection(tabResourceInfo);
-                    }
 
                 }
                 ensembleTree.deselect(userClickedTreeItem);
@@ -1880,15 +1947,14 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                             "Toggle Ensemble Members Visibility");
                     ccj.setPriority(Job.INTERACTIVE);
                     ccj.setTargetEnsembleProduct(ensembleName);
-                    /* interactive, yes, but don't race other Jobs */
                     ccj.schedule(elegantWaitPeriod);
+
                 } else if (mousedItem instanceof GenericResourceHolder) {
 
                     ToggleProductVisiblityJob ccj = new ToggleProductVisiblityJob(
                             "Toggle Product Visibility");
                     ccj.setPriority(Job.INTERACTIVE);
                     ccj.setTargetTreeItem(userClickedTreeItem);
-                    /* interactive, yes, but don't race other Jobs */
                     ccj.schedule(elegantWaitPeriod);
                 }
             }
@@ -1899,7 +1965,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
             Point point = new Point(event.x, event.y);
 
-            if (!EnsembleToolManager.getInstance().isReady()
+            if (!EnsembleTool.getInstance().isToolEditable()
                     || !isViewerTreeReady()) {
                 return;
             }
@@ -1957,24 +2023,11 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                         GenericResourceHolder grh = (GenericResourceHolder) mousedObject;
                         EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE = grh
                                 .getRsc();
-                        ensemblesTreeViewer.getTree().deselectAll();
-                        ensemblesTreeViewer.getTree().select(
-                                userClickedTreeItem);
+                        ensembleTreeViewer.getTree().deselectAll();
+                        ensembleTreeViewer.getTree()
+                                .select(userClickedTreeItem);
                     }
-                    ensemblesTreeViewer.getTree().update();
-                }
-
-                /*
-                 * Always display either the last opened tab or the information
-                 * tab (i.e. only display the ERF tab when the user is actively
-                 * entering an ERF probablility).
-                 */
-                disableERFTabWidgets();
-                if (lastSelectedNonTransientTabItem != null) {
-                    tabFolder_lowerSash
-                            .setSelection(lastSelectedNonTransientTabItem);
-                } else {
-                    tabFolder_lowerSash.setSelection(tabResourceInfo);
+                    ensembleTreeViewer.getTree().update();
                 }
 
                 /*
@@ -1984,8 +2037,10 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 if (mousedObject instanceof GeneratedGridResourceHolder) {
                     GeneratedGridResourceHolder grh = (GeneratedGridResourceHolder) mousedObject;
                     if (grh.getCalculation() == Calculation.ENSEMBLE_RELATIVE_FREQUENCY) {
-                        tabFolder_lowerSash.setSelection(tabERFLayerControl);
-                        setERFFields(grh.getRange(), grh.getUniqueName());
+                        /**
+                         * TODO: Do we want to bring up the ERF dialog with the
+                         * existing values to populate?
+                         */
                     }
                 }
 
@@ -2117,7 +2172,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             final List<GenericResourceHolder> children) {
 
         EnsembleSREFColorChooser cd = new EnsembleSREFColorChooser(
-                owner.getShell());
+                ownerComposite.getShell());
         cd.setBlockOnOpen(true);
         if (cd.open() == Window.OK) {
 
@@ -2136,7 +2191,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             final List<GenericResourceHolder> children) {
 
         EnsembleGEFSColorChooser cd = new EnsembleGEFSColorChooser(
-                owner.getShell());
+                ownerComposite.getShell());
         cd.setBlockOnOpen(true);
         if (cd.open() == Window.OK) {
             cd.close();
@@ -2147,6 +2202,26 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             ccj.schedule();
         }
 
+    }
+
+    public boolean isMakeEditableOnRestorePreference() {
+        return editableOnRestore;
+    }
+
+    public boolean isMakeEditableOnSwapInPreference() {
+        return editableOnSwapIn;
+    }
+
+    public boolean isMinimizeOnForeignToolLoadPreference() {
+        return minimizeOnForeignToolLoad;
+    }
+
+    public boolean isMinimizeOnToggleUneditable() {
+        return minimizeOnToggleUneditable;
+    }
+
+    public boolean isCreateNewToolLayerOnNewEditor() {
+        return createToolLayerOnNewEditor;
     }
 
     public RGB getStartColor(RGB inColor) {
@@ -2211,66 +2286,41 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         VizApp.runAsync(new Runnable() {
             public void run() {
                 if (isViewerTreeReady()) {
-                    ensemblesTreeViewer.setInput(null);
+                    ensembleTreeViewer.setInput(EnsembleTool.getInstance()
+                            .getEmptyResourceList());
                 }
             }
         });
     }
 
-    public void refreshInput() {
+    synchronized public void refreshInput() {
 
-        // TODO: Is there a better way to initialize e.g. listeners;
-        // a better place to detect when the view part is uninitialized?
-        if (viewPartListener == null) {
-            viewPartListener = new EnsembleViewPartListener(this);
-            IWorkbenchWindow window = PlatformUI.getWorkbench()
-                    .getActiveWorkbenchWindow();
-            IPartService service = window.getPartService();
-            service.addPartListener(viewPartListener);
-        }
-
-        if (!EnsembleToolManager.getInstance().isReady()) {
-            if (isViewerTreeReady()) {
-                ensemblesTreeViewer.refresh(false);
-            }
+        if (!isViewerTreeReady()) {
             return;
         }
 
-        final Map<String, List<GenericResourceHolder>> ensembleResourcesMap = EnsembleToolManager
+        final Map<String, List<GenericResourceHolder>> ensembleResourcesMap = EnsembleTool
                 .getInstance().getEnsembleResources();
 
         VizApp.runAsync(new Runnable() {
-            @SuppressWarnings("unchecked")
             public void run() {
 
-                if (ensemblesTreeViewer == null || !isViewerTreeReady()) {
+                if (!isViewerTreeReady()) {
                     return;
                 }
 
-                Map<String, List<GenericResourceHolder>> previousResourcesMap = null;
-
                 // this method only acts on an instance of a Map ...
                 if (ensembleResourcesMap != null) {
+
                     // only change the tree's input reference (via setInput)
-                    // when the ensembleResourcesMap reference is new or has
-                    // changed.
-                    if ((ensemblesTreeViewer.getInput() == null)
-                            || (ensembleResourcesMap != ensemblesTreeViewer
+                    // when the ensembleResourcesMap reference is different.
+
+                    if ((ensembleTreeViewer.getInput() == null)
+                            || (ensembleResourcesMap != ensembleTreeViewer
                                     .getInput())) {
-                        // unregister previous model's resources
-                        if (ensemblesTreeViewer.getInput() != null) {
-                            previousResourcesMap = (Map<String, List<GenericResourceHolder>>) ensemblesTreeViewer
-                                    .getInput();
-                            unregisterResources(previousResourcesMap);
-                        }
-                        ensemblesTreeViewer.setInput(ensembleResourcesMap);
-                        ensemblesTreeViewer.refresh(true);
-                        // register new model's resources
-                        registerResources(ensembleResourcesMap);
-                    } else {
-                        ensemblesTreeViewer.refresh(true);
-                        registerResources(ensembleResourcesMap);
+                        ensembleTreeViewer.setInput(ensembleResourcesMap);
                     }
+                    ensembleTreeViewer.refresh(true);
 
                     GenericResourceHolder grh = null;
                     String ensembleRscName = null;
@@ -2287,13 +2337,10 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                             }
                         }
 
-                        updateTimeBasisInfo(EnsembleToolManager.getInstance()
-                                .getTimeBasisResourceName(),
-                                EnsembleToolManager.getInstance()
-                                        .getTimeBasisLegendTime());
+                        updateInfoTab();
 
-                        setTreeExpansion(EnsembleToolManager.getInstance()
-                                .getActiveToolLayer().getExpandedElements());
+                        setTreeExpansion(EnsembleTool.getInstance()
+                                .getExpandedElements());
 
                         if ((selectedItems != null)
                                 && (selectedItems.length > 0)
@@ -2309,51 +2356,65 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                             }
                         }
                     }
-
-                    /* always refresh the tree */
-                    if (isViewerTreeReady()) {
-                        ensemblesTreeViewer.refresh(true);
-                    }
                 }
-
             }
         });
-
     }
 
-    private void registerResources(
-            Map<String, List<GenericResourceHolder>> ensembleResourcesMap) {
-
-        List<AbstractVizResource<?, ?>> allResources = getAllResources(ensembleResourcesMap);
-        for (AbstractVizResource<?, ?> vr : allResources) {
-            vr.registerListener(this);
-        }
-
+    @Override
+    public void doSave(IProgressMonitor monitor) {
+        /**
+         * TODO Currently we don't have any way to Save the loaded products as a
+         * bundle, that is in a way that would allow the user to reopen the
+         * products back into the Ensemble Tool.
+         */
     }
 
-    private void unregisterResources(
-            Map<String, List<GenericResourceHolder>> previousResourcesMap) {
-
-        List<AbstractVizResource<?, ?>> allResources = getAllResources(previousResourcesMap);
-        for (AbstractVizResource<?, ?> vr : allResources) {
-            vr.unregisterListener(this);
-        }
+    @Override
+    public void doSaveAs() {
+        /**
+         * TODO Currently we don't have any way to Save As the loaded products
+         * as a bundle, that is in a way that would allow the user to reopen the
+         * products back into the Ensemble Tool.
+         */
     }
 
-    private List<AbstractVizResource<?, ?>> getAllResources(
-            Map<String, List<GenericResourceHolder>> previousResourcesMap) {
-
-        List<AbstractVizResource<?, ?>> allRscs = new ArrayList<AbstractVizResource<?, ?>>();
-        List<GenericResourceHolder> currList = null;
-
-        Set<String> keys = previousResourcesMap.keySet();
-        for (String k : keys) {
-            currList = previousResourcesMap.get(k);
-            for (GenericResourceHolder grh : currList) {
-                allRscs.add(grh.getRsc());
-            }
+    @Override
+    public boolean isDirty() {
+        if (PlatformUI.getWorkbench().isClosing()) {
+            return false;
         }
-        return allRscs;
+        return true;
+    }
+
+    @Override
+    public boolean isSaveAsAllowed() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public boolean isSaveOnCloseNeeded() {
+        boolean saveOnClose = true;
+        if (PlatformUI.getWorkbench().isClosing()) {
+            saveOnClose = false;
+        }
+        return saveOnClose;
+    }
+
+    @Override
+    public int promptToSaveOnClose() {
+
+        if (PlatformUI.getWorkbench().isClosing()) {
+            return ISaveablePart2.NO;
+        } else if (isDisabled) {
+            return ISaveablePart2.CANCEL;
+        }
+
+        int userResponseToClose = EnsembleTool.getInstance()
+                .verifyCloseActiveToolLayer();
+        return userResponseToClose;
+
     }
 
     private void setTreeExpansion(List<String> expandedElements) {
@@ -2371,7 +2432,7 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         List<String> expandedItems = new ArrayList<String>();
 
         if (isViewerTreeReady()) {
-            TreeItem[] children = ensemblesTreeViewer.getTree().getItems();
+            TreeItem[] children = ensembleTreeViewer.getTree().getItems();
             List<TreeItem> immediateChildren = Arrays.asList(children);
             for (TreeItem ti : immediateChildren) {
                 if (ti != null && !ti.isDisposed()) {
@@ -2391,39 +2452,16 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
      * This method is so we can keep track of the expansion state of the tree.
      */
     public void updateExpansionState() {
-        EnsembleToolManager.getInstance().getActiveToolLayer()
-                .setExpandedElements(getTreeExpansion());
+        EnsembleTool.getInstance().setExpandedElements(getTreeExpansion());
     }
-
-    protected TreeItem calculationItemSelected = null;
 
     private void startAddERFLayer(String mousedEnsembleName) {
 
-        userRequestedERF = true;
-        tabFolder_lowerSash.setSelection(tabERFLayerControl);
-        enableDefaultERFTabWidgetState(mousedEnsembleName);
-
-    }
-
-    private void putCursorInSelectedERFRange() {
-        if (userRequestedERF == true) {
-
-            if (radioChooserRange_1.getSelection()) {
-                lowerRangeEntryTextBox_1.forceFocus();
-            }
-
-            else if (radioChooserRange_2.getSelection()) {
-                lowerRangeEntryTextBox_2.forceFocus();
-            }
-
-            else if (radioChooserRange_3.getSelection()) {
-                lowerRangeEntryTextBox_3.forceFocus();
-            }
-
-            else if (radioChooserRange_4.getSelection()) {
-                lowerRangeEntryTextBox_4.forceFocus();
-            }
-
+        erfDialog = new ERFProductDialog_Modal(ownerComposite.getShell(),
+                mousedEnsembleName);
+        if (erfDialog.open() == Window.OK) {
+            erfDialog.close();
+            erfDialog = null;
         }
     }
 
@@ -2433,755 +2471,14 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
      */
     private void fillLowerSash(Composite lowerSash) {
 
-        tabFolder_lowerSash = new TabFolder(lowerSash, SWT.NONE);
-
-        fillMetaDataInfoTab(tabFolder_lowerSash);
-        fillRelativeFrequency(tabFolder_lowerSash);
-        fillPreferencesTab(tabFolder_lowerSash);
-        tabFolder_lowerSash.setSelection(tabResourceInfo);
-        disableERFTabWidgets();
-    }
-
-    /*
-     * This method constructs the ui for the the relative frequency tab. This
-     * tab allows the user to choose one of four radio button row-based widget
-     * selections which allows access to one of four range-filter row-widget
-     * selections for the ERF. These are row-based widgets composed of range
-     * filters including 1) choosing x within a range 2) choosing x outside of a
-     * range 3) choosing x above a threshold and 4) choosing x below a
-     * threshold.
-     */
-    private void fillRelativeFrequency(final TabFolder tabFolder_lowerSash) {
-
-        Composite mainPanel = new Composite(tabFolder_lowerSash, SWT.BORDER);
-        GridData gd_rootCalculatorPanel = new GridData(SWT.FILL, SWT.FILL,
-                false, true, 1, 1);
-        gd_rootCalculatorPanel.widthHint = 220;
-        gd_rootCalculatorPanel.heightHint = 240;
-        mainPanel.setLayoutData(gd_rootCalculatorPanel);
-        mainPanel.setLayout(new GridLayout(5, false));
-
-        tabERFLayerControl = new TabItem(tabFolder_lowerSash, SWT.NONE);
-        tabERFLayerControl.setText(" Rel Freq ");
-        tabERFLayerControl.setControl(mainPanel);
-
-        Label lbl_dummySpacer_A = new Label(mainPanel, SWT.NONE);
-        GridData gd_dummySpacer_A = new GridData(SWT.CENTER, SWT.CENTER, false,
-                false, 5, 1);
-        gd_dummySpacer_A.heightHint = 5;
-        lbl_dummySpacer_A.setLayoutData(gd_dummySpacer_A);
-
-        // this is the title box containing the ensemble name ... it has a
-        // a slightly different background to highlight the title. It is also
-        // centered.
-        label_ensembleProductName = new Label(mainPanel, SWT.BORDER);
-        label_ensembleProductName.setFont(SWTResourceManager.getFont("Dialog",
-                9, SWT.BOLD));
-        label_ensembleProductName.setAlignment(SWT.CENTER);
-        label_ensembleProductName.setForeground(SWTResourceManager.getColor(0,
-                0, 0));
-        label_ensembleProductName
-                .setBackground(SWTResourceManager.LIGHT_YELLOW);
-        GridData gd_label_frameTimeUsingBasis = new GridData(SWT.CENTER,
-                SWT.CENTER, true, false, 5, 1);
-        gd_label_frameTimeUsingBasis.heightHint = 23;
-        gd_label_frameTimeUsingBasis.widthHint = 256;
-        label_ensembleProductName.setLayoutData(gd_label_frameTimeUsingBasis);
-
-        // height spacer
-        Label lbl_dummySpacer_B = new Label(mainPanel, SWT.NONE);
-        GridData gd_dummySpacer_B = new GridData(SWT.CENTER, SWT.CENTER, false,
-                false, 5, 1);
-        gd_dummySpacer_B.heightHint = 5;
-        lbl_dummySpacer_B.setLayoutData(gd_dummySpacer_B);
-
-        //
-        // This is the beginning of the WITHIN A RANGE row-widget
-        // Select this widget row by choosing the radio button which
-        // precedes it.
-        Composite rangeToolRoot_1 = new Composite(mainPanel, SWT.BORDER);
-        rangeToolRoot_1.setLayout(new GridLayout(7, false));
-        rangeToolRoot_1
-                .setToolTipText("ERF probability P(x) is within a range (%)");
-        GridData gd_rangeToolRoot_1 = new GridData(SWT.LEFT, SWT.CENTER, true,
-                false, 5, 1);
-        gd_rangeToolRoot_1.heightHint = 38;
-        gd_rangeToolRoot_1.widthHint = 260;
-        gd_rangeToolRoot_1.verticalIndent = 1;
-        gd_rangeToolRoot_1.horizontalIndent = 1;
-        rangeToolRoot_1.setLayoutData(gd_rangeToolRoot_1);
-
-        // Are you choosing the WITHIN A RANGE row-widget?
-        radioChooserRange_1 = new Button(rangeToolRoot_1, SWT.RADIO);
-        radioChooserRange_1.setSelection(true);
-
-        // All the ui components for WITHIN A RANGE will have tool tip hints.
-
-        // Put the "probability of x" label ...
-        Label lblProbabilityOfX_1 = new Label(rangeToolRoot_1, SWT.NONE);
-        GridData gd_lblProbabilityOfX_1 = new GridData(SWT.CENTER, SWT.CENTER,
-                false, false, 1, 1);
-        gd_lblProbabilityOfX_1.widthHint = 50;
-        lblProbabilityOfX_1.setLayoutData(gd_lblProbabilityOfX_1);
-        lblProbabilityOfX_1.setFont(SWTResourceManager.getFont("Serif", 11,
-                SWT.BOLD | SWT.ITALIC));
-        lblProbabilityOfX_1.setText("P(x):   ");
-        lblProbabilityOfX_1
-                .setToolTipText("ERF probability P(x) is within a range (%)");
-
-        // There's a lower bound text entry to this WITHIN A RANGE row-widget.
-        lowerRangeEntryTextBox_1 = new Text(rangeToolRoot_1, SWT.CENTER
-                | SWT.BORDER);
-        GridData gd_lowerRangeEntryTextBox_1 = new GridData(SWT.CENTER,
-                SWT.CENTER, false, false, 1, 1);
-        gd_lowerRangeEntryTextBox_1.widthHint = 30;
-        lowerRangeEntryTextBox_1.setLayoutData(gd_lowerRangeEntryTextBox_1);
-        lowerRangeEntryTextBox_1
-                .setToolTipText("This must be the minimum value for 'x'");
-
-        Label lblLowerConditional_1 = new Label(rangeToolRoot_1, SWT.NONE);
-        GridData gd_lblLowerConditional_1 = new GridData(SWT.CENTER,
-                SWT.CENTER, false, false, 3, 1);
-        lblLowerConditional_1.setFont(SWTResourceManager.getFont("Serif", 12,
-                SWT.BOLD));
-        gd_lblLowerConditional_1.heightHint = 22;
-        gd_lblLowerConditional_1.widthHint = 65;
-        lblLowerConditional_1.setLayoutData(gd_lblLowerConditional_1);
-        lblLowerConditional_1.setText("   <  x  <");
-        lblLowerConditional_1
-                .setToolTipText("ERF probability P(x) is within a range (%)");
-
-        // There's an upper bound text entry to this WITHIN A RANGE row-widget.
-        upperRangeEntryTextBox_1 = new Text(rangeToolRoot_1, SWT.CENTER
-                | SWT.BORDER);
-        GridData gd_upperRangeEntryTextBox_1 = new GridData(SWT.LEFT,
-                SWT.CENTER, false, false, 1, 1);
-        gd_upperRangeEntryTextBox_1.widthHint = 30;
-        upperRangeEntryTextBox_1.setLayoutData(gd_upperRangeEntryTextBox_1);
-        upperRangeEntryTextBox_1
-                .setToolTipText("This must be the maximum value for 'x'");
-
-        // This is the beginning of the OUTSIDE A RANGE widget row.
-        // Select this widget row by choosing the radio button which
-        // precedes it.
-        Composite rangeToolRoot_2 = new Composite(mainPanel, SWT.BORDER);
-        GridData gd_rangeToolRoot_2 = new GridData(SWT.LEFT, SWT.CENTER, false,
-                false, 5, 1);
-        gd_rangeToolRoot_2.widthHint = 262;
-        rangeToolRoot_2.setLayoutData(gd_rangeToolRoot_2);
-        rangeToolRoot_2.setLayout(new GridLayout(7, false));
-        rangeToolRoot_2
-                .setToolTipText("ERF probability P(x) is outside a range (%)");
-
-        // Are you choosing the OUTSIDE A RANGE row-widget?
-        radioChooserRange_2 = new Button(rangeToolRoot_2, SWT.RADIO);
-        radioChooserRange_2.setSelection(false);
-
-        // All the ui components for OUTSIDE A RANGE will have tool tip hints.
-
-        // Put the "probability of x" label ...
-        Label lblProbabilityOfX_2 = new Label(rangeToolRoot_2, SWT.NONE);
-        GridData gd_lblProbabilityOfX_2 = new GridData(SWT.CENTER, SWT.CENTER,
-                false, false, 1, 1);
-        gd_lblProbabilityOfX_2.widthHint = 50;
-        lblProbabilityOfX_2.setLayoutData(gd_lblProbabilityOfX_2);
-        lblProbabilityOfX_2.setText("P(x):");
-        lblProbabilityOfX_2.setFont(SWTResourceManager.getFont("Serif", 11,
-                SWT.BOLD | SWT.ITALIC));
-        lblProbabilityOfX_2
-                .setToolTipText("ERF probability P(x) is outside a range (%)");
-
-        // There's a lower bound text entry to this OUTSIDE A RANGE row-widget.
-        lowerRangeEntryTextBox_2 = new Text(rangeToolRoot_2, SWT.BORDER
-                | SWT.CENTER);
-        GridData gd_lowerRangeEntryTextBox_2 = new GridData(SWT.CENTER,
-                SWT.CENTER, false, false, 1, 1);
-        gd_lowerRangeEntryTextBox_2.widthHint = 30;
-        lowerRangeEntryTextBox_2.setLayoutData(gd_lowerRangeEntryTextBox_2);
-        lowerRangeEntryTextBox_2
-                .setToolTipText("This must be the minimum value for 'x'");
-
-        Label lblLowerConditional_2 = new Label(rangeToolRoot_2, SWT.NONE);
-        GridData gd_lblLowerConditional_2 = new GridData(SWT.CENTER,
-                SWT.CENTER, false, false, 3, 1);
-        lblLowerConditional_2.setFont(SWTResourceManager.getFont("Serif", 12,
-                SWT.BOLD));
-        gd_lblLowerConditional_2.heightHint = 22;
-        gd_lblLowerConditional_2.widthHint = 65;
-        lblLowerConditional_2.setLayoutData(gd_lblLowerConditional_2);
-        lblLowerConditional_2.setText("   >  x  >");
-        lblLowerConditional_2
-                .setToolTipText("ERF probability P(x) is outside a range (%)");
-
-        // There's an upper bound text entry to this OUTSIDE A RANGE row-widget.
-        upperRangeEntryTextBox_2 = new Text(rangeToolRoot_2, SWT.BORDER
-                | SWT.CENTER);
-        GridData gd_upperRangeEntryTextBox_2 = new GridData(SWT.LEFT,
-                SWT.CENTER, false, false, 1, 1);
-        gd_upperRangeEntryTextBox_2.widthHint = 30;
-        upperRangeEntryTextBox_2.setLayoutData(gd_upperRangeEntryTextBox_2);
-        upperRangeEntryTextBox_2
-                .setToolTipText("This must be the maximum value for 'x'");
-
-        // This is the beginning of the ABOVE A THRESHOLD row-widget.
-        // Select this widget row by choosing the radio button which
-        // precedes it.
-        Composite rangeToolRoot_3 = new Composite(mainPanel, SWT.BORDER);
-        GridData gd_rangeToolRoot_3 = new GridData(SWT.LEFT, SWT.CENTER, false,
-                false, 5, 1);
-        gd_rangeToolRoot_3.widthHint = 262;
-        rangeToolRoot_3.setLayoutData(gd_rangeToolRoot_3);
-        rangeToolRoot_3.setLayout(new GridLayout(7, false));
-        rangeToolRoot_3.setToolTipText("ERF probability P(x) is above (%)");
-
-        // Are you choosing the ABOVE A THRESHOLD widget row?
-        radioChooserRange_3 = new Button(rangeToolRoot_3, SWT.RADIO);
-        radioChooserRange_3.setSelection(false);
-
-        // All the ui components for ABOVE A THRESHOLD will have tool tip hints.
-
-        // Put the "probability of x" label ...
-        Label lblProbabilityOfX_3 = new Label(rangeToolRoot_3, SWT.NONE);
-        GridData gd_lblProbabilityOfX_3 = new GridData(SWT.RIGHT, SWT.CENTER,
-                false, false, 1, 1);
-        gd_lblProbabilityOfX_3.widthHint = 42;
-        lblProbabilityOfX_3.setLayoutData(gd_lblProbabilityOfX_3);
-        lblProbabilityOfX_3.setText("P(x): ");
-        lblProbabilityOfX_3.setFont(SWTResourceManager.getFont("Serif", 11,
-                SWT.BOLD | SWT.ITALIC));
-
-        // There's an upper bound text entry to this ABOVE A THRESHOLD row-
-        // widget.
-        Label lblValueOfX_3 = new Label(rangeToolRoot_3, SWT.NONE);
-        lblValueOfX_3.setAlignment(SWT.CENTER);
-        GridData gd_lblValueOfX_3 = new GridData(SWT.RIGHT, SWT.CENTER, false,
-                false, 2, 1);
-        gd_lblValueOfX_3.widthHint = 45;
-        lblValueOfX_3.setLayoutData(gd_lblValueOfX_3);
-        lblValueOfX_3.setFont(SWTResourceManager.getFont("Serif", 12, SWT.BOLD
-                | SWT.ITALIC));
-        lblValueOfX_3.setText("x   > ");
-        lblValueOfX_3.setToolTipText("ERF probability P(x) is above (%)");
-
-        lowerRangeEntryTextBox_3 = new Text(rangeToolRoot_3, SWT.BORDER
-                | SWT.CENTER);
-        GridData gd_lowerRangeEntryTextBox_3 = new GridData(SWT.CENTER,
-                SWT.CENTER, false, false, 1, 1);
-        gd_lowerRangeEntryTextBox_3.widthHint = 30;
-        lowerRangeEntryTextBox_3.setLayoutData(gd_lowerRangeEntryTextBox_3);
-        lowerRangeEntryTextBox_3
-                .setToolTipText("The threshold that 'x' is above");
-
-        new Label(rangeToolRoot_3, SWT.NONE);
-        new Label(rangeToolRoot_3, SWT.NONE);
-
-        // This is the beginning of the BELOW A THRESHOLD row-widget.
-        // Select this widget row by choosing the radio button which
-        // precedes it.
-        Composite rangeToolRoot_4 = new Composite(mainPanel, SWT.BORDER);
-        GridData gd_rangeToolRoot_4 = new GridData(SWT.LEFT, SWT.CENTER, false,
-                false, 5, 1);
-        gd_rangeToolRoot_4.widthHint = 262;
-        rangeToolRoot_4.setLayoutData(gd_rangeToolRoot_4);
-        rangeToolRoot_4.setLayout(new GridLayout(7, false));
-        rangeToolRoot_4.setToolTipText("ERF probability P(x) is below (%)");
-
-        // Are you choosing the BELOW A THRESHOLD row-widget?
-        radioChooserRange_4 = new Button(rangeToolRoot_4, SWT.RADIO);
-        radioChooserRange_4.setSelection(false);
-
-        // All the ui components for BELOW A THRESHOLD will have tool tip hints.
-
-        // Put the "probability of x" label ...
-        Label lblProbabilityOfX_4 = new Label(rangeToolRoot_4, SWT.NONE);
-        GridData gd_lblProbabilityOfX_4 = new GridData(SWT.RIGHT, SWT.CENTER,
-                false, false, 1, 1);
-        gd_lblProbabilityOfX_4.widthHint = 42;
-        lblProbabilityOfX_4.setLayoutData(gd_lblProbabilityOfX_4);
-        lblProbabilityOfX_4.setText("P(x): ");
-        lblProbabilityOfX_4.setFont(SWTResourceManager.getFont("Serif", 11,
-                SWT.BOLD | SWT.ITALIC));
-        lblProbabilityOfX_4.setToolTipText("Probability P(x) is below");
-
-        // There's a lower bound text entry to this BELOW A THRESHOLD row-
-        // widget.
-        Label lblValueOfX_4 = new Label(rangeToolRoot_4, SWT.NONE);
-        lblValueOfX_4.setAlignment(SWT.CENTER);
-        GridData gd_lblValueOfX_4 = new GridData(SWT.RIGHT, SWT.CENTER, false,
-                false, 2, 1);
-        gd_lblValueOfX_4.widthHint = 45;
-        lblValueOfX_4.setLayoutData(gd_lblValueOfX_4);
-        lblValueOfX_4.setFont(SWTResourceManager.getFont("Serif", 12, SWT.BOLD
-                | SWT.ITALIC));
-        lblValueOfX_4.setText("x   < ");
-        lblValueOfX_4.setToolTipText("ERF probability P(x) is below (%)");
-
-        lowerRangeEntryTextBox_4 = new Text(rangeToolRoot_4, SWT.BORDER
-                | SWT.CENTER);
-        GridData gd_lowerRangeEntryTextBox_4 = new GridData(SWT.CENTER,
-                SWT.CENTER, false, false, 1, 1);
-        gd_lowerRangeEntryTextBox_4.widthHint = 30;
-        lowerRangeEntryTextBox_4.setLayoutData(gd_lowerRangeEntryTextBox_4);
-        lowerRangeEntryTextBox_4
-                .setToolTipText("The threshold that 'x' is below");
-
-        new Label(rangeToolRoot_4, SWT.NONE);
-        new Label(rangeToolRoot_4, SWT.NONE);
-
-        // Height spacer
-        Label lbl_dummySpacer_0 = new Label(mainPanel, SWT.NONE);
-        GridData gd_dummySpacer_0 = new GridData(SWT.CENTER, SWT.CENTER, false,
-                false, 3, 1);
-        gd_dummySpacer_0.heightHint = 5;
-        lbl_dummySpacer_0.setLayoutData(gd_dummySpacer_0);
-
-        Label lbl_dummySpacer_1 = new Label(mainPanel, SWT.NONE);
-        GridData gd_dummySpacer_1 = new GridData(SWT.LEFT, SWT.CENTER, false,
-                false, 2, 1);
-        gd_dummySpacer_1.widthHint = 78;
-        lbl_dummySpacer_1.setLayoutData(gd_dummySpacer_1);
-
-        // only one range-filter row-widget is enabled at a time
-        lowerRangeEntryTextBox_1.setEnabled(true);
-        upperRangeEntryTextBox_1.setEnabled(true);
-
-        lowerRangeEntryTextBox_2.setEnabled(false);
-        upperRangeEntryTextBox_2.setEnabled(false);
-
-        lowerRangeEntryTextBox_3.setEnabled(false);
-        lowerRangeEntryTextBox_4.setEnabled(false);
-
-        // horizontal spacer
-        Label lbl_dummySpacer_3 = new Label(mainPanel, SWT.NONE);
-        GridData gd_dummySpacer_3 = new GridData(SWT.LEFT, SWT.CENTER, false,
-                false, 2, 1);
-        gd_dummySpacer_3.widthHint = 75;
-        lbl_dummySpacer_3.setLayoutData(gd_dummySpacer_3);
-
-        // Cancel button
-        btn_cancelERF = new Button(mainPanel, SWT.PUSH);
-        GridData gd_cancelProbability = new GridData(SWT.RIGHT, SWT.CENTER,
-                false, false, 1, 1);
-        btn_cancelERF.setFont(SWTResourceManager.getFont("Sans", 10, SWT.NONE));
-        btn_cancelERF.setBackground(SWTResourceManager.LIGHTER_GRAY);
-        gd_cancelProbability.heightHint = 28;
-        gd_cancelProbability.widthHint = 58;
-        btn_cancelERF.setLayoutData(gd_cancelProbability);
-        btn_cancelERF.setText("Cancel");
-
-        btn_cancelERF.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-                userRequestedERF = false;
-                disableERFTabWidgets();
-                if (lastSelectedNonTransientTabItem != null) {
-                    tabFolder_lowerSash
-                            .setSelection(lastSelectedNonTransientTabItem);
-                } else {
-                    tabFolder_lowerSash.setSelection(tabResourceInfo);
-                }
-            }
-        });
-
-        // Compute ERF button
-        btn_computeERF = new Button(mainPanel, SWT.PUSH);
-        GridData gd_computeProbability = new GridData(SWT.LEFT, SWT.CENTER,
-                false, false, 2, 1);
-        btn_computeERF
-                .setFont(SWTResourceManager.getFont("Sans", 10, SWT.NONE));
-        btn_computeERF.setBackground(SWTResourceManager.PALE_DULL_AZURE);
-        gd_computeProbability.heightHint = 28;
-        gd_computeProbability.widthHint = 120;
-        btn_computeERF.setLayoutData(gd_computeProbability);
-        btn_computeERF.setText("Compute ERF");
-
-        // compute the ERF based on a range
-        btn_computeERF.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-                userRequestedERF = false;
-                computeERF();
-            }
-        });
-
-        // select the WITHIN A RANGE row-widget and deselect the others.
-        radioChooserRange_1.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-
-                radioChooserRange_1.setSelection(true);
-                radioChooserRange_2.setSelection(false);
-                radioChooserRange_3.setSelection(false);
-                radioChooserRange_4.setSelection(false);
-
-                lowerRangeEntryTextBox_1.setText("");
-                lowerRangeEntryTextBox_2.setText("");
-                lowerRangeEntryTextBox_3.setText("");
-                lowerRangeEntryTextBox_4.setText("");
-                upperRangeEntryTextBox_1.setText("");
-                upperRangeEntryTextBox_2.setText("");
-
-                lowerRangeEntryTextBox_1.setEnabled(true);
-                lowerRangeEntryTextBox_2.setEnabled(false);
-                lowerRangeEntryTextBox_3.setEnabled(false);
-                lowerRangeEntryTextBox_4.setEnabled(false);
-                upperRangeEntryTextBox_1.setEnabled(true);
-                upperRangeEntryTextBox_2.setEnabled(false);
-
-                lowerRangeEntryTextBox_1.forceFocus();
-
-            }
-        });
-
-        // select the OUTSIDE A RANGE row-widget and deselect the others.
-        radioChooserRange_2.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-
-                radioChooserRange_1.setSelection(false);
-                radioChooserRange_2.setSelection(true);
-                radioChooserRange_3.setSelection(false);
-                radioChooserRange_4.setSelection(false);
-
-                lowerRangeEntryTextBox_1.setText("");
-                lowerRangeEntryTextBox_2.setText("");
-                lowerRangeEntryTextBox_3.setText("");
-                lowerRangeEntryTextBox_4.setText("");
-                upperRangeEntryTextBox_1.setText("");
-                upperRangeEntryTextBox_2.setText("");
-
-                lowerRangeEntryTextBox_1.setEnabled(false);
-                lowerRangeEntryTextBox_2.setEnabled(true);
-                lowerRangeEntryTextBox_3.setEnabled(false);
-                lowerRangeEntryTextBox_4.setEnabled(false);
-                upperRangeEntryTextBox_1.setEnabled(false);
-                upperRangeEntryTextBox_2.setEnabled(true);
-
-                lowerRangeEntryTextBox_2.forceFocus();
-
-            }
-        });
-
-        // select the ABOVE A THRESHOLD and deselect the others.
-        radioChooserRange_3.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-
-                radioChooserRange_1.setSelection(false);
-                radioChooserRange_2.setSelection(false);
-                radioChooserRange_3.setSelection(true);
-                radioChooserRange_4.setSelection(false);
-
-                lowerRangeEntryTextBox_1.setText("");
-                lowerRangeEntryTextBox_2.setText("");
-                lowerRangeEntryTextBox_3.setText("");
-                lowerRangeEntryTextBox_4.setText("");
-                upperRangeEntryTextBox_1.setText("");
-                upperRangeEntryTextBox_2.setText("");
-
-                lowerRangeEntryTextBox_1.setEnabled(false);
-                lowerRangeEntryTextBox_2.setEnabled(false);
-                lowerRangeEntryTextBox_3.setEnabled(true);
-                lowerRangeEntryTextBox_4.setEnabled(false);
-                upperRangeEntryTextBox_1.setEnabled(false);
-                upperRangeEntryTextBox_2.setEnabled(false);
-
-                lowerRangeEntryTextBox_3.forceFocus();
-
-            }
-        });
-
-        // select the BELOW A THRESHOLD and deselect the others.
-        radioChooserRange_4.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-
-                radioChooserRange_1.setSelection(false);
-                radioChooserRange_2.setSelection(false);
-                radioChooserRange_3.setSelection(false);
-                radioChooserRange_4.setSelection(true);
-
-                lowerRangeEntryTextBox_1.setText("");
-                lowerRangeEntryTextBox_2.setText("");
-                lowerRangeEntryTextBox_3.setText("");
-                lowerRangeEntryTextBox_4.setText("");
-                upperRangeEntryTextBox_1.setText("");
-                upperRangeEntryTextBox_2.setText("");
-
-                lowerRangeEntryTextBox_1.setEnabled(false);
-                lowerRangeEntryTextBox_2.setEnabled(false);
-                lowerRangeEntryTextBox_3.setEnabled(false);
-                lowerRangeEntryTextBox_4.setEnabled(true);
-                upperRangeEntryTextBox_1.setEnabled(false);
-                upperRangeEntryTextBox_2.setEnabled(false);
-
-                lowerRangeEntryTextBox_4.forceFocus();
-
-            }
-        });
-
-    }
-
-    // extract and validate the values from the chosen ERF range
-    protected void computeERF() {
-
-        if (radioChooserRange_1.getSelection()) {
-            String lns = lowerRangeEntryTextBox_1.getText();
-            double lowerValue = 0;
-            try {
-                lowerValue = Double.parseDouble(lns);
-            } catch (NumberFormatException nfe) {
-                MessageDialog.openError(owner.getShell(), "Invalid Number",
-                        "Lower range entry must be a valid real number.");
-                return;
-            }
-            String hns = upperRangeEntryTextBox_1.getText();
-            double higherValue = 0;
-            try {
-                higherValue = Double.parseDouble(hns);
-            } catch (NumberFormatException nfe) {
-                MessageDialog.openError(owner.getShell(), "Invalid Number",
-                        "Higher range entry must be a valid real number.");
-                return;
-            }
-            if (lowerValue >= higherValue) {
-                MessageDialog
-                        .openError(owner.getShell(), "Invalid Range",
-                                "Lower range entry must be smaller than higher range entry.");
-                return;
-            } else {
-                Range range = new Range(RangeType.INNER_RANGE);
-                range.setRange(lowerValue, higherValue);
-                EnsembleToolManager.getInstance().calculate(
-                        Calculation.ENSEMBLE_RELATIVE_FREQUENCY, range);
-            }
-        }
-
-        else if (radioChooserRange_2.getSelection()) {
-            String lns = lowerRangeEntryTextBox_2.getText();
-            double lowerValue = 0;
-            try {
-                lowerValue = Double.parseDouble(lns);
-            } catch (NumberFormatException nfe) {
-                MessageDialog.openError(owner.getShell(), "Invalid Number",
-                        "Lower range entry must be a valid real number.");
-                return;
-            }
-            String hns = upperRangeEntryTextBox_2.getText();
-            double higherValue = 0;
-            try {
-                higherValue = Double.parseDouble(hns);
-            } catch (NumberFormatException nfe) {
-                MessageDialog.openError(owner.getShell(), "Invalid Number",
-                        "Higher range entry must be a valid real number.");
-                return;
-            }
-            if (lowerValue >= higherValue) {
-                MessageDialog
-                        .openError(owner.getShell(), "Invalid Range",
-                                "Lower range entry must be smaller than higher range entry.");
-                return;
-            } else {
-                Range range = new Range(RangeType.OUTER_RANGE);
-                range.setRange(lowerValue, higherValue);
-                EnsembleToolManager.getInstance().calculate(
-                        Calculation.ENSEMBLE_RELATIVE_FREQUENCY, range);
-            }
-        }
-
-        else if (radioChooserRange_3.getSelection()) {
-            String lns = lowerRangeEntryTextBox_3.getText();
-            double lowerValue = 0;
-            try {
-                lowerValue = Double.parseDouble(lns);
-            } catch (NumberFormatException nfe) {
-                MessageDialog.openError(owner.getShell(), "Invalid Number",
-                        "Entry must be a valid number.");
-                return;
-            }
-            Range range = new Range(RangeType.ABOVE_THRESHOLD);
-            range.setThreshold(lowerValue);
-            EnsembleToolManager.getInstance().calculate(
-                    Calculation.ENSEMBLE_RELATIVE_FREQUENCY, range);
-        }
-
-        else if (radioChooserRange_4.getSelection()) {
-            String lns = lowerRangeEntryTextBox_4.getText();
-            double lowerValue = 0;
-            try {
-                lowerValue = Double.parseDouble(lns);
-            } catch (NumberFormatException nfe) {
-                MessageDialog.openError(owner.getShell(), "Invalid Number",
-                        "Entry must be a valid number.");
-                return;
-            }
-            Range range = new Range(RangeType.BELOW_THRESHOLD);
-            range.setThreshold(lowerValue);
-            EnsembleToolManager.getInstance().calculate(
-                    Calculation.ENSEMBLE_RELATIVE_FREQUENCY, range);
-        }
-
-        if (EnsembleToolManager.getInstance().isReady()) {
-            EnsembleToolManager.getInstance().getActiveToolLayer()
-                    .transferFocusToEditor();
-        }
-
-        disableERFTabWidgets();
-        if (lastSelectedNonTransientTabItem != null) {
-            tabFolder_lowerSash.setSelection(lastSelectedNonTransientTabItem);
-        } else {
-            tabFolder_lowerSash.setSelection(tabResourceInfo);
-        }
-    }
-
-    // disable the ERF widgets
-    protected void disableERFTabWidgets() {
-
-        clearProbabilityFields();
-
-        radioChooserRange_1.setEnabled(false);
-        radioChooserRange_2.setEnabled(false);
-        radioChooserRange_3.setEnabled(false);
-        radioChooserRange_4.setEnabled(false);
-
-        lowerRangeEntryTextBox_1.setEnabled(false);
-        lowerRangeEntryTextBox_2.setEnabled(false);
-        lowerRangeEntryTextBox_3.setEnabled(false);
-        lowerRangeEntryTextBox_4.setEnabled(false);
-        upperRangeEntryTextBox_1.setEnabled(false);
-        upperRangeEntryTextBox_2.setEnabled(false);
-
-        btn_cancelERF.setEnabled(false);
-        btn_computeERF.setEnabled(false);
-    }
-
-    // enable the ERF widgets default state
-    protected void enableDefaultERFTabWidgetState(String rscName) {
-
-        clearProbabilityFields();
-        label_ensembleProductName.setText(rscName);
-
-        radioChooserRange_1.setEnabled(true);
-        radioChooserRange_2.setEnabled(true);
-        radioChooserRange_3.setEnabled(true);
-        radioChooserRange_4.setEnabled(true);
-
-        lowerRangeEntryTextBox_1.setEnabled(true);
-        lowerRangeEntryTextBox_2.setEnabled(false);
-        lowerRangeEntryTextBox_3.setEnabled(false);
-        lowerRangeEntryTextBox_4.setEnabled(false);
-        upperRangeEntryTextBox_1.setEnabled(true);
-        upperRangeEntryTextBox_2.setEnabled(false);
-
-        radioChooserRange_1.setSelection(true);
-        radioChooserRange_2.setSelection(false);
-        radioChooserRange_3.setSelection(false);
-        radioChooserRange_4.setSelection(false);
-
-        lowerRangeEntryTextBox_1.insert("");
-        lowerRangeEntryTextBox_1.forceFocus();
-
-        btn_cancelERF.setEnabled(true);
-        btn_computeERF.setEnabled(true);
-    }
-
-    // set the ERF tab widgets to enable the row-widget based
-    // on the Range filter type. Other row-widgets are then
-    // disabled.
-    private void setERFFields(Range range, String rscName) {
-
-        clearProbabilityFields();
-        label_ensembleProductName.setText(rscName);
-
-        radioChooserRange_1.setEnabled(true);
-        radioChooserRange_2.setEnabled(true);
-        radioChooserRange_3.setEnabled(true);
-        radioChooserRange_4.setEnabled(true);
-        btn_cancelERF.setEnabled(true);
-        btn_computeERF.setEnabled(true);
-
-        if (range.getRangeType() == RangeType.INNER_RANGE) {
-            radioChooserRange_1.setSelection(true);
-            radioChooserRange_2.setSelection(false);
-            radioChooserRange_3.setSelection(false);
-            radioChooserRange_4.setSelection(false);
-
-            String lowerStr = Double.toString(range.getLowerRangeThreshold());
-            String upperStr = Double.toString(range.getUpperRangeThreshold());
-            lowerRangeEntryTextBox_1.setText(lowerStr);
-            upperRangeEntryTextBox_1.setText(upperStr);
-
-            lowerRangeEntryTextBox_1.setEnabled(true);
-            lowerRangeEntryTextBox_2.setEnabled(false);
-            lowerRangeEntryTextBox_3.setEnabled(false);
-            lowerRangeEntryTextBox_4.setEnabled(false);
-            upperRangeEntryTextBox_1.setEnabled(true);
-            upperRangeEntryTextBox_2.setEnabled(false);
-
-        } else if (range.getRangeType() == RangeType.OUTER_RANGE) {
-            radioChooserRange_1.setSelection(false);
-            radioChooserRange_2.setSelection(true);
-            radioChooserRange_3.setSelection(false);
-            radioChooserRange_4.setSelection(false);
-
-            String lowerStr = Double.toString(range.getLowerRangeThreshold());
-            String upperStr = Double.toString(range.getUpperRangeThreshold());
-            lowerRangeEntryTextBox_2.setText(lowerStr);
-            upperRangeEntryTextBox_2.setText(upperStr);
-
-            lowerRangeEntryTextBox_1.setEnabled(false);
-            lowerRangeEntryTextBox_2.setEnabled(true);
-            lowerRangeEntryTextBox_3.setEnabled(false);
-            lowerRangeEntryTextBox_4.setEnabled(false);
-            upperRangeEntryTextBox_1.setEnabled(false);
-            upperRangeEntryTextBox_2.setEnabled(true);
-
-        } else if (range.getRangeType() == RangeType.ABOVE_THRESHOLD) {
-            radioChooserRange_1.setSelection(false);
-            radioChooserRange_2.setSelection(false);
-            radioChooserRange_3.setSelection(true);
-            radioChooserRange_4.setSelection(false);
-
-            String threshold = Double.toString(range.getThreshold());
-            lowerRangeEntryTextBox_3.setText(threshold);
-
-            lowerRangeEntryTextBox_1.setEnabled(false);
-            lowerRangeEntryTextBox_2.setEnabled(false);
-            lowerRangeEntryTextBox_3.setEnabled(true);
-            lowerRangeEntryTextBox_4.setEnabled(false);
-            upperRangeEntryTextBox_1.setEnabled(false);
-            upperRangeEntryTextBox_2.setEnabled(false);
-
-        } else if (range.getRangeType() == RangeType.BELOW_THRESHOLD) {
-            radioChooserRange_1.setSelection(false);
-            radioChooserRange_2.setSelection(false);
-            radioChooserRange_3.setSelection(false);
-            radioChooserRange_4.setSelection(true);
-
-            String threshold = Double.toString(range.getThreshold());
-            lowerRangeEntryTextBox_4.setText(threshold);
-
-            lowerRangeEntryTextBox_1.setEnabled(false);
-            lowerRangeEntryTextBox_2.setEnabled(false);
-            lowerRangeEntryTextBox_3.setEnabled(false);
-            lowerRangeEntryTextBox_4.setEnabled(true);
-            upperRangeEntryTextBox_1.setEnabled(false);
-            upperRangeEntryTextBox_2.setEnabled(false);
-
-        }
-
-    }
-
-    // clear all user-entered probability field ranges.
-    private void clearProbabilityFields() {
-        lowerRangeEntryTextBox_1.setText("");
-        lowerRangeEntryTextBox_2.setText("");
-        lowerRangeEntryTextBox_3.setText("");
-        lowerRangeEntryTextBox_4.setText("");
-        upperRangeEntryTextBox_1.setText("");
-        upperRangeEntryTextBox_2.setText("");
-        label_ensembleProductName.setText("");
-
+        lowerSashTabFolder = new TabFolder(lowerSash, SWT.NONE);
+        GridLayout lowerSashTabFolder_gl = new GridLayout(1, true);
+        lowerSashTabFolder_gl.marginHeight = 1;
+        lowerSashTabFolder_gl.marginWidth = 1;
+        lowerSashTabFolder.setLayout(lowerSashTabFolder_gl);
+        fillInfoTab(lowerSashTabFolder);
+        fillPreferencesTab(lowerSashTabFolder);
+        lowerSashTabFolder.setSelection(resourceInfoTabItem);
     }
 
     // The preference tab contains the preference widgets including
@@ -3189,101 +2486,118 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
     // use the resource color or user-defined color for selection.
     private void fillPreferencesTab(TabFolder tabFolder_lowerSash) {
 
-        Composite composite = new Composite(tabFolder_lowerSash, SWT.BORDER);
-        composite.setLayout(new GridLayout(10, true));
-        GridData gd_composite = new GridData(SWT.LEFT, SWT.CENTER, false,
+        Composite prefsRootComposite = new Composite(tabFolder_lowerSash,
+                SWT.BORDER);
+        prefsRootComposite.setLayout(new GridLayout(10, true));
+        GridData prefsComposite_gd = new GridData(SWT.LEFT, SWT.CENTER, false,
                 false, 1, 1);
-        gd_composite.heightHint = 215;
-        gd_composite.widthHint = 351;
-        composite.setLayoutData(gd_composite);
-        composite.setBackground(SWTResourceManager.MEDIUM_GRAY);
-        tabPreferences = new TabItem(tabFolder_lowerSash, SWT.NONE);
-        tabPreferences.setText(" Prefs ");
-        tabPreferences.setControl(composite);
+        prefsComposite_gd.heightHint = 205;
+        prefsComposite_gd.widthHint = 351;
+        prefsRootComposite.setLayoutData(prefsComposite_gd);
+        prefsRootComposite.setBackground(SWTResourceManager.MEDIUM_GRAY);
+        preferencesTabItem = new TabItem(tabFolder_lowerSash, SWT.NONE);
+        preferencesTabItem
+                .setImage(EnsembleToolViewerImageStore.TAB_OPTIONS_ENABLED_IMG);
+        preferencesTabItem.setControl(prefsRootComposite);
 
-        Composite composite_ThickenOnSelection = new Composite(composite,
+        final int numCols = 5;
+        thickenOnSelectionComposite = new Composite(prefsRootComposite,
                 SWT.SHADOW_ETCHED_IN);
-        composite_ThickenOnSelection.setLayout(new GridLayout(5, false));
-        GridData gd_composite_ThickenOnSelection = new GridData(SWT.LEFT,
-                SWT.CENTER, false, false, 1, 1);
-        gd_composite_ThickenOnSelection.widthHint = 152;
-        gd_composite_ThickenOnSelection.heightHint = 130;
-        composite_ThickenOnSelection
-                .setLayoutData(gd_composite_ThickenOnSelection);
+        thickenOnSelectionComposite.setLayout(new GridLayout(numCols, false));
 
-        final Button btnThickenOnSelection = new Button(
-                composite_ThickenOnSelection, SWT.CHECK);
-        btnThickenOnSelection.setSelection(true);
+        GridData thickenOnSelectionComposite_gd = new GridData(SWT.LEFT,
+                SWT.TOP, false, false, 1, 10);
+        thickenOnSelectionComposite_gd.widthHint = 152;
+        thickenOnSelectionComposite
+                .setLayoutData(thickenOnSelectionComposite_gd);
+
+        GridData separatorLbl_gd = new GridData(SWT.LEFT, SWT.CENTER, false,
+                false, numCols, 1);
+        separatorLbl_gd.widthHint = 218;
+
+        Label separatorLbl_0 = new Label(thickenOnSelectionComposite,
+                SWT.SEPARATOR | SWT.HORIZONTAL);
+        separatorLbl_0.setLayoutData(separatorLbl_gd);
+        separatorLbl_0.setVisible(false);
+
+        thickenOnSelectionBtn = new Button(thickenOnSelectionComposite,
+                SWT.CHECK);
+        thickenOnSelectionBtn.setSelection(true);
         thickenOnSelection = true;
-        btnThickenOnSelection.setText("Thicken On Selection");
-        btnThickenOnSelection.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
+        thickenOnSelectionBtn.setText("Thicken On Selection");
+        thickenOnSelectionBtn.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
                 false, false, 4, 1));
-        btnThickenOnSelection.setFont(viewFont);
+        thickenOnSelectionBtn.setFont(viewFont);
 
-        new Label(composite_ThickenOnSelection, SWT.NONE);
+        Label label_separator_A = new Label(thickenOnSelectionComposite,
+                SWT.SEPARATOR | SWT.HORIZONTAL);
+        label_separator_A.setLayoutData(separatorLbl_gd);
+        label_separator_A.setVisible(false);
 
-        Label label_1 = new Label(composite_ThickenOnSelection, SWT.SEPARATOR
-                | SWT.HORIZONTAL);
-        GridData gd_label_1 = new GridData(SWT.LEFT, SWT.CENTER, false, false,
-                4, 1);
-        gd_label_1.widthHint = 218;
-        label_1.setLayoutData(gd_label_1);
+        Label separatorLbl_1 = new Label(thickenOnSelectionComposite,
+                SWT.SEPARATOR | SWT.HORIZONTAL);
+        separatorLbl_1.setLayoutData(separatorLbl_gd);
 
-        final Button btnUseResourceColor = new Button(
-                composite_ThickenOnSelection, SWT.RADIO);
-        btnUseResourceColor.setSelection(true);
-        btnUseResourceColor.setText("Use Resource Color");
-        btnUseResourceColor.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
-                false, false, 4, 1));
-        btnUseResourceColor.setFont(smallViewFont);
+        Label separatorLbl_B = new Label(thickenOnSelectionComposite,
+                SWT.SEPARATOR | SWT.HORIZONTAL);
+        separatorLbl_B.setLayoutData(separatorLbl_gd);
+        separatorLbl_B.setVisible(false);
 
-        new Label(composite_ThickenOnSelection, SWT.NONE);
+        useResourceColorRdo = new Button(thickenOnSelectionComposite, SWT.RADIO);
+        useResourceColorRdo.setSelection(true);
+        useResourceColorRdo.setText("Use Product Color");
+        useResourceColorRdo.setLayoutData(new GridData(SWT.LEFT, SWT.BOTTOM,
+                false, false, numCols, 2));
+        useResourceColorRdo.setFont(smallViewFont);
 
-        final Button btnChooseColor = new Button(composite_ThickenOnSelection,
-                SWT.RADIO);
-        GridData gd_btnChooseColor = new GridData(SWT.LEFT, SWT.TOP, false,
+        chooseColorRdo = new Button(thickenOnSelectionComposite, SWT.RADIO);
+        GridData chooseColorBtn_gd = new GridData(SWT.LEFT, SWT.CENTER, false,
                 false, 3, 1);
-        gd_btnChooseColor.widthHint = 115;
-        btnChooseColor.setLayoutData(gd_btnChooseColor);
-        btnChooseColor.setFont(smallViewFont);
-        btnChooseColor.setText("Choose Color ");
-        btnChooseColor.setSelection(false);
+        chooseColorBtn_gd.widthHint = 93;
+        chooseColorRdo.setLayoutData(chooseColorBtn_gd);
+        chooseColorRdo.setFont(smallViewFont);
+        chooseColorRdo.setText("Choose Color ");
+        chooseColorRdo.setSelection(false);
 
-        final Label label_ColorChooser = new Label(
-                composite_ThickenOnSelection, SWT.BORDER);
-        label_ColorChooser.setBackground(thickenOnSelectionColor);
-        label_ColorChooser.setFont(SWTResourceManager.getFont("Dialog", 14,
+        colorChooserLbl = new Label(thickenOnSelectionComposite, SWT.BORDER);
+        colorChooserLbl.setBackground(thickenOnSelectionColor);
+        colorChooserLbl.setFont(SWTResourceManager.getFont("Dialog", 14,
                 SWT.NONE));
-        label_ColorChooser.setAlignment(SWT.CENTER);
-        GridData gd_label = new GridData(SWT.LEFT, SWT.CENTER, false, false, 1,
-                1);
-        gd_label.widthHint = 20;
-        label_ColorChooser.setLayoutData(gd_label);
-        label_ColorChooser.setEnabled(false);
-        label_ColorChooser.setBackground(SWTResourceManager.LIGHT_GRAY);
-        label_ColorChooser.setText("X");
+        colorChooserLbl.setAlignment(SWT.CENTER);
+        GridData colorChooserLbl_gd = new GridData(SWT.LEFT, SWT.CENTER, false,
+                false, 2, 1);
+        colorChooserLbl_gd.widthHint = 40;
+        colorChooserLbl.setLayoutData(colorChooserLbl_gd);
+        colorChooserLbl.setEnabled(false);
+        colorChooserLbl.setBackground(SWTResourceManager.LIGHT_GRAY);
+        colorChooserLbl.setText("X");
 
-        // new Label(composite_ThickenOnSelection, SWT.NONE);
+        Label separatorLbl_3 = new Label(thickenOnSelectionComposite,
+                SWT.SEPARATOR | SWT.HORIZONTAL);
+        separatorLbl_3.setLayoutData(separatorLbl_gd);
+        separatorLbl_3.setVisible(false);
 
-        final Label labelThicknessChooser = new Label(
-                composite_ThickenOnSelection, SWT.BORDER);
-        GridData gd_labelThicknessChooser = new GridData(SWT.LEFT, SWT.CENTER,
+        thicknessChooserLbl = new Label(thickenOnSelectionComposite, SWT.BORDER
+                | SWT.CENTER);
+        GridData thicknessChooserLbl_gd = new GridData(SWT.LEFT, SWT.CENTER,
                 false, false, 2, 1);
-        gd_labelThicknessChooser.widthHint = 60;
-        labelThicknessChooser.setLayoutData(gd_labelThicknessChooser);
-        labelThicknessChooser.setText("Thickness: ");
-        labelThicknessChooser.setFont(smallViewFont);
-        labelThicknessChooser.setAlignment(SWT.CENTER);
+        thicknessChooserLbl_gd.widthHint = 65;
+        thicknessChooserLbl_gd.heightHint = 23;
+        thicknessChooserLbl.setLayoutData(thicknessChooserLbl_gd);
+        thicknessChooserLbl.setText("Thickness: ");
+        thicknessChooserLbl.setFont(smallViewFont);
+        thicknessChooserLbl.setAlignment(SWT.CENTER);
 
-        final Spinner spinnerThicknessChooser = new Spinner(
-                composite_ThickenOnSelection, SWT.BORDER);
-        spinnerThicknessChooser.setValues(thickenWidth, 2, 7, 0, 1, 1);
-        GridData gd_spinnerThicknessChooser = new GridData(SWT.LEFT,
-                SWT.CENTER, false, false, 2, 1);
-        gd_spinnerThicknessChooser.widthHint = 28;
-        spinnerThicknessChooser.setLayoutData(gd_spinnerThicknessChooser);
-        spinnerThicknessChooser.setFont(viewFont);
-        spinnerThicknessChooser.addSelectionListener(new SelectionListener() {
+        thicknessChooserSpinner = new Spinner(thickenOnSelectionComposite,
+                SWT.BORDER);
+        thicknessChooserSpinner.setValues(thickenWidth, 2, 7, 0, 1, 1);
+        GridData thicknessChooser_gd = new GridData(SWT.LEFT, SWT.CENTER,
+                false, false, 2, 1);
+        thicknessChooser_gd.widthHint = 45;
+        thicknessChooserLbl_gd.heightHint = 27;
+        thicknessChooserSpinner.setLayoutData(thicknessChooser_gd);
+        thicknessChooserSpinner.setFont(viewFont);
+        thicknessChooserSpinner.addSelectionListener(new SelectionListener() {
 
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -3297,344 +2611,435 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
 
         });
 
-        label_ColorChooser.addMouseListener(new MouseAdapter() {
+        colorChooserLbl.addMouseListener(new MouseAdapter() {
 
             public void mouseUp(MouseEvent e) {
-                ColorDialog cd = new ColorDialog(owner.getShell());
-                cd.setRGB(thickenOnSelectionColor.getRGB());
-                cd.setText("Choose Selection Color");
-                RGB result = cd.open();
-                if (result != null) {
-                    Color c = SWTResourceManager.getColor(result);
-                    thickenOnSelectionColor = c;
-                    label_ColorChooser.setBackground(c);
+                if (!useResourceColorOnThicken) {
+                    ColorDialog cd = new ColorDialog(ownerComposite.getShell());
+                    cd.setRGB(thickenOnSelectionColor.getRGB());
+                    cd.setText("Choose Selection Color");
+                    RGB result = cd.open();
+                    if (result != null) {
+                        Color c = SWTResourceManager.getColor(result);
+                        thickenOnSelectionColor = c;
+                        colorChooserLbl.setBackground(c);
+                    }
                 }
             }
-
         });
 
-        btnThickenOnSelection.addSelectionListener(new SelectionAdapter() {
+        thickenOnSelectionBtn.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
-                boolean isResourceColorBeingUsed = btnUseResourceColor
+                boolean isResourceColorBeingUsed = useResourceColorRdo
                         .getSelection();
-                boolean isChecked = btnThickenOnSelection.getSelection();
+                boolean isChecked = thickenOnSelectionBtn.getSelection();
                 if (isChecked) {
-                    btnUseResourceColor.setEnabled(true);
-                    btnChooseColor.setEnabled(true);
-                    label_ColorChooser.setEnabled(true);
+                    useResourceColorRdo.setEnabled(true);
+                    chooseColorRdo.setEnabled(true);
+                    colorChooserLbl.setEnabled(true);
                     if (isResourceColorBeingUsed) {
-                        label_ColorChooser
+                        colorChooserLbl
                                 .setBackground(SWTResourceManager.LIGHT_GRAY);
-                        label_ColorChooser.setText("X");
+                        colorChooserLbl.setText("X");
                     } else {
-                        label_ColorChooser
-                                .setBackground(thickenOnSelectionColor);
-                        label_ColorChooser.setText("");
+                        colorChooserLbl.setBackground(thickenOnSelectionColor);
+                        colorChooserLbl.setText("");
                     }
-                    labelThicknessChooser.setEnabled(true);
-                    spinnerThicknessChooser.setEnabled(true);
+                    thicknessChooserLbl.setEnabled(true);
+                    thicknessChooserSpinner.setEnabled(true);
                     thickenOnSelection = true;
                 } else {
-                    btnUseResourceColor.setEnabled(false);
-                    btnChooseColor.setEnabled(false);
-                    label_ColorChooser.setEnabled(false);
-                    label_ColorChooser
+                    useResourceColorRdo.setEnabled(false);
+                    chooseColorRdo.setEnabled(false);
+                    colorChooserLbl.setEnabled(false);
+                    colorChooserLbl
                             .setBackground(SWTResourceManager.LIGHT_GRAY);
-                    label_ColorChooser.setText("X");
-                    labelThicknessChooser.setEnabled(false);
-                    spinnerThicknessChooser.setEnabled(false);
+                    colorChooserLbl.setText("X");
+                    thicknessChooserLbl.setEnabled(false);
+                    thicknessChooserSpinner.setEnabled(false);
                     thickenOnSelection = false;
                 }
             }
         });
 
-        btnUseResourceColor.addSelectionListener(new SelectionListener() {
+        useResourceColorRdo.addSelectionListener(new SelectionAdapter() {
 
             @Override
             public void widgetSelected(SelectionEvent e) {
                 boolean isSelected = ((Button) e.getSource()).getSelection();
                 if (isSelected) {
-                    label_ColorChooser
+                    colorChooserLbl
                             .setBackground(SWTResourceManager.LIGHT_GRAY);
-                    label_ColorChooser.setText("X");
-                    label_ColorChooser.setEnabled(false);
+                    colorChooserLbl.setText("X");
+                    colorChooserLbl.setEnabled(false);
                     useResourceColorOnThicken = true;
                 }
             }
 
-            @Override
-            public void widgetDefaultSelected(SelectionEvent e) {
-
-            }
-
         });
 
-        btnChooseColor.addSelectionListener(new SelectionListener() {
+        chooseColorRdo.addSelectionListener(new SelectionAdapter() {
 
             @Override
             public void widgetSelected(SelectionEvent e) {
                 boolean isSelected = ((Button) e.getSource()).getSelection();
                 if (isSelected) {
-                    label_ColorChooser.setBackground(thickenOnSelectionColor);
-                    label_ColorChooser.setText("");
-                    label_ColorChooser.setEnabled(true);
+                    colorChooserLbl.setBackground(thickenOnSelectionColor);
+                    colorChooserLbl.setText("");
+                    colorChooserLbl.setEnabled(true);
                     useResourceColorOnThicken = false;
                 }
-            }
-
-            @Override
-            public void widgetDefaultSelected(SelectionEvent e) {
-
             }
 
         });
 
         /* Additional preferences */
 
-        Composite composite_SmallFlags = new Composite(composite,
+        smallFlagsComposite = new Composite(prefsRootComposite,
                 SWT.SHADOW_ETCHED_IN);
-        composite_SmallFlags.setLayout(new GridLayout(4, false));
-        GridData gd_composite_SmallFlags = new GridData(SWT.LEFT, SWT.CENTER,
-                true, false, 4, 1);
-        gd_composite_SmallFlags.widthHint = 154;
-        gd_composite_SmallFlags.heightHint = 130;
-        composite_SmallFlags.setLayoutData(gd_composite_SmallFlags);
+        smallFlagsComposite.setLayout(new GridLayout(5, false));
+        GridData smallFlagsComposite_gd = new GridData(SWT.LEFT, SWT.CENTER,
+                false, false, 4, 6);
+        smallFlagsComposite_gd.widthHint = 175;
+        smallFlagsComposite.setLayoutData(smallFlagsComposite_gd);
 
         /*
-         * Auto-focus preference: asserted by default. Controls whether focus is
-         * grabbed by the View when the mouse enters the Tree control and
-         * grabbed by the active editor when the Tree control loses focus.
+         * Allow the user to control editability of the ensemble tool layer when
+         * this view (ViewPart) is restored.
          */
-
-        final Button btnAutoFocus = new Button(composite_SmallFlags, SWT.CHECK);
-        autoFocus = true;
-        btnAutoFocus.setSelection(autoFocus);
-        btnAutoFocus.setText("Auto-Focus");
-        btnAutoFocus.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false,
-                false, 4, 1));
-        btnAutoFocus.setFont(viewFont);
-
-        /* vertical spacers */
-        Label separator1 = new Label(composite_SmallFlags, SWT.SEPARATOR
-                | SWT.HORIZONTAL);
-        GridData gd_separator_1 = new GridData(SWT.LEFT, SWT.CENTER, false,
-                false, 4, 1);
-        gd_separator_1.widthHint = 150;
-        separator1.setLayoutData(gd_separator_1);
-
-        new Label(composite_SmallFlags, SWT.NONE);
-        new Label(composite_SmallFlags, SWT.NONE);
-        new Label(composite_SmallFlags, SWT.NONE);
-
-        Label separator2 = new Label(composite_SmallFlags, SWT.SEPARATOR
-                | SWT.HORIZONTAL);
-        GridData gd_separator_2 = new GridData(SWT.LEFT, SWT.CENTER, false,
-                false, 4, 1);
-        gd_separator_2.widthHint = 150;
-        separator2.setLayoutData(gd_separator_2);
-
-        /*
-         * Editable on Restore preference: for 14.4.1 release only, this
-         * preference is asserted by default and not changeable. It defines the
-         * way that a given ensemble tool layer has its editability turned-on
-         * once the navigator view (this EnsembleToolViewer) is restored.
-         * 
-         * This control will be enabled in future releases, as the user may not
-         * want the tool layer to automatically become editable on view restore.
-         */
-        final Button btnEditableOnRestore = new Button(composite_SmallFlags,
-                SWT.CHECK);
-        btnEditableOnRestore.setSelection(true);
-        btnEditableOnRestore.setText("Make editable on restore");
-        btnEditableOnRestore.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
-                false, false, 4, 1));
-        btnEditableOnRestore.setFont(smallViewFont);
-        btnEditableOnRestore.setEnabled(false);
-
-        /*
-         * Editable on Swap-In preference: for 14.4.1 release only, this
-         * preference is asserted by default and not changeable. It defines the
-         * way that a given ensemble tool layer has its editability turned-on
-         * once an ensemble tool layer is swapped in to the active editor.
-         * 
-         * This control will be enabled in future releases, as the user may not
-         * want the tool layer to automatically become editable when swapped in.
-         */
-        final Button btnEditableOnSwapIn = new Button(composite_SmallFlags,
-                SWT.CHECK);
-        btnEditableOnSwapIn.setSelection(true);
-        btnEditableOnSwapIn.setText("Make editable on swap-in");
-        btnEditableOnSwapIn.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
-                false, false, 4, 1));
-        btnEditableOnSwapIn.setFont(smallViewFont);
-        btnEditableOnSwapIn.setEnabled(false);
-
-        btnAutoFocus.addSelectionListener(new SelectionListener() {
+        editableOnRestoreBtn = new Button(smallFlagsComposite, SWT.CHECK);
+        editableOnRestoreBtn.setSelection(editableOnRestore);
+        editableOnRestoreBtn.setText("Make editable on restore");
+        editableOnRestoreBtn.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
+                true, false, 4, 1));
+        editableOnRestoreBtn.setFont(smallViewFont);
+        editableOnRestoreBtn.setEnabled(true);
+        editableOnRestoreBtn.addSelectionListener(new SelectionAdapter() {
 
             @Override
             public void widgetSelected(SelectionEvent e) {
-                autoFocus = ((Button) e.getSource()).getSelection();
-            }
-
-            @Override
-            public void widgetDefaultSelected(SelectionEvent e) {
-                autoFocus = ((Button) e.getSource()).getSelection();
+                editableOnRestore = ((Button) e.getSource()).getSelection();
             }
 
         });
 
+        /*
+         * Allow the user to control whether this view (ViewPart) is minimized
+         * when the user loads another tool (e.g. Points, Baselines, etc).
+         */
+        minimizeOnForeignToolBtn = new Button(smallFlagsComposite, SWT.CHECK);
+        minimizeOnForeignToolBtn.setSelection(minimizeOnForeignToolLoad);
+        minimizeOnForeignToolBtn.setText("Minimize on foreign tool");
+        minimizeOnForeignToolBtn.setLayoutData(new GridData(SWT.LEFT,
+                SWT.CENTER, true, false, 4, 1));
+        minimizeOnForeignToolBtn.setFont(smallViewFont);
+        minimizeOnForeignToolBtn.setEnabled(true);
+        minimizeOnForeignToolBtn.addSelectionListener(new SelectionAdapter() {
+
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                minimizeOnForeignToolLoad = ((Button) e.getSource())
+                        .getSelection();
+            }
+
+        });
+
+        /*
+         * Allow the user to control whether the ensemble tool view is minimized
+         * when the active tool layer is toggled to uneditable.
+         */
+        minimizeOnToggleUneditableBtn = new Button(smallFlagsComposite,
+                SWT.CHECK);
+        minimizeOnToggleUneditableBtn.setSelection(minimizeOnToggleUneditable);
+        minimizeOnToggleUneditableBtn.setText("Minimize on toggle uneditable");
+        minimizeOnToggleUneditableBtn.setLayoutData(new GridData(SWT.LEFT,
+                SWT.CENTER, true, false, 5, 1));
+        minimizeOnToggleUneditableBtn.setFont(smallViewFont);
+        minimizeOnToggleUneditableBtn.setEnabled(true);
+        minimizeOnToggleUneditableBtn
+                .addSelectionListener(new SelectionAdapter() {
+
+                    @Override
+                    public void widgetSelected(SelectionEvent e) {
+                        minimizeOnToggleUneditable = ((Button) e.getSource())
+                                .getSelection();
+                    }
+
+                });
+
+        /*
+         * Allow the user to control whether the Prefs tab automatically swtches
+         * back to the Info tab after use.
+         */
+        autoHidePreferencesBtn = new Button(smallFlagsComposite, SWT.CHECK);
+        autoHidePreferencesBtn.setSelection(autoHidePreferences);
+        autoHidePreferencesBtn.setText("Auto-Hide Preferences");
+        autoHidePreferencesBtn.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
+                true, false, 5, 1));
+        autoHidePreferencesBtn.setFont(smallViewFont);
+        autoHidePreferencesBtn.setEnabled(true);
+        autoHidePreferencesBtn.addSelectionListener(new SelectionAdapter() {
+
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                autoHidePreferences = ((Button) e.getSource()).getSelection();
+            }
+
+        });
+
+        /*
+         * Allow the user to control the way swapping-in a pane containing an
+         * ensemble tool layer effects the editability of the tool layer.
+         */
+        editableOnSwapInBtn = new Button(smallFlagsComposite, SWT.CHECK);
+        editableOnSwapIn = false;
+        editableOnSwapInBtn.setSelection(editableOnSwapIn);
+        editableOnSwapInBtn.setText("Make editable on swap-in");
+        editableOnSwapInBtn.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
+                true, false, 4, 1));
+        editableOnSwapInBtn.setFont(smallViewFont);
+        // btnEditableOnSwapIn.setEnabled(true);
+        editableOnSwapInBtn.setEnabled(false);
+        editableOnSwapInBtn.addSelectionListener(new SelectionAdapter() {
+
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                editableOnSwapIn = ((Button) e.getSource()).getSelection();
+            }
+
+        });
+
+        /*
+         * Allow the user to control whether the active ensemble tool layer
+         * should be made uneditable when this view (ViewPart) is minimized.
+         */
+        uneditableOnMinimizeBtn = new Button(smallFlagsComposite, SWT.CHECK);
+        editableOnSwapIn = false;
+        uneditableOnMinimizeBtn.setSelection(uneditableOnMinimize);
+        uneditableOnMinimizeBtn.setText("Make uneditable on minimize");
+        uneditableOnMinimizeBtn.setLayoutData(new GridData(SWT.LEFT,
+                SWT.CENTER, true, false, 4, 1));
+        uneditableOnMinimizeBtn.setFont(smallViewFont);
+        // btnUneditableOnMinimize.setEnabled(true);
+        uneditableOnMinimizeBtn.setEnabled(false);
+        uneditableOnMinimizeBtn.addSelectionListener(new SelectionAdapter() {
+
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                uneditableOnMinimize = ((Button) e.getSource()).getSelection();
+            }
+
+        });
+
+        /*
+         * Allow the user to control, when a new editor is opened, whether a new
+         * ensemble tool layer is created and made editable.
+         */
+
+        createToolLayerOnNewEditorBtn = new Button(smallFlagsComposite,
+                SWT.CHECK);
+        createToolLayerOnNewEditorBtn.setSelection(createToolLayerOnNewEditor);
+        createToolLayerOnNewEditorBtn.setText("New tool layer on new editor");
+        createToolLayerOnNewEditorBtn.setLayoutData(new GridData(SWT.LEFT,
+                SWT.CENTER, true, false, 5, 1));
+        createToolLayerOnNewEditorBtn.setFont(smallViewFont); //
+        createToolLayerOnNewEditorBtn.setEnabled(false);
+        createToolLayerOnNewEditorBtn
+                .addSelectionListener(new SelectionAdapter() {
+                    @Override
+                    public void widgetSelected(SelectionEvent e) {
+                        createToolLayerOnNewEditor = ((Button) e.getSource())
+                                .getSelection();
+                    }
+
+                });
+
     }
 
-    private void fillMetaDataInfoTab(TabFolder tabFolder_lowerSash) {
+    private void fillInfoTab(TabFolder lowerSashTbFldr) {
 
-        Composite metaDataInfoComposite = new Composite(tabFolder_lowerSash,
-                SWT.BORDER);
-        GridLayout gl_infoComposite = new GridLayout(3, false);
-        gl_infoComposite.horizontalSpacing = 2;
-        gl_infoComposite.verticalSpacing = 3;
-        metaDataInfoComposite.setLayout(gl_infoComposite);
-        GridData gd = new GridData(GridData.FILL_BOTH);
-        tabFolder_lowerSash.setLayoutData(gd);
+        resourceInfoTabItem = new TabItem(lowerSashTbFldr, SWT.NONE);
+        // tabResourceInfo.setText("  Info  ");
+        resourceInfoTabItem
+                .setImage(EnsembleToolViewerImageStore.TAB_INFO_ENABLED_IMG);
+        GridData lowerSashTbFldr_gd = new GridData(GridData.FILL_BOTH);
+        lowerSashTbFldr.setLayoutData(lowerSashTbFldr_gd);
 
-        tabResourceInfo = new TabItem(tabFolder_lowerSash, SWT.NONE);
-        tabResourceInfo.setText("  Info  ");
-        tabResourceInfo.setControl(metaDataInfoComposite);
-
-        Label lblPrimaryRscTime = new Label(metaDataInfoComposite, SWT.BORDER);
-        lblPrimaryRscTime.setFont(SWTResourceManager.getFont("Dialog", 9,
-                SWT.NONE));
-        lblPrimaryRscTime.setLayoutData(new GridData(SWT.FILL, SWT.CENTER,
-                false, false, 1, 1));
-        lblPrimaryRscTime.setText(" Time: ");
-
-        label_frameTimeUsingBasis = new Label(metaDataInfoComposite, SWT.BORDER);
-        label_frameTimeUsingBasis.setFont(SWTResourceManager.getFont("Dialog",
-                8, SWT.NORMAL));
-        label_frameTimeUsingBasis.setAlignment(SWT.CENTER);
-        label_frameTimeUsingBasis.setForeground(SWTResourceManager.getColor(0,
-                0, 0));
-        label_frameTimeUsingBasis
-                .setBackground(SWTResourceManager.LIGHT_YELLOW);
-        GridData gd_label_frameTimeUsingBasis = new GridData(SWT.FILL,
-                SWT.CENTER, true, false, 2, 1);
-        gd_label_frameTimeUsingBasis.heightHint = 16;
-        gd_label_frameTimeUsingBasis.widthHint = 150;
-        label_frameTimeUsingBasis.setLayoutData(gd_label_frameTimeUsingBasis);
-        // label_frameTimeUsingBasis.setText(" 20.09 - 187hr Fri 18:00z 21-Mar-14");
-
-        Label lblPrimaryRsc = new Label(metaDataInfoComposite, SWT.BORDER);
-        lblPrimaryRsc.setFont(SWTResourceManager.getFont("Dialog", 9,
-                SWT.NORMAL));
-        lblPrimaryRsc.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false,
-                false, 1, 1));
-        lblPrimaryRsc.setText(" Basis: ");
-
-        label_TimeMatchResourceLabel = new Label(metaDataInfoComposite,
-                SWT.BORDER);
-        label_TimeMatchResourceLabel.setFont(SWTResourceManager.getFont(
-                "Dialog", 8, SWT.NORMAL));
-        label_TimeMatchResourceLabel
-                .setBackground(SWTResourceManager.LIGHT_YELLOW);
-        label_TimeMatchResourceLabel.setAlignment(SWT.CENTER);
-        GridData gd_label_TimeMatchResourceLabel = new GridData(SWT.FILL,
-                SWT.CENTER, true, false, 2, 1);
-        gd_label_TimeMatchResourceLabel.widthHint = 130;
-        label_TimeMatchResourceLabel
-                .setLayoutData(gd_label_TimeMatchResourceLabel);
-        // label_TimeMatchResourceLabel.setText("GFS Ensemble 500 MB");
-
-        // need to fill some space
-        Composite filler = new Composite(metaDataInfoComposite, SWT.NONE);
-        filler.setSize(20, 150);
-        GridData gd_filler = new GridData(SWT.FILL, SWT.CENTER, true, false, 3,
-                1);
-        gd_filler.widthHint = 150;
-        gd_filler.heightHint = 20;
-        filler.setLayoutData(gd_filler);
+        createTimeSeriesInfo();
+        createPlanViewInfo();
     }
 
-    protected void updateTimeBasisInfo(String timeBasisRscName, String datatime) {
-        if (!label_TimeMatchResourceLabel.isDisposed()) {
-            label_TimeMatchResourceLabel.setText(timeBasisRscName);
-            label_frameTimeUsingBasis.setText(datatime);
-        }
-    }
-
-    public void updateLegendTimeInfo() {
+    public void updateInfoTab() {
 
         VizApp.runAsync(new Runnable() {
             public void run() {
-                updateTimeBasisInfo(EnsembleToolManager.getInstance()
-                        .getTimeBasisResourceName(), EnsembleToolManager
-                        .getInstance().getTimeBasisLegendTime());
+                if (isViewerTreeReady()) {
+                    if (editorResourceType == ResourceType.PLAN_VIEW) {
+                        updatePlanViewInfo(EnsembleTool.getInstance()
+                                .getTimeBasisResourceName(), EnsembleTool
+                                .getInstance().getTimeBasisLegendTime());
+                        resourceInfoTabItem
+                                .setControl(planViewInfoTabComposite);
+                        timeSeriesInfoTabComposite.setVisible(false);
+                        planViewInfoTabComposite.setVisible(true);
+                    } else if (editorResourceType == ResourceType.TIME_SERIES) {
+                        updateTimeSeriesInfo(EnsembleTool.getInstance()
+                                .getTimeSeriesPoint());
+                        resourceInfoTabItem
+                                .setControl(timeSeriesInfoTabComposite);
+                        planViewInfoTabComposite.setVisible(false);
+                        timeSeriesInfoTabComposite.setVisible(true);
+                    }
+                    lowerSashTabFolder.setSelection(resourceInfoTabItem);
+                    // tabFolder_lowerSash.redraw();
+                    // tabFolder_lowerSash.update();
+                }
+            }
+        });
+    }
+
+    private void createPlanViewInfo() {
+
+        planViewInfoTabComposite = new Composite(lowerSashTabFolder, SWT.BORDER);
+        GridLayout infoComposite_gl = new GridLayout(3, false);
+        infoComposite_gl.horizontalSpacing = 2;
+        infoComposite_gl.verticalSpacing = 3;
+        planViewInfoTabComposite.setLayout(infoComposite_gl);
+
+        primaryRscTimeLbl = new Label(planViewInfoTabComposite, SWT.BORDER);
+        primaryRscTimeLbl.setFont(SWTResourceManager.getFont("Dialog", 10,
+                SWT.NONE));
+        primaryRscTimeLbl.setLayoutData(new GridData(SWT.FILL, SWT.CENTER,
+                false, false, 1, 1));
+        primaryRscTimeLbl.setText(" Time: ");
+
+        frameTimeUsingBasisLbl = new Label(planViewInfoTabComposite, SWT.BORDER);
+        frameTimeUsingBasisLbl.setFont(SWTResourceManager.getFont("Dialog", 10,
+                SWT.BOLD));
+        frameTimeUsingBasisLbl.setAlignment(SWT.CENTER);
+        frameTimeUsingBasisLbl.setForeground(SWTResourceManager.getColor(0, 0,
+                0));
+        frameTimeUsingBasisLbl.setBackground(SWTResourceManager.LIGHT_YELLOW);
+        GridData frameTimeUsingBasisLbl_gd = new GridData(SWT.FILL, SWT.CENTER,
+                true, false, 2, 1);
+        frameTimeUsingBasisLbl_gd.heightHint = 22;
+        frameTimeUsingBasisLbl_gd.widthHint = 150;
+        frameTimeUsingBasisLbl.setLayoutData(frameTimeUsingBasisLbl_gd);
+
+        primaryRscLbl = new Label(planViewInfoTabComposite, SWT.BORDER);
+        primaryRscLbl.setFont(SWTResourceManager.getFont("Dialog", 10,
+                SWT.NORMAL));
+        primaryRscLbl.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false,
+                false, 1, 1));
+        primaryRscLbl.setText(" Basis: ");
+
+        timeMatchResourceLbl = new Label(planViewInfoTabComposite, SWT.BORDER);
+        timeMatchResourceLbl.setFont(SWTResourceManager.getFont("Dialog", 9,
+                SWT.BOLD));
+        timeMatchResourceLbl.setBackground(SWTResourceManager.LIGHT_YELLOW);
+        timeMatchResourceLbl.setAlignment(SWT.CENTER);
+        GridData timeMatchResourceLbl_gd = new GridData(SWT.FILL, SWT.CENTER,
+                true, false, 2, 1);
+        timeMatchResourceLbl_gd.widthHint = 130;
+        timeMatchResourceLbl_gd.heightHint = 20;
+        timeMatchResourceLbl.setLayoutData(timeMatchResourceLbl_gd);
+
+        // need to fill some space
+        Composite fillerComposite = new Composite(planViewInfoTabComposite,
+                SWT.NONE);
+        fillerComposite.setSize(20, 150);
+        GridData filler_gd = new GridData(SWT.FILL, SWT.CENTER, true, false, 3,
+                1);
+        filler_gd.widthHint = 150;
+        filler_gd.heightHint = 22;
+        fillerComposite.setLayoutData(filler_gd);
+
+    }
+
+    private void createTimeSeriesInfo() {
+
+        timeSeriesInfoTabComposite = new Composite(lowerSashTabFolder,
+                SWT.BORDER);
+        GridLayout timeSeriesInfoComposite_gl = new GridLayout(3, false);
+        timeSeriesInfoComposite_gl.horizontalSpacing = 2;
+        timeSeriesInfoComposite_gl.verticalSpacing = 3;
+        timeSeriesInfoTabComposite.setLayout(timeSeriesInfoComposite_gl);
+
+        timeSeriesPointLabelLbl = new Label(timeSeriesInfoTabComposite,
+                SWT.BORDER);
+        timeSeriesPointLabelLbl.setFont(SWTResourceManager.getFont("Dialog",
+                10, SWT.NONE));
+        timeSeriesPointLabelLbl.setLayoutData(new GridData(SWT.FILL,
+                SWT.CENTER, false, false, 1, 1));
+        timeSeriesPointLabelLbl.setText(" Point: ");
+
+        timeSeriesPointValueLbl = new Label(timeSeriesInfoTabComposite,
+                SWT.BORDER);
+        timeSeriesPointValueLbl.setFont(SWTResourceManager.getFont("Dialog",
+                10, SWT.BOLD));
+        timeSeriesPointValueLbl.setAlignment(SWT.CENTER);
+        timeSeriesPointValueLbl.setForeground(SWTResourceManager.getColor(0, 0,
+                0));
+        timeSeriesPointValueLbl.setBackground(SWTResourceManager.LIGHT_YELLOW);
+        GridData timeSeriesPointValueLbl_gd = new GridData(SWT.FILL,
+                SWT.CENTER, true, false, 2, 1);
+        timeSeriesPointValueLbl_gd.heightHint = 22;
+        timeSeriesPointValueLbl_gd.widthHint = 150;
+        timeSeriesPointValueLbl.setLayoutData(timeSeriesPointValueLbl_gd);
+
+        // need to fill some space
+        Composite fillerComposite = new Composite(timeSeriesInfoTabComposite,
+                SWT.NONE);
+        fillerComposite.setSize(20, 150);
+        GridData fillerComposite_gd = new GridData(SWT.FILL, SWT.CENTER, true,
+                false, 3, 1);
+        fillerComposite_gd.widthHint = 150;
+        fillerComposite_gd.heightHint = 22;
+        fillerComposite.setLayoutData(fillerComposite_gd);
+    }
+
+    protected void updatePlanViewInfo(String timeBasisRscName, String datatime) {
+        if (!timeMatchResourceLbl.isDisposed()) {
+            timeMatchResourceLbl.setText(timeBasisRscName);
+            frameTimeUsingBasisLbl.setText(datatime);
+        }
+    }
+
+    protected void updateTimeSeriesInfo(String pointValue) {
+        if (!timeSeriesPointValueLbl.isDisposed()) {
+            timeSeriesPointValueLbl.setText(pointValue);
+        }
+    }
+
+    /*
+     * Called from a class that is listening to the frameChange event.
+     */
+    public void frameChanged(FramesInfo framesInfo) {
+
+        currentFramesInfo = framesInfo;
+        updateLegendTimeInfo();
+
+        VizApp.runAsync(new Runnable() {
+            public void run() {
+                if (isViewerTreeReady()) {
+                    ensembleTreeViewer.refresh(true);
+                }
             }
         });
 
     }
 
-    /*
-     * This listener is engaged when the mouse enters or exits the Tree control.
-     * 
-     * Only if the auto-focus user-preference is asserted will this listener
-     * transfers focus between the EnsembleToolViewer view and the CAVE
-     * application's active editor.
-     * 
-     * However, and only if the auto-focus user-preference is asserted, this
-     * focus listener ignores focus events immediately after the Volume Browser
-     * is opened (for a period of IGNORE_FOCUS_PERIOD milliseconds. This was
-     * done so the VB didn't lose focus immediately after opening which
-     * automatically pushes the dialog to behind the CAVE application.
-     */
-    private class TransferFocusListener implements MouseTrackListener {
-
-        @Override
-        public void mouseEnter(MouseEvent e) {
-
-            if (autoFocus) {
-                if (volumeBrowserJustOpened) {
-                    long currentTime = System.currentTimeMillis();
-                    long timeElapsed = currentTime - ignoreFocusStartTime;
-                    if (timeElapsed > IGNORE_FOCUS_PERIOD_MILLIS) {
-                        volumeBrowserJustOpened = false;
-                    }
-                }
-                if (!volumeBrowserJustOpened) {
-                    grabFocus();
+    public void updateLegendTimeInfo() {
+        VizApp.runAsync(new Runnable() {
+            public void run() {
+                if (EnsembleTool.getInstance().getTimeBasisResourceName() != null) {
+                    updatePlanViewInfo(EnsembleTool.getInstance()
+                            .getTimeBasisResourceName(), EnsembleTool
+                            .getInstance().getTimeBasisLegendTime());
                 }
             }
-        }
-
-        @Override
-        public void mouseExit(MouseEvent e) {
-
-            if (autoFocus) {
-                /*
-                 * no need to worry about focus if the user is about to do an
-                 * ERF calculation ...
-                 */
-                if (userRequestedERF == true) {
-                    putCursorInSelectedERFRange();
-                } else if (EnsembleToolManager.getInstance().isReady()) {
-                    if (volumeBrowserJustOpened) {
-                        long currentTime = System.currentTimeMillis();
-                        long timeElapsed = currentTime - ignoreFocusStartTime;
-                        if (timeElapsed > IGNORE_FOCUS_PERIOD_MILLIS) {
-                            volumeBrowserJustOpened = false;
-                        }
-                    }
-                    if (!volumeBrowserJustOpened) {
-                        EnsembleToolManager.getInstance().getActiveToolLayer()
-                                .transferFocusToEditor();
-                    }
-                }
-            }
-        }
-
-        @Override
-        public void mouseHover(MouseEvent e) {
-        }
-
+        });
     }
 
     /*
@@ -3665,20 +3070,6 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
         }
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.raytheon.uf.viz.core.rsc.IRefreshListener#refresh()
-     * 
-     * Assert a refresh flag whenever a refresh is requested.
-     */
-    @Override
-    public void refresh() {
-
-        RefreshRequested = true;
-
-    }
-
     protected void updateCursor(final Cursor c) {
         VizApp.runAsync(new Runnable() {
 
@@ -3690,6 +3081,35 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
             }
 
         });
+    }
+
+    protected class UpperTabSelectionListener extends SelectionAdapter {
+
+        @Override
+        public void widgetSelected(SelectionEvent e) {
+
+            CTabItem ti = tabEnsemblesMainTabFolder.getSelection();
+            if (viewEditable) {
+                if (ti == itemLegendsTabItem) {
+                    itemLegendsTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_LEGENDS_ENABLED_SELECTED_IMG);
+                    itemMatrixTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_MATRIX_ENABLED_UNSELECTED_IMG);
+                }
+                if (ti == itemMatrixTabItem) {
+                    itemLegendsTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_LEGENDS_ENABLED_UNSELECTED_IMG);
+                    itemMatrixTabItem
+                            .setImage(EnsembleToolViewerImageStore.TAB_MATRIX_ENABLED_SELECTED_IMG);
+                }
+            } else {
+                itemLegendsTabItem
+                        .setImage(EnsembleToolViewerImageStore.TAB_LEGENDS_DISABLED_IMG);
+                itemMatrixTabItem
+                        .setImage(EnsembleToolViewerImageStore.TAB_MATRIX_DISABLED_IMG);
+            }
+
+        }
     }
 
     /*
@@ -3831,9 +3251,6 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 updateCursor(waitCursor);
                 TreeItem ensembleRootItem = findTreeItemByLabelName(ensembleName);
 
-                /* Turn the refresh period to near-immediate for toggling */
-                IGNORE_INTERIM_REFRESH_REQUEST_PERIOD = 1;
-
                 TreeItem[] descendants = getDirectDescendants(ensembleRootItem);
                 TreeItem ti = null;
                 int numDescendants = descendants.length;
@@ -3854,72 +3271,26 @@ public class EnsembleToolViewer extends ViewPart implements IRefreshListener {
                 updateCursor(normalCursor);
                 status = Status.OK_STATUS;
             }
-            /* Reset the refresh period to normal lazy waiting */
-            IGNORE_INTERIM_REFRESH_REQUEST_PERIOD = LONGEST_REFRESH_WAIT;
             return status;
         }
 
     }
 
-    /**
-     * This job class runs for as long as the Ensemble Tool is open (i.e. not
-     * disposed). It waits for a period of time and then checks to see if a viz
-     * resource refresh has been requested. If so, it refreshs the Tree.
-     */
-    private class ConstantlyCheckForRefreshJob extends Job {
-
-        private IStatus status = Status.OK_STATUS;
-
-        public ConstantlyCheckForRefreshJob(String name) {
-            super(name);
-            status = Status.OK_STATUS;
-        }
-
-        public void cancelJob() {
-            status = Status.CANCEL_STATUS;
-        }
-
-        @Override
-        protected IStatus run(IProgressMonitor monitor) {
-
-            if (status == Status.CANCEL_STATUS) {
-                return status;
-            }
-            /* if a refresh was requested then refresh asynchronolusly. */
-            if (RefreshRequested) {
-
-                RefreshRequested = false;
-
-                VizApp.runAsync(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        if ((status != Status.CANCEL_STATUS)
-                                && (isViewerTreeReady())) {
-                            ensemblesTreeViewer.refresh();
-                        }
-                    }
-                });
-            }
-            /*
-             * wait for a period before checking to see if another refresh was
-             * requested.
-             */
-            schedule(IGNORE_INTERIM_REFRESH_REQUEST_PERIOD);
-            setPriority(Job.SHORT);
-            return Status.OK_STATUS;
-        }
-    }
-
     private boolean isViewerTreeReady() {
         boolean isReady = false;
 
-        if (ensemblesTreeViewer != null && ensembleTree != null
-                && ensemblesTreeViewer.getTree() != null
-                && !ensemblesTreeViewer.getTree().isDisposed()) {
+        if (ensembleTreeViewer != null && ensembleTree != null
+                && ensembleTreeViewer.getTree() != null
+                && !ensembleTreeViewer.getTree().isDisposed()) {
             isReady = true;
         }
 
         return isReady;
     }
+
+    @Override
+    public void setFocus() {
+        ensembleTreeViewer.getControl().setFocus();
+    }
+
 }

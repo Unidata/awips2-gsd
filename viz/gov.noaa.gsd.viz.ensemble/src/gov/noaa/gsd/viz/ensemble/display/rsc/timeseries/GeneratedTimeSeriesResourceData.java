@@ -3,6 +3,7 @@ package gov.noaa.gsd.viz.ensemble.display.rsc.timeseries;
 import gov.noaa.gsd.viz.ensemble.display.calculate.EnsembleCalculator;
 import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.control.EnsembleResourceManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,8 +24,6 @@ import com.raytheon.uf.viz.xy.timeseries.display.TimeSeriesDescriptor;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResourceData;
 import com.raytheon.viz.core.graphing.xy.XYDataList;
-import com.raytheon.viz.ui.EditorUtil;
-import com.raytheon.viz.ui.editor.AbstractEditor;
 
 /**
  * Uses cached data of loaded members in the time series display, generates an
@@ -64,8 +63,10 @@ public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData {
     // create an empty metadata map
     protected HashMap<String, RequestConstraint> metadataMap = new HashMap<String, RequestConstraint>();
 
-    public GeneratedTimeSeriesResourceData(EnsembleCalculator calculator,
-            String level, String unit) {
+    private EnsembleToolLayer toolLayer = null;
+
+    public GeneratedTimeSeriesResourceData(EnsembleToolLayer tl,
+            EnsembleCalculator calculator, String level, String unit) {
 
         super();
 
@@ -78,7 +79,7 @@ public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData {
         // No time request in time matching
         this.setRequeryNecessaryOnTimeMatch(false);
         this.setMetadataMap(metadataMap);
-
+        toolLayer = tl;
     }
 
     /**
@@ -115,12 +116,8 @@ public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData {
         pair.setProperties(rp);
         descriptor.getResourceList().add(pair);
 
-        // TODO: Is this the correct way to associate the editor with the
-        // resource?
-        AbstractEditor editor = EditorUtil
-                .getActiveEditorAs(AbstractEditor.class);
         EnsembleResourceManager.getInstance().registerGenerated(
-                (AbstractVizResource<?, ?>) resource, editor);
+                (AbstractVizResource<?, ?>) resource);
 
         return resource;
     }
@@ -133,17 +130,12 @@ public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData {
 
     public void update() throws VizException {
 
-        // TODO: Is this the correct way to associate the editor with the
-        // resource?
-        AbstractEditor editor = EditorUtil
-                .getActiveEditorAs(AbstractEditor.class);
-
         if (level != null && !level.equals("") && unit != null
                 && !unit.equals("")) {
             // Same level and unit case
             dataHolders = EnsembleResourceManager
                     .getInstance()
-                    .getResourceList(editor)
+                    .getResourceList(toolLayer)
                     .getUserLoadedRscs(
                             (IDescriptor) new TimeSeriesDescriptor(), true,
                             level, unit);
@@ -170,7 +162,7 @@ public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData {
             // false);
             dataHolders = EnsembleResourceManager
                     .getInstance()
-                    .getResourceList(editor)
+                    .getResourceList(toolLayer)
                     .getUserLoadedRscs(
                             (IDescriptor) new TimeSeriesDescriptor(), true);
         }

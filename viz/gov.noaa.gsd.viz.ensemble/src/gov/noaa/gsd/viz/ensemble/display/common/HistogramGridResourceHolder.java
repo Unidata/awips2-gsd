@@ -84,10 +84,10 @@ public class HistogramGridResourceHolder extends GenericResourceHolder {
     @Override
     public Calculation getCalculation() {
         // return "color histogram";
-        if (((HistogramResource<?>) this.rsc).getMode() == HistogramResource.DisplayMode.SAMPLING)
+        if (((HistogramResource<?>) this.rsc).getMode() == HistogramResource.DisplayMode.POINT_SAMPLING)
             return Calculation.HISTOGRAM_SAMPLING;
         else
-            return Calculation.HISTOGRAM_TEXT;
+            return Calculation.VALUE_SAMPLING;
     }
 
     public String getGroupName() {
@@ -131,6 +131,11 @@ public class HistogramGridResourceHolder extends GenericResourceHolder {
     @Override
     public int hashCode() {
         return getUniqueName().hashCode();
+    }
+
+    @Override
+    public boolean requiresLoadCheck() {
+        return false;
     }
 
 }

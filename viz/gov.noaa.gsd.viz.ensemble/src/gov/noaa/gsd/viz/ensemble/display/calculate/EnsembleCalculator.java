@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import javax.measure.unit.Unit;
+
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.opengis.referencing.FactoryException;
@@ -19,9 +21,9 @@ import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.common.status.UFStatus.Priority;
 import com.raytheon.uf.common.time.DataTime;
+import com.raytheon.uf.viz.core.grid.rsc.data.GeneralGridData;
 import com.raytheon.viz.core.graphing.xy.XYData;
 import com.raytheon.viz.core.graphing.xy.XYDataList;
-import com.raytheon.viz.grid.rsc.general.GeneralGridData;
 import com.raytheon.viz.grid.rsc.general.GridMemoryManager;
 
 /**
@@ -67,6 +69,25 @@ public abstract class EnsembleCalculator {
     protected DisplayType displayType;
 
     /**
+     * Data unit, comes frome data.
+     */
+    protected Unit dataUnit = null;
+
+    public void setDataUnit(Unit dataUnit) {
+        this.dataUnit = dataUnit;
+    }
+
+    /**
+     * Data display unit as configured
+     */
+    protected Unit dispUnit = null;
+
+    /**
+     * Result data unit, defult is from the inputed data unit
+     */
+    protected Unit resultUnit = null;
+
+    /**
      * Define the display type.
      */
     public enum DisplayType {
@@ -76,6 +97,14 @@ public abstract class EnsembleCalculator {
     public EnsembleCalculator(Calculation c, DisplayType displayType) {
         calculationType = c;
         this.displayType = displayType;
+    }
+
+    public void setDispUnit(Unit dispUnit) {
+        this.dispUnit = dispUnit;
+    }
+
+    public Unit getResultUnit() {
+        return resultUnit;
     }
 
     /**
@@ -122,8 +151,9 @@ public abstract class EnsembleCalculator {
     public List<GeneralGridData> calculate(List<List<GeneralGridData>> inputData) {
 
         if (inputData == null || inputData.size() == 0
-                || inputData.get(0) == null || inputData.get(0).size() == 0)
+                || inputData.get(0) == null || inputData.get(0).size() == 0) {
             return null;
+        }
 
         GridGeometry2D geometry = matchGeometry(inputData);
 
@@ -135,6 +165,14 @@ public abstract class EnsembleCalculator {
         GeneralGridData[] resaultGridData = new GeneralGridData[inputData
                 .get(0).size()];
 
+        /**
+         * The data and display units of output are same as input if the result
+         * unit is not specified,
+         */
+        Unit rUnit = resultUnit;
+        if (rUnit == null) {
+            rUnit = dataUnit;
+        }
         for (int k = 0; k < inputData.get(0).size(); k++) {// List
 
             int imax = inputData.size();
@@ -160,8 +198,7 @@ public abstract class EnsembleCalculator {
                 GeneralGridData resultData = GeneralGridData
                         .createVectorDataUV(geometry,
                                 doGridCalculation(dataU, imax, geometry),
-                                doGridCalculation(dataV, imax, geometry),
-                                inputData.get(0).get(0).getDataUnit());
+                                doGridCalculation(dataV, imax, geometry), rUnit);
 
                 // To be monitored by GridMemoryManager
                 resultData = GridMemoryManager.getInstance().manage(resultData);
@@ -183,7 +220,7 @@ public abstract class EnsembleCalculator {
                 // Do Calculation
                 GeneralGridData resultData = GeneralGridData.createScalarData(
                         geometry, doGridCalculation(data, imax, geometry),
-                        inputData.get(0).get(0).getDataUnit());
+                        rUnit);
 
                 // To be monitored by GridMemoryManager
                 resultData = GridMemoryManager.getInstance().manage(resultData);
@@ -419,8 +456,8 @@ public abstract class EnsembleCalculator {
                     if (data.get(j).getX() == null
                             && data.get(j).getY() == null)
                         continue;
-
-                    if (xValues[i].equals(data.get(j).getX())) {
+                    if (((DataTime) xValues[i]).getValidTime().compareTo(
+                            ((DataTime) (data.get(j).getX())).getValidTime()) == 0) {
                         yValues.add(Float.parseFloat(data.get(j).getY()
                                 .toString()));
 
