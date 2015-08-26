@@ -70,10 +70,10 @@ import com.vividsolutions.jts.geom.Coordinate;
  * The EnsembleToolLayer is an AbstractVizResource that the user can turn on or
  * off (i.e. make editable or not). Typically there is one instance of this
  * class per AbstractEditor window. This class is meant to be controlled by the
- * EnsembleTool. Though this class is decoupled from the other classes in
- * this plug-in, the idea is that the EnsembleToolLayer is the class which knows
- * how to have access to its virtually contained resources and how to act upon
- * them. In the greater picture, the tool layer controls the entire state of the
+ * EnsembleTool. Though this class is decoupled from the other classes in this
+ * plug-in, the idea is that the EnsembleToolLayer is the class which knows how
+ * to have access to its virtually contained resources and how to act upon them.
+ * In the greater picture, the tool layer controls the entire state of the
  * Ensemble Tool; if the activel tool layer is turned off (made "not editable")
  * then the Ensemble Tool is also disabled, but if the user switches to another
  * editor that has an EnsembleToolLayer that is "editable", the manager will
@@ -260,8 +260,8 @@ public class EnsembleToolLayer extends
     }
 
     public IDisplayPaneContainer getEditor() {
-        IDisplayPaneContainer editor = EnsembleTool.getInstance()
-                .findEditor(this);
+        IDisplayPaneContainer editor = EnsembleTool.getInstance().findEditor(
+                this);
         return editor;
     }
 
@@ -623,8 +623,7 @@ public class EnsembleToolLayer extends
     public void frameChanged(IDescriptor descriptor, DataTime oldTime,
             DataTime newTime) {
 
-        EnsembleTool.getInstance().frameChanged(
-                descriptor.getFramesInfo());
+        EnsembleTool.getInstance().frameChanged(descriptor.getFramesInfo());
 
     }
 
@@ -686,10 +685,8 @@ public class EnsembleToolLayer extends
 
                     @Override
                     public void run() {
-                        EnsembleTool.getInstance().setViewerWindowState(
-                                state);
-                        EnsembleTool.getInstance()
-                                .clearEditableToggleFlags();
+                        EnsembleTool.getInstance().setViewerWindowState(state);
+                        EnsembleTool.getInstance().clearEditableToggleFlags();
                     }
                 });
             }

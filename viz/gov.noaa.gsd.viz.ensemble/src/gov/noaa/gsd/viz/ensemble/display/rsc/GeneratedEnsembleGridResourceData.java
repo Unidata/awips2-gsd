@@ -25,6 +25,7 @@ import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.grid.rsc.data.GeneralGridData;
 import com.raytheon.uf.viz.core.map.MapDescriptor;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+import com.raytheon.uf.viz.core.rsc.IInitListener;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
 import com.raytheon.uf.viz.core.rsc.ResourceProperties;
 import com.raytheon.viz.grid.rsc.GridResourceData;
@@ -49,7 +50,8 @@ import com.raytheon.viz.grid.rsc.general.GridResource;
  * </pre>
  */
 
-public class GeneratedEnsembleGridResourceData extends GridResourceData {
+public class GeneratedEnsembleGridResourceData extends GridResourceData
+        implements IInitListener {
     private IDescriptor mapDescriptor = null;
 
     /**
@@ -159,6 +161,7 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
         resource = (GeneratedEnsembleGridResource) rsc;
 
         resource.setCalculation(calculator.getCalculation());
+        resource.registerListener(this);
 
         update();
         ResourceProperties rp = new ResourceProperties();
@@ -167,9 +170,6 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
         pair.setResource(rsc);
         pair.setProperties(rp);
         descriptor.getResourceList().add(pair);
-
-        EnsembleResourceManager.getInstance().registerGenerated(
-                (AbstractVizResource<?, ?>) resource);
 
         return rsc;
     }
@@ -438,6 +438,22 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData {
 
     public Map<String, List<GenericResourceHolder>> getDataHolders() {
         return dataHolders;
+    }
+
+    public String getLevel() {
+        return level;
+    }
+
+    public String getUnit() {
+        return unit;
+    }
+
+    @Override
+    public void inited(AbstractVizResource<?, ?> rsc) {
+
+        EnsembleResourceManager.getInstance().registerGenerated(
+                (AbstractVizResource<?, ?>) resource);
+
     }
 
 }

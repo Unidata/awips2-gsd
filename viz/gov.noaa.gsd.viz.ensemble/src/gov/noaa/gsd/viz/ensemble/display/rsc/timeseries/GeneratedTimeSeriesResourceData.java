@@ -18,6 +18,7 @@ import com.raytheon.uf.viz.core.drawables.IDescriptor;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+import com.raytheon.uf.viz.core.rsc.IInitListener;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
 import com.raytheon.uf.viz.core.rsc.ResourceProperties;
 import com.raytheon.uf.viz.xy.timeseries.display.TimeSeriesDescriptor;
@@ -43,7 +44,8 @@ import com.raytheon.viz.core.graphing.xy.XYDataList;
  * 
  * </pre>
  */
-public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData {
+public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData
+        implements IInitListener {
 
     private Map<String, List<GenericResourceHolder>> dataHolders = new ConcurrentHashMap<String, List<GenericResourceHolder>>();
 
@@ -99,6 +101,7 @@ public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData {
 
         resource = new GeneratedTimeSeriesResource<GeneratedTimeSeriesResourceData>(
                 this, loadProperties);
+        resource.registerListener(this);
         resource.setCalculation(calculator.getCalculation());
         resource.setDescriptor((TimeSeriesDescriptor) descriptor);
 
@@ -115,9 +118,6 @@ public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData {
         pair.setResource(resource);
         pair.setProperties(rp);
         descriptor.getResourceList().add(pair);
-
-        EnsembleResourceManager.getInstance().registerGenerated(
-                (AbstractVizResource<?, ?>) resource);
 
         return resource;
     }
@@ -281,6 +281,10 @@ public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData {
         return members;
     }
 
+    public EnsembleCalculator getCalculator() {
+        return calculator;
+    }
+
     public String getLevel() {
         return level;
     }
@@ -295,5 +299,13 @@ public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData {
 
     public void setUnit(String unit) {
         this.unit = unit;
+    }
+
+    @Override
+    public void inited(AbstractVizResource<?, ?> rsc) {
+
+        EnsembleResourceManager.getInstance().registerGenerated(
+                (AbstractVizResource<?, ?>) resource);
+
     }
 }

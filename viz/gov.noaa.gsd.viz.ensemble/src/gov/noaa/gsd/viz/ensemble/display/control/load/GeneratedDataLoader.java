@@ -25,6 +25,7 @@ import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.common.status.UFStatus.Priority;
 import com.raytheon.uf.viz.core.drawables.IDescriptor;
+import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.map.IMapDescriptor;
 import com.raytheon.uf.viz.core.map.MapDescriptor;
@@ -498,6 +499,29 @@ public class GeneratedDataLoader {
             if (!(theEditor.getActiveDisplayPane().getDescriptor() instanceof IMapDescriptor)) {
                 return Status.CANCEL_STATUS;
             }
+
+            for (ResourcePair pair : theEditor.getActiveDisplayPane()
+                    .getDescriptor().getResourceList()) {
+                if (pair.getResourceData() instanceof GeneratedEnsembleGridResourceData) {
+                    GeneratedEnsembleGridResourceData grd = (GeneratedEnsembleGridResourceData) pair
+                            .getResourceData();
+
+                    /*
+                     * If there is already a generated resource having the same
+                     * calculation, level and unit then unload the existing
+                     * resource.
+                     */
+                    if (grd.getLevel().equals(level)
+                            && grd.getUnit().equals(unit)) {
+                        if (grd.getCalculator().getCalculation() == calculator
+                                .getCalculation()) {
+                            pair.getResource().unload();
+                        }
+                    }
+
+                }
+            }
+
             GeneratedEnsembleGridResourceData ensembleData = new GeneratedEnsembleGridResourceData(
                     toolLayer, calculator, theEditor.getActiveDisplayPane()
                             .getDescriptor(), level, unit);
@@ -546,6 +570,28 @@ public class GeneratedDataLoader {
             if (!(theEditor.getActiveDisplayPane().getDescriptor() instanceof TimeSeriesDescriptor)) {
                 return status;
             }
+
+            for (ResourcePair pair : theEditor.getActiveDisplayPane()
+                    .getDescriptor().getResourceList()) {
+
+                /*
+                 * If there is already a generated resource having the same
+                 * calculation, level and unit then unload the existing
+                 * resource.
+                 */
+                if (pair.getResourceData() instanceof GeneratedTimeSeriesResourceData) {
+                    GeneratedTimeSeriesResourceData tsd = (GeneratedTimeSeriesResourceData) pair
+                            .getResourceData();
+                    if (tsd.getLevel().equals(level)
+                            && tsd.getUnit().equals(unit)) {
+                        if (tsd.getCalculator().getCalculation() == calculator
+                                .getCalculation()) {
+                            pair.getResource().unload();
+                        }
+                    }
+                }
+            }
+
             GeneratedTimeSeriesResourceData ensembleData = new GeneratedTimeSeriesResourceData(
                     toolLayer, calculator, level, unit);
 

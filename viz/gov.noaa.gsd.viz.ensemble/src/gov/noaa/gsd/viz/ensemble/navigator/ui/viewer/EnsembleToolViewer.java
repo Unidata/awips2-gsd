@@ -1016,20 +1016,23 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
             // ToolManager. Create a primitive array of Objects having
             // those names.
 
-            Map<String, List<GenericResourceHolder>> ensembles = (Map<String, List<GenericResourceHolder>>) inputElement;
-            if ((ensembles == null) || (ensembles.size() == 0)) {
+            Map<String, List<GenericResourceHolder>> allLoadedProducts = (Map<String, List<GenericResourceHolder>>) inputElement;
+            if ((allLoadedProducts == null) || (allLoadedProducts.size() == 0)) {
                 return new Object[0];
             }
 
-            Object[] members = new Object[ensembles.size()];
+            Object[] members = new Object[allLoadedProducts.size()];
 
             List<GenericResourceHolder> currResources = null;
-            Set<String> ensembleNames = ensembles.keySet();
-            Iterator<String> iterator = ensembleNames.iterator();
+            Set<String> loadedProductNames = allLoadedProducts.keySet();
+            Iterator<String> iterator = loadedProductNames.iterator();
             String currName = null;
             for (int i = 0; iterator.hasNext(); i++) {
                 currName = iterator.next();
-                currResources = ensembles.get(currName);
+                if (currName == null || currName.equals("")) {
+                    continue;
+                }
+                currResources = allLoadedProducts.get(currName);
                 // is this resource empty?
                 if (currResources.size() == 0) {
                     continue;
@@ -1059,15 +1062,18 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
             Map<String, List<GenericResourceHolder>> ensembles = EnsembleTool
                     .getInstance().getEnsembleResources();
 
-            if ((ensembles == null) || (ensembles.size() == 0)) {
+            if ((ensembles == null) || (ensembles.size() == 0)
+                    || parentElement == null) {
                 return new Object[0];
             }
 
             Object[] members = null;
-
             if (String.class.isAssignableFrom(parentElement.getClass())) {
 
                 String ensembleName = (String) parentElement;
+                if (ensembleName.length() == 0) {
+                    return new Object[0];
+                }
                 List<GenericResourceHolder> resources = ensembles
                         .get(ensembleName);
                 members = new Object[resources.size()];
@@ -1221,13 +1227,15 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                 if (calculationMenu != null) {
                     MenuItem[] items = calculationMenu.getItems();
                     for (MenuItem item : items) {
-                        if ((item.getText().compareTo(
-                                Calculation.STANDARD_DEVIATION.getTitle()) == 0)
-                                || (item.getText().compareTo(
+                        if (item.getText().equals(
+                                Calculation.STANDARD_DEVIATION.getTitle())
+                                || item.getText().equals(
                                         Calculation.HISTOGRAM_SAMPLING
-                                                .getTitle()) == 0)
-                                || (item.getText().compareTo(
-                                        Calculation.VALUE_SAMPLING.getTitle()) == 0)) {
+                                                .getTitle())
+                                || item.getText().equals(
+                                        Calculation.SUMMATION.getTitle())
+                                || item.getText().equals(
+                                        Calculation.VALUE_SAMPLING.getTitle())) {
                             if (isTimeSeries) {
                                 item.setEnabled(false);
                             } else {
@@ -1814,6 +1822,18 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                             new Listener() {
                                 public void handleEvent(Event event) {
 
+                                    /*
+                                     * TODO: SWT bug prevents getting children
+                                     * on a collapsed tree item. Must expand
+                                     * first for color gradient change method to
+                                     * "see" children.
+                                     */
+                                    boolean isExpanded = userClickedTreeItem
+                                            .getExpanded();
+                                    if (!isExpanded) {
+                                        userClickedTreeItem.setExpanded(true);
+                                    }
+
                                     updateColorsOnEnsembleResource(mousedEnsembleName);
 
                                 }
@@ -1905,9 +1925,10 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                 ensembleTree.deselect(userClickedTreeItem);
             }
             /*
-             * Is this a simple left-click (MB1) over a tree item? Also, make
-             * certain this isn't a Ctrl-MB1 (as that key sequence is the
-             * selection feature and is handled in the mouseUp event.
+             * Is this a simple left-click (MB1) over a tree item? Then
+             * show/hide. Also, make certain this isn't a Ctrl-MB1 (as that key
+             * sequence is the selection feature and is handled in the mouseUp
+             * event.
              */
             else if ((userClickedTreeItem != null) && (event.button == 1)
                     && ((event.stateMask & SWT.CTRL) == 0)) {
@@ -2151,8 +2172,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
      */
     protected void updateColorsOnEnsembleResource(final String ensembleName) {
 
-        VizApp.runAsync(new Runnable() {
-
+        VizApp.runSync(new Runnable() {
             @Override
             public void run() {
                 setPerturbationMembers(getEnsembleMemberGenericResources(ensembleName));
@@ -2302,6 +2322,10 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         final Map<String, List<GenericResourceHolder>> ensembleResourcesMap = EnsembleTool
                 .getInstance().getEnsembleResources();
 
+        if (ensembleResourcesMap == null) {
+            return;
+        }
+
         VizApp.runAsync(new Runnable() {
             public void run() {
 
@@ -2311,6 +2335,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
                 // this method only acts on an instance of a Map ...
                 if (ensembleResourcesMap != null) {
+
+                    ensembleTree.clearAll(true);
 
                     // only change the tree's input reference (via setInput)
                     // when the ensembleResourcesMap reference is different.
@@ -2356,6 +2382,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                             }
                         }
                     }
+                    ensembleTreeViewer.refresh(false);
                 }
             }
         });
@@ -3128,7 +3155,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
             Color currColor = null;
             for (GenericResourceHolder gRsc : getPerturbationMembers()) {
-                if (gRsc instanceof GridResourceHolder) {
+                if ((gRsc instanceof GridResourceHolder)
+                        || (gRsc instanceof TimeSeriesResourceHolder)) {
                     AbstractVizResource<?, ?> rsc = gRsc.getRsc();
                     String ensId = gRsc.getEnsembleIdRaw();
                     if ((ensId != null) && (ensId.length() > 1)) {
@@ -3164,7 +3192,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
             int count = 0;
 
             for (GenericResourceHolder gRsc : getPerturbationMembers()) {
-                if (gRsc instanceof GridResourceHolder) {
+                if ((gRsc instanceof GridResourceHolder)
+                        || (gRsc instanceof TimeSeriesResourceHolder)) {
                     count++;
                     AbstractVizResource<?, ?> rsc = gRsc.getRsc();
                     if (count == 1) {

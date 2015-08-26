@@ -19,6 +19,7 @@ import com.raytheon.uf.viz.core.grid.rsc.data.GeneralGridData;
 import com.raytheon.uf.viz.core.map.MapDescriptor;
 import com.raytheon.uf.viz.core.rsc.AbstractResourceData;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+import com.raytheon.uf.viz.core.rsc.IInitListener;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
 import com.raytheon.uf.viz.core.rsc.ResourceProperties;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
@@ -40,7 +41,8 @@ import com.raytheon.viz.grid.rsc.general.D2DGridResource;
  * </pre>
  */
 
-public class HistogramResourceData extends AbstractResourceData {
+public class HistogramResourceData extends AbstractResourceData implements
+        IInitListener {
 
     private IDescriptor mapDescriptor = null;
 
@@ -100,6 +102,7 @@ public class HistogramResourceData extends AbstractResourceData {
                 loadProperties, descriptor, level, unit, mode);
 
         resource = (HistogramResource<HistogramResourceData>) rsc;
+        resource.registerListener(this);
 
         update();
         ResourceProperties rp = new ResourceProperties();
@@ -108,10 +111,6 @@ public class HistogramResourceData extends AbstractResourceData {
         pair.setResource(rsc);
         pair.setProperties(rp);
         descriptor.getResourceList().add(pair);
-
-        // Register to the ensemble resource manager
-        EnsembleResourceManager.getInstance().registerGenerated(
-                (AbstractVizResource<?, ?>) resource);
 
         return rsc;
     }
@@ -214,6 +213,14 @@ public class HistogramResourceData extends AbstractResourceData {
     public boolean equals(Object obj) {
         // TODO
         return false;
+    }
+
+    @Override
+    public void inited(AbstractVizResource<?, ?> rsc) {
+        // Register to the ensemble resource manager
+        EnsembleResourceManager.getInstance().registerGenerated(
+                (AbstractVizResource<?, ?>) resource);
+
     }
 
 }

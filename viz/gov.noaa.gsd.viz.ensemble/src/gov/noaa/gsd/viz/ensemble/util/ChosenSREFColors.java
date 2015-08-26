@@ -70,8 +70,7 @@ public class ChosenSREFColors {
         this.nmb_color = nmb_color;
     }
 
-    // TODO: this is a poor man's solution wokring against hard-coded names:
-    // .... such as ctll1, ctll8, ctll15, n1, n2, n3, n4, p5, p6, p7 etc.
+    // TODO: this is a poor man's solution working against hard-coded names:
     public Color getGradientByEnsembleId(String name) {
 
         Color c = null;
@@ -98,7 +97,7 @@ public class ChosenSREFColors {
                     saturationSchedule[(shiftedPertNum - 1)]);
         }
 
-        // third model is EM ...
+        // third model is ARW ...
         if ((pertNumber >= 15) && (pertNumber <= 21)) {
             startColor = em_color;
             shiftedPertNum = pertNumber - 14;

@@ -3,8 +3,8 @@ package gov.noaa.gsd.viz.ensemble.display.control;
 import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.NavigatorResourceList;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +24,7 @@ import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.viz.core.IDisplayPaneContainer;
 import com.raytheon.uf.viz.core.drawables.IDescriptor;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
+import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.core.rsc.IDisposeListener;
 import com.raytheon.uf.viz.core.rsc.IRefreshListener;
@@ -32,7 +33,6 @@ import com.raytheon.uf.viz.core.rsc.capabilities.ColorableCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.DensityCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.DisplayTypeCapability;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
-import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
 import com.raytheon.viz.ui.editor.AbstractEditor;
 
 /**
@@ -197,14 +197,15 @@ public class EnsembleResourceManager implements IDisposeListener {
 
         // no duplicates
         if (rsc == null
-                || (ensembleToolResourcesMap.get(toolLayer)
-                        .containsResource(rsc))) {
+                || ensembleToolResourcesMap.get(toolLayer)
+                        .containsResource(rsc)) {
             return;
         }
 
         // TODO: Must refactor so we don't use setSystemResource(boolean)
         // method.
         rsc.getProperties().setSystemResource(true);
+
         rsc.registerListener((IDisposeListener) this);
 
         if (rsc.hasCapability(DisplayTypeCapability.class)) {
@@ -681,8 +682,10 @@ public class EnsembleResourceManager implements IDisposeListener {
                     incomingSpooler.drainTo(items);
                     if (!monitor.isCanceled()) {
                         for (AbstractVizResource<?, ?> r : items) {
-                            EnsembleResourceManager.getInstance()
-                                    .registerResource(r);
+                            if (r != null) {
+                                EnsembleResourceManager.getInstance()
+                                        .registerResource(r);
+                            }
                         }
                     }
                 }

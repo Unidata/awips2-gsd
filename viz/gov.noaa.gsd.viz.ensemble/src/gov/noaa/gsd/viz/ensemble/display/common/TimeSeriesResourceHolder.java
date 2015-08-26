@@ -148,7 +148,7 @@ public class TimeSeriesResourceHolder extends GenericResourceHolder {
 
     @Override
     public String getEnsembleIdRaw() {
-        return "";
+        return getEnsembleId();
     }
 
     @Override
