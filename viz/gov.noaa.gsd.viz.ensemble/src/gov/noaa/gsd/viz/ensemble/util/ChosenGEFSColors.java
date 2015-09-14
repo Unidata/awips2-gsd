@@ -41,6 +41,9 @@ public class ChosenGEFSColors {
     private Color color = SWTResourceManager.NEON_PURPLE;
 
     public Color getColor() {
+        if (color.isDisposed()) {
+            color = SWTResourceManager.NEON_PURPLE;
+        }
         return color;
     }
 
