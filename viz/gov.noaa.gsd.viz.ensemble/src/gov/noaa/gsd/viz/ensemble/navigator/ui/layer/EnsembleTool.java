@@ -139,8 +139,8 @@ public class EnsembleTool extends AbstractTool implements
     private EnsembleEditorPartListener theEditorsListener = null;
 
     /*
-     * The EnsembleTool adheres to a singleton pattern. This method is
-     * the accessor to the singleton instance reference.
+     * The EnsembleTool adheres to a singleton pattern. This method is the
+     * accessor to the singleton instance reference.
      */
     public static EnsembleTool getInstance() {
         if (SINGLETON == null) {
@@ -150,8 +150,8 @@ public class EnsembleTool extends AbstractTool implements
     }
 
     /*
-     * The EnsembleTool adheres to a singleton pattern. This constructor
-     * is therefore private.
+     * The EnsembleTool adheres to a singleton pattern. This constructor is
+     * therefore private.
      * 
      * This ctor creates the ETLMResourceDataManager singleton and also adds a
      * shutdown hook which guarantees that this class is disposed of properly.
@@ -168,12 +168,10 @@ public class EnsembleTool extends AbstractTool implements
                 EnsembleToolDiagnosticStateDialog.DIALOG_HEIGHT);
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
-
             @Override
             public void run() {
                 dispose();
             }
-
         });
 
     }

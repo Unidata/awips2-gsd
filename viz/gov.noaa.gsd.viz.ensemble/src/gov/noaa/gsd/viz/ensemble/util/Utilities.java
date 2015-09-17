@@ -111,7 +111,7 @@ public class Utilities {
         float ir = (float) 1.0 - r;
 
         RGB rgb1 = color1.getRGB();
-        RGB rgb2 = SWTResourceManager.WHITE.getRGB();
+        RGB rgb2 = GlobalColor.get(GlobalColor.WHITE).getRGB();
 
         int r1 = rgb1.red;
         int b1 = rgb1.blue;
