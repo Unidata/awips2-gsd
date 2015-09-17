@@ -47,9 +47,6 @@ public class ChosenSREFColors {
     private Color em_color = SWTResourceManager.DEEP_BLUE;
 
     public Color get_EM_color() {
-        if (em_color.isDisposed()) {
-            em_color = SWTResourceManager.DEEP_BLUE;
-        }
         return em_color;
     }
 
@@ -58,9 +55,6 @@ public class ChosenSREFColors {
     }
 
     public Color get_NMM_color() {
-        if (nmm_color.isDisposed()) {
-            nmm_color = SWTResourceManager.CHERRY_RED;
-        }
         return nmm_color;
     }
 
@@ -69,9 +63,6 @@ public class ChosenSREFColors {
     }
 
     public Color get_NMB_color() {
-        if (nmb_color.isDisposed()) {
-            nmb_color = SWTResourceManager.SPRING_GREEN;
-        }
         return nmb_color;
     }
 
