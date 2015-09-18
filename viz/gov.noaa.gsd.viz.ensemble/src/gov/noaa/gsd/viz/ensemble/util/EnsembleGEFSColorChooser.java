@@ -77,7 +77,7 @@ public class EnsembleGEFSColorChooser extends CaveJFACEDialog {
         final Composite label_color_GEFS = new Composite(container, SWT.BORDER);
         label_color_GEFS.setForeground(ChosenGEFSColors.getInstance()
                 .getColor());
-        label_color_GEFS.setBackground(SWTResourceManager.WHITE);
+        label_color_GEFS.setBackground(GlobalColor.get(GlobalColor.WHITE));
         GridData gd_label_color_GEFS = new GridData(SWT.LEFT, SWT.CENTER,
                 false, false, 3, 1);
         gd_label_color_GEFS.heightHint = 24;

@@ -37,16 +37,18 @@ public class ChosenSREFColors {
     static private ChosenSREFColors SINGLETON = null;
 
     private ChosenSREFColors() {
-
     }
 
-    private Color nmm_color = SWTResourceManager.CHERRY_RED;
+    private Color nmm_color = GlobalColor.get(GlobalColor.CHERRY_RED);
 
-    private Color nmb_color = SWTResourceManager.SPRING_GREEN;
+    private Color nmb_color = GlobalColor.get(GlobalColor.SPRING_GREEN);
 
-    private Color em_color = SWTResourceManager.DEEP_BLUE;
+    private Color em_color = GlobalColor.get(GlobalColor.DEEP_BLUE);
 
     public Color get_EM_color() {
+        if (em_color.isDisposed()) {
+            em_color = GlobalColor.get(GlobalColor.DEEP_BLUE);
+        }
         return em_color;
     }
 
@@ -55,6 +57,9 @@ public class ChosenSREFColors {
     }
 
     public Color get_NMM_color() {
+        if (nmm_color.isDisposed()) {
+            nmm_color = GlobalColor.get(GlobalColor.CHERRY_RED);
+        }
         return nmm_color;
     }
 
@@ -63,6 +68,9 @@ public class ChosenSREFColors {
     }
 
     public Color get_NMB_color() {
+        if (nmb_color.isDisposed()) {
+            nmb_color = GlobalColor.get(GlobalColor.SPRING_GREEN);
+        }
         return nmb_color;
     }
 
