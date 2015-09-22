@@ -70,158 +70,11 @@ public class SWTResourceManager {
 
     private static Map<RGB, Color> m_colorMap = new HashMap<RGB, Color>();
 
-    private static Map<RGB, Color> m_singletonColorMap = new HashMap<RGB, Color>();
-
-    public static final Color NEAR_WHITE = SWTResourceManager
-            .getColorSingleton(new RGB(240, 240, 240));
-
-    public static final Color LIGHTER_GRAY = SWTResourceManager
-            .getColorSingleton(new RGB(216, 216, 216));
-
-    public static final Color LIGHT_GRAY = SWTResourceManager
-            .getColorSingleton(new RGB(210, 210, 210));
-
-    public static final Color MEDIUM_GRAY = SWTResourceManager
-            .getColorSingleton(new RGB(160, 160, 160));
-
-    public static final Color DARKER_GRAY = SWTResourceManager
-            .getColorSingleton(new RGB(130, 130, 130));
-
-    public static final Color BRIGHT_YELLOW = SWTResourceManager
-            .getColorSingleton(new RGB(255, 255, 0));
-
-    public static final Color LIGHTER_YELLOW = SWTResourceManager
-            .getColorSingleton(new RGB(255, 255, 102));
-
-    public static final Color PALE_DULL_YELLOW = SWTResourceManager
-            .getColorSingleton(new RGB(255, 255, 150));
-
-    public static final Color LIGHT_YELLOW = SWTResourceManager
-            .getColorSingleton(new RGB(255, 255, 220));
-
-    public static final Color PALE_DULL_ORANGE = SWTResourceManager
-            .getColorSingleton(new RGB(255, 204, 153));
-
-    public static final Color PALE_LIGHT_AZURE = SWTResourceManager
-            .getColorSingleton(new RGB(215, 239, 255));
-
-    public static final Color PALE_DULL_AZURE = SWTResourceManager
-            .getColorSingleton(new RGB(168, 215, 255));
-
-    public static final Color PALE_WEAK_MAGENTA = SWTResourceManager
-            .getColorSingleton(new RGB(255, 204, 255));
-
-    public static final Color PALE_WEAK_GREEN = SWTResourceManager
-            .getColorSingleton(new RGB(204, 255, 204));
-
-    public static final Color PALE_WEAK_BLUE = SWTResourceManager
-            .getColorSingleton(new RGB(203, 229, 255));
-
-    public static final Color PASTEL_LIGHT_BLUE = SWTResourceManager
-            .getColorSingleton(new RGB(134, 181, 245));
-
-    public static final Color PALE_DULL_VIOLET = SWTResourceManager
-            .getColorSingleton(new RGB(204, 204, 255));
-
-    public static final Color WHITE = SWTResourceManager
-            .getColorSingleton(new RGB(255, 255, 255));
-
-    public static final Color BLACK = SWTResourceManager
-            .getColorSingleton(new RGB(0, 0, 0));
-
-    // Crayola Colors ...
-    public static final Color BLUE = SWTResourceManager
-            .getColorSingleton(new RGB(31, 117, 254));
-
-    public static final Color SLATE_BLUE = SWTResourceManager
-            .getColorSingleton(new RGB(0, 153, 255));
-
-    public static final Color CERULEAN = SWTResourceManager
-            .getColorSingleton(new RGB(29, 172, 214));
-
-    public static final Color GREEN = SWTResourceManager
-            .getColorSingleton(new RGB(0, 204, 0));
-
-    public static final Color CARIBBEAN_GREEN = SWTResourceManager
-            .getColorSingleton(new RGB(0, 204, 153));
-
-    public static final Color SLATE_GREEN = SWTResourceManager
-            .getColorSingleton(new RGB(51, 153, 102));
-
-    public static final Color SEA_GREEN = SWTResourceManager
-            .getColorSingleton(new RGB(51, 204, 204));
-
-    public static final Color LIGHT_OLIVE = SWTResourceManager
-            .getColorSingleton(new RGB(153, 204, 0));
-
-    public static final Color YELLOW = SWTResourceManager
-            .getColorSingleton(new RGB(255, 255, 102));
-
-    public static final Color ATOMIC_TANGERINE = SWTResourceManager
-            .getColorSingleton(new RGB(255, 164, 116));
-
-    public static final Color BURNT_ORANGE = SWTResourceManager
-            .getColorSingleton(new RGB(255, 127, 73));
-
-    public static final Color NEON_CARROT = SWTResourceManager
-            .getColorSingleton(new RGB(255, 163, 67));
-
-    public static final Color PEACH = SWTResourceManager
-            .getColorSingleton(new RGB(255, 204, 153));
-
-    public static final Color RED = SWTResourceManager
-            .getColorSingleton(new RGB(255, 51, 0));
-
-    public static final Color SLATE_RED = SWTResourceManager
-            .getColorSingleton(new RGB(255, 153, 153));
-
-    public static final Color WILD_WATERMELON = SWTResourceManager
-            .getColorSingleton(new RGB(252, 108, 133));
-
-    public static final Color PINK_FLAMINGO = SWTResourceManager
-            .getColorSingleton(new RGB(252, 116, 253));
-
-    public static final Color HOT_MAGENTA = SWTResourceManager
-            .getColorSingleton(new RGB(252, 29, 206));
-
-    public static final Color PURPLE = SWTResourceManager
-            .getColorSingleton(new RGB(153, 51, 255));
-
-    public static final Color SEPIA = SWTResourceManager
-            .getColorSingleton(new RGB(165, 105, 79));
-
-    public static final Color NEON_PURPLE = SWTResourceManager
-            .getColorSingleton(new RGB(217, 0, 255));
-
-    public static final Color CHERRY_RED = SWTResourceManager
-            .getColorSingleton(new RGB(255, 0, 31));
-
-    public static final Color SPRING_GREEN = SWTResourceManager
-            .getColorSingleton(new RGB(0, 204, 68));
-
-    public static final Color DEEP_BLUE = SWTResourceManager
-            .getColorSingleton(new RGB(3, 2, 255));
-
     // //////////////////////////////////////////////////////////////////////////
     //
     // Color
     //
     // //////////////////////////////////////////////////////////////////////////
-
-    /**
-     * Returns the {@link Color} given its red, green and blue component values.
-     * The color is a singleton color so should never be disposed of by the
-     * caller.
-     */
-    public static Color getColorSingleton(RGB rgb) {
-        Color color = m_singletonColorMap.get(rgb);
-        if (color == null) {
-            Display display = Display.getCurrent();
-            color = new Color(display, rgb);
-            m_singletonColorMap.put(rgb, color);
-        }
-        return color;
-    }
 
     /**
      * Returns the system {@link Color} matching the specific ID. The color is a
@@ -261,6 +114,11 @@ public class SWTResourceManager {
      */
     public static Color getColor(RGB rgb) {
         Color color = m_colorMap.get(rgb);
+        /* defensive coding: if it was in the map but somehow disposed */
+        if ((color != null) && (color.isDisposed())) {
+            m_colorMap.remove(rgb);
+            color = null;
+        }
         if (color == null) {
             Display display = Display.getCurrent();
             color = new Color(display, rgb);
@@ -672,4 +530,5 @@ public class SWTResourceManager {
         disposeFonts();
         disposeCursors();
     }
+
 }

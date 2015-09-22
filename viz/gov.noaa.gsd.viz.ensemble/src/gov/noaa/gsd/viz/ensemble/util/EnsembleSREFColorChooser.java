@@ -77,7 +77,7 @@ public class EnsembleSREFColorChooser extends CaveJFACEDialog {
         final Composite label_color_NMM = new Composite(container, SWT.BORDER);
         label_color_NMM.setForeground(ChosenSREFColors.getInstance()
                 .get_NMM_color());
-        label_color_NMM.setBackground(SWTResourceManager.WHITE);
+        label_color_NMM.setBackground(GlobalColor.get(GlobalColor.WHITE));
         GridData gd_label_color_NMM = new GridData(SWT.LEFT, SWT.CENTER, false,
                 false, 3, 1);
         gd_label_color_NMM.heightHint = 24;
@@ -121,7 +121,7 @@ public class EnsembleSREFColorChooser extends CaveJFACEDialog {
         final Composite label_color_NMB = new Composite(container, SWT.BORDER);
         label_color_NMB.setForeground(ChosenSREFColors.getInstance()
                 .get_NMB_color());
-        label_color_NMB.setBackground(SWTResourceManager.WHITE);
+        label_color_NMB.setBackground(GlobalColor.get(GlobalColor.WHITE));
         GridData gd_label_color_NMB = new GridData(SWT.LEFT, SWT.CENTER, false,
                 false, 3, 1);
         gd_label_color_NMB.heightHint = 24;
@@ -164,7 +164,7 @@ public class EnsembleSREFColorChooser extends CaveJFACEDialog {
         final Composite label_color_EM = new Composite(container, SWT.BORDER);
         label_color_EM.setForeground(ChosenSREFColors.getInstance()
                 .get_EM_color());
-        label_color_EM.setBackground(SWTResourceManager.WHITE);
+        label_color_EM.setBackground(GlobalColor.get(GlobalColor.WHITE));
         GridData gd_label_color_EM = new GridData(SWT.LEFT, SWT.CENTER, false,
                 false, 3, 1);
         gd_label_color_EM.heightHint = 24;

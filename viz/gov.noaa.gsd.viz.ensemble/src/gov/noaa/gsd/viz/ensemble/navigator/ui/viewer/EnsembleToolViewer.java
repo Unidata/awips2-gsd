@@ -12,6 +12,7 @@ import gov.noaa.gsd.viz.ensemble.util.ChosenGEFSColors;
 import gov.noaa.gsd.viz.ensemble.util.ChosenSREFColors;
 import gov.noaa.gsd.viz.ensemble.util.EnsembleGEFSColorChooser;
 import gov.noaa.gsd.viz.ensemble.util.EnsembleSREFColorChooser;
+import gov.noaa.gsd.viz.ensemble.util.GlobalColor;
 import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
 import gov.noaa.gsd.viz.ensemble.util.Utilities;
 
@@ -298,7 +299,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
     private static boolean LAST_HIGHLIGHTED_RESOURCE_OUTLINE_ASSERTED = false;
 
-    private Color thickenOnSelectionColor = SWTResourceManager.PASTEL_LIGHT_BLUE;
+    private Color thickenOnSelectionColor = null;
 
     private boolean thickenOnSelection = true;
 
@@ -311,10 +312,6 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
     final private ITreeViewerListener expandCollapseListener = new EnsembleTreeExpandCollapseListener();
 
     private ERFProductDialog_Modal erfDialog = null;
-
-    private static final Color ENABLED_FOREGROUND_COLOR = SWTResourceManager.BLACK;
-
-    private static final Color DISABLED_FOREGROUND_COLOR = SWTResourceManager.MEDIUM_GRAY;
 
     protected TreeItem calculationSelectedTreeItem = null;
 
@@ -353,6 +350,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         autoHidePreferences = true;
 
         imageCache = new ArrayList<>();
+        thickenOnSelectionColor = getThickenOnSelectionColor();
 
     }
 
@@ -370,7 +368,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
          * TODO: This colorized backdrop should happen not by being hard-coded
          * but via state change (ie. by calling setEnabled).
          */
-        ownerComposite.setBackground(SWTResourceManager.PALE_DULL_AZURE);
+        ownerComposite.setBackground(GlobalColor
+                .get(GlobalColor.PALE_DULL_AZURE));
 
         /* create the defaut icons when the view is initially opened */
         EnsembleToolViewerImageStore.constructImages();
@@ -408,13 +407,13 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         tabEnsemblesMainTabFolder = new CTabFolder(rootTabComposite, SWT.TOP
                 | SWT.BORDER);
         tabEnsemblesMainTabFolder.setFont(viewFont);
-        tabEnsemblesMainTabFolder
-                .setSelectionBackground(SWTResourceManager.PALE_LIGHT_AZURE);
+        tabEnsemblesMainTabFolder.setSelectionBackground(GlobalColor
+                .get(GlobalColor.PALE_LIGHT_AZURE));
 
         /* here's the toolbar */
         Composite toolbarComposite = new Composite(tabEnsemblesMainTabFolder,
                 SWT.NONE);
-        toolbarComposite.setBackground(SWTResourceManager.WHITE);
+        toolbarComposite.setBackground(GlobalColor.get(GlobalColor.WHITE));
 
         FillLayout toolbarContainer_fl = new FillLayout(SWT.HORIZONTAL);
         toolbarContainer_fl.marginWidth = 1;
@@ -431,7 +430,6 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         tabEnsemblesMainTabFolder.setTopRight(toolbarComposite);
         tabEnsemblesMainTabFolder.setFont(SWTResourceManager.getFont(
                 "SansSerif", 10, SWT.NONE));
-
         tabEnsemblesMainTabFolder
                 .addSelectionListener(new UpperTabSelectionListener());
 
@@ -439,13 +437,11 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         itemLegendsTabItem = new CTabItem(tabEnsemblesMainTabFolder, SWT.NONE);
         itemLegendsTabItem
                 .setImage(EnsembleToolViewerImageStore.TAB_LEGENDS_ENABLED_UNSELECTED_IMG);
-        // tabItemLegends.setText("  Legends  ");
-
         /* tab entry for Matrix */
         itemMatrixTabItem = new CTabItem(tabEnsemblesMainTabFolder, SWT.NONE);
         itemMatrixTabItem
                 .setImage(EnsembleToolViewerImageStore.TAB_MATRIX_ENABLED_UNSELECTED_IMG);
-        // tabItemMatrix.setText("  Matrix  ");
+
         /*
          * let's have an upper sash and lower sash that the user can resize
          * vertically (see SWT concept of sash)
@@ -477,7 +473,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
          * folder (i.e. set of tabs in one container) ...
          */
         lowerSashComposite = new Composite(sashForm, SWT.BORDER_SOLID);
-        lowerSashComposite.setBackground(SWTResourceManager.LIGHT_GRAY);
+        lowerSashComposite.setBackground(GlobalColor
+                .get(GlobalColor.LIGHT_GRAY));
         GridLayout lowerSash_gl = new GridLayout();
         lowerSashComposite.setLayout(lowerSash_gl);
         GridData lowerSash_gd = new GridData(SWT.FILL, SWT.FILL, true, true, 1,
@@ -645,8 +642,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
                     /* if all invisible then make sure the parent is grayed-out. */
                     if (allInvisible) {
-                        parentItem
-                                .setForeground(EnsembleToolViewer.DISABLED_FOREGROUND_COLOR);
+                        parentItem.setForeground(getDisabledForegroundColor());
                         if (isViewerTreeReady()) {
                             ensembleTreeViewer.getTree().deselectAll();
                         }
@@ -657,8 +653,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                      */
 
                     else {
-                        parentItem
-                                .setForeground(EnsembleToolViewer.ENABLED_FOREGROUND_COLOR);
+                        parentItem.setForeground(getEnabledForegroundColor());
                         if (isViewerTreeReady()) {
                             ensembleTreeViewer.getTree().deselectAll();
                         }
@@ -818,8 +813,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                     powerToggleToolItem
                             .setImage(EnsembleToolViewerImageStore.POWER_ON_IMG);
                     powerToggleToolItem.setToolTipText("Tool Off");
-                    ownerComposite
-                            .setBackground(SWTResourceManager.PALE_DULL_AZURE);
+                    ownerComposite.setBackground(GlobalColor
+                            .get(GlobalColor.PALE_DULL_AZURE));
                     tabEnsemblesMainTabFolder.setSelection(itemLegendsTabItem);
                     resourceInfoTabItem
                             .setImage(EnsembleToolViewerImageStore.TAB_INFO_ENABLED_IMG);
@@ -829,14 +824,15 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                             .setImage(EnsembleToolViewerImageStore.TAB_LEGENDS_ENABLED_SELECTED_IMG);
                     itemMatrixTabItem
                             .setImage(EnsembleToolViewerImageStore.TAB_MATRIX_ENABLED_UNSELECTED_IMG);
-                    lowerSashComposite
-                            .setBackground(SWTResourceManager.PALE_DULL_AZURE);
+                    lowerSashComposite.setBackground(GlobalColor
+                            .get(GlobalColor.PALE_DULL_AZURE));
 
                 } else {
                     powerToggleToolItem
                             .setImage(EnsembleToolViewerImageStore.POWER_OFF_IMG);
                     powerToggleToolItem.setToolTipText("Tool On");
-                    ownerComposite.setBackground(SWTResourceManager.LIGHT_GRAY);
+                    ownerComposite.setBackground(GlobalColor
+                            .get(GlobalColor.LIGHTER_GRAY));
                     resourceInfoTabItem
                             .setImage(EnsembleToolViewerImageStore.TAB_INFO_DISABLED_IMG);
                     preferencesTabItem
@@ -846,8 +842,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                     itemMatrixTabItem
                             .setImage(EnsembleToolViewerImageStore.TAB_MATRIX_DISABLED_IMG);
                     ensembleTreeViewer.getTree().deselectAll();
-                    lowerSashComposite
-                            .setBackground(SWTResourceManager.LIGHT_GRAY);
+                    lowerSashComposite.setBackground(GlobalColor
+                            .get(GlobalColor.LIGHTER_GRAY));
                 }
 
                 thickenOnSelectionComposite.setEnabled(viewEditable);
@@ -860,6 +856,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                 thicknessChooserSpinner.setEnabled(viewEditable);
 
                 editableOnRestoreBtn.setEnabled(viewEditable);
+                /* TODO: Remaining preferences */
                 // btnEditableOnSwapIn.setEnabled(viewEditable);
                 // btnUneditableOnMinimize.setEnabled(viewEditable);
                 // btnCreateToolLayerOnNewEditor.setEnabled(viewEditable);
@@ -920,7 +917,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                      * grayed-out. This needs to be further evaluated for a
                      * better solution.
                      */
-                    if (fg.getRGB().equals(DISABLED_FOREGROUND_COLOR.getRGB())) {
+                    if (fg.getRGB()
+                            .equals(getEnabledForegroundColor().getRGB())) {
                         isVisible = false;
                     } else {
                         isVisible = true;
@@ -928,16 +926,14 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
                     /* if it was on turn it off */
                     if (isVisible) {
-                        finalItem
-                                .setForeground(EnsembleToolViewer.DISABLED_FOREGROUND_COLOR);
+                        finalItem.setForeground(getDisabledForegroundColor());
                         if (isViewerTreeReady()) {
                             ensembleTreeViewer.getTree().deselectAll();
                         }
                     }
                     /* if it was off turn it on */
                     else {
-                        finalItem
-                                .setForeground(EnsembleToolViewer.ENABLED_FOREGROUND_COLOR);
+                        finalItem.setForeground(getEnabledForegroundColor());
                         if (isViewerTreeReady()) {
                             ensembleTreeViewer.getTree().deselectAll();
                         }
@@ -953,11 +949,9 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                     gr.getRsc().issueRefresh();
                     /* update tree item to reflect new state */
                     if (isVisible) {
-                        finalItem
-                                .setForeground(EnsembleToolViewer.ENABLED_FOREGROUND_COLOR);
+                        finalItem.setForeground(getEnabledForegroundColor());
                     } else {
-                        finalItem
-                                .setForeground(EnsembleToolViewer.DISABLED_FOREGROUND_COLOR);
+                        finalItem.setForeground(getDisabledForegroundColor());
                     }
                     if (isViewerTreeReady()) {
                         ensembleTreeViewer.getTree().deselectAll();
@@ -1376,17 +1370,17 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                         .getPixel(new RGB(255, 255, 255));
                 image = new Image(ownerComposite.getDisplay(), imageData);
                 GC gc = new GC(image);
-                gc.setBackground(SWTResourceManager.WHITE);
+                gc.setBackground(GlobalColor.get(GlobalColor.WHITE));
                 gc.fillRectangle(0, 0, imageWidth, imageHeight);
 
                 // if any ensemble members are visible then the root tree item
                 // should be "toggled on" ...
                 if (anyChildrenToggleOn(productName)) {
-                    gc.setBackground(SWTResourceManager.BLACK);
+                    gc.setBackground(GlobalColor.get(GlobalColor.BLACK));
                 }
                 // otherwise, the root tree item should appear "toggled off" ...
                 else {
-                    gc.setBackground(SWTResourceManager.DARKER_GRAY);
+                    gc.setBackground(GlobalColor.get(GlobalColor.GRAY));
                 }
 
                 int listEntryLineUpperLeft_x = 4;
@@ -1440,13 +1434,13 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                         .getPixel(new RGB(255, 255, 255));
                 image = new Image(ownerComposite.getDisplay(), imageData);
                 GC gc = new GC(image);
-                gc.setBackground(SWTResourceManager.WHITE);
+                gc.setBackground(GlobalColor.get(GlobalColor.WHITE));
                 gc.fillRectangle(0, 0, imageWidth, imageHeight);
                 if (gr.getRsc().getProperties().isVisible()) {
 
                     // need the following tweaking integers which cosmetic
                     // center things nicely
-                    gc.setBackground(SWTResourceManager.BLACK);
+                    gc.setBackground(GlobalColor.get(GlobalColor.BLACK));
 
                     // the icon for a visible individual grid resources put the
                     // color of the resource inside a black bordered rectangle.
@@ -1463,13 +1457,13 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                                     - 2, innerColorWidth, innerColorHeight);
 
                     // then put a nice hyphen
-                    gc.setBackground(SWTResourceManager.BLACK);
+                    gc.setBackground(GlobalColor.get(GlobalColor.BLACK));
                     gc.fillRectangle(colorWidth + bulletUpperLeftMargin_x,
                             bulletUpperLeft_y, bulletSize + 2, bulletSize - 1);
                 } else {
                     // need the following tweaking integers which cosmetic
                     // center things nicely
-                    gc.setBackground(SWTResourceManager.BLACK);
+                    gc.setBackground(GlobalColor.get(GlobalColor.GRAY));
 
                     // the icon for a hidden individual grid resources put the
                     // color of the resource inside a greyed bordered rectangle.
@@ -1482,13 +1476,13 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                                     + ((colorHeight - innerColorHeight) / 2)
                                     - 2, innerColorWidth, innerColorHeight);
 
-                    gc.setBackground(SWTResourceManager.LIGHT_GRAY);
+                    gc.setBackground(GlobalColor.get(GlobalColor.GRAY));
                     gc.fillRectangle(colorWidth + bulletUpperLeftMargin_x,
                             bulletUpperLeft_y, bulletSize + 2, bulletSize - 1);
                 }
                 if (gr.requiresLoadCheck()
                         && (!gr.isLoadedAtFrame(currentFramesInfo))) {
-                    gc.setBackground(SWTResourceManager.DARKER_GRAY);
+                    gc.setBackground(GlobalColor.get(GlobalColor.GRAY));
 
                     // the icon for a hidden individual grid resources put the
                     // color of the resource inside a greyed bordered rectangle.
@@ -1558,11 +1552,11 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                 TreeItem treeItem = findTreeItemByResource(gr);
                 if (treeItem != null) {
                     if (gr.getRsc().getProperties().isVisible()) {
-                        treeItem.setForeground(EnsembleToolViewer.ENABLED_FOREGROUND_COLOR);
+                        treeItem.setForeground(getEnabledForegroundColor());
                     } else {
-                        treeItem.setForeground(EnsembleToolViewer.DISABLED_FOREGROUND_COLOR);
+                        treeItem.setForeground(getDisabledForegroundColor());
                     }
-                    // matchParentToChildrenVisibility(treeItem);
+                    matchParentToChildrenVisibility(treeItem);
                 }
                 if (nodeLabel != null) {
                     nodeLabel = nodeLabel.trim();
@@ -2100,7 +2094,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                             if (!useResourceColorOnThicken) {
                                 currentEnsembleRsc.getCapability(
                                         ColorableCapability.class).setColor(
-                                        thickenOnSelectionColor.getRGB());
+                                        getThickenOnSelectionColor().getRGB());
                             }
                         }
                     }
@@ -2143,7 +2137,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                             if (!useResourceColorOnThicken) {
                                 currentEnsembleRsc.getCapability(
                                         ColorableCapability.class).setColor(
-                                        thickenOnSelectionColor.getRGB());
+                                        getThickenOnSelectionColor().getRGB());
                             }
                         }
                     }
@@ -2521,7 +2515,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         prefsComposite_gd.heightHint = 205;
         prefsComposite_gd.widthHint = 351;
         prefsRootComposite.setLayoutData(prefsComposite_gd);
-        prefsRootComposite.setBackground(SWTResourceManager.MEDIUM_GRAY);
+        prefsRootComposite.setBackground(GlobalColor
+                .get(GlobalColor.MEDIUM_GRAY));
         preferencesTabItem = new TabItem(tabFolder_lowerSash, SWT.NONE);
         preferencesTabItem
                 .setImage(EnsembleToolViewerImageStore.TAB_OPTIONS_ENABLED_IMG);
@@ -2587,7 +2582,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         chooseColorRdo.setSelection(false);
 
         colorChooserLbl = new Label(thickenOnSelectionComposite, SWT.BORDER);
-        colorChooserLbl.setBackground(thickenOnSelectionColor);
+        colorChooserLbl.setBackground(getThickenOnSelectionColor());
         colorChooserLbl.setFont(SWTResourceManager.getFont("Dialog", 14,
                 SWT.NONE));
         colorChooserLbl.setAlignment(SWT.CENTER);
@@ -2596,7 +2591,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         colorChooserLbl_gd.widthHint = 40;
         colorChooserLbl.setLayoutData(colorChooserLbl_gd);
         colorChooserLbl.setEnabled(false);
-        colorChooserLbl.setBackground(SWTResourceManager.LIGHT_GRAY);
+        colorChooserLbl.setBackground(GlobalColor.get(GlobalColor.LIGHT_GRAY));
         colorChooserLbl.setText("X");
 
         Label separatorLbl_3 = new Label(thickenOnSelectionComposite,
@@ -2643,12 +2638,12 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
             public void mouseUp(MouseEvent e) {
                 if (!useResourceColorOnThicken) {
                     ColorDialog cd = new ColorDialog(ownerComposite.getShell());
-                    cd.setRGB(thickenOnSelectionColor.getRGB());
+                    cd.setRGB(getThickenOnSelectionColor().getRGB());
                     cd.setText("Choose Selection Color");
                     RGB result = cd.open();
                     if (result != null) {
                         Color c = SWTResourceManager.getColor(result);
-                        thickenOnSelectionColor = c;
+                        setThickenOnSelectionColor(c);
                         colorChooserLbl.setBackground(c);
                     }
                 }
@@ -2666,11 +2661,12 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                     chooseColorRdo.setEnabled(true);
                     colorChooserLbl.setEnabled(true);
                     if (isResourceColorBeingUsed) {
-                        colorChooserLbl
-                                .setBackground(SWTResourceManager.LIGHT_GRAY);
+                        colorChooserLbl.setBackground(GlobalColor
+                                .get(GlobalColor.LIGHT_GRAY));
                         colorChooserLbl.setText("X");
                     } else {
-                        colorChooserLbl.setBackground(thickenOnSelectionColor);
+                        colorChooserLbl
+                                .setBackground(getThickenOnSelectionColor());
                         colorChooserLbl.setText("");
                     }
                     thicknessChooserLbl.setEnabled(true);
@@ -2680,8 +2676,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                     useResourceColorRdo.setEnabled(false);
                     chooseColorRdo.setEnabled(false);
                     colorChooserLbl.setEnabled(false);
-                    colorChooserLbl
-                            .setBackground(SWTResourceManager.LIGHT_GRAY);
+                    colorChooserLbl.setBackground(GlobalColor
+                            .get(GlobalColor.LIGHT_GRAY));
                     colorChooserLbl.setText("X");
                     thicknessChooserLbl.setEnabled(false);
                     thicknessChooserSpinner.setEnabled(false);
@@ -2696,8 +2692,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
             public void widgetSelected(SelectionEvent e) {
                 boolean isSelected = ((Button) e.getSource()).getSelection();
                 if (isSelected) {
-                    colorChooserLbl
-                            .setBackground(SWTResourceManager.LIGHT_GRAY);
+                    colorChooserLbl.setBackground(GlobalColor
+                            .get(GlobalColor.LIGHT_GRAY));
                     colorChooserLbl.setText("X");
                     colorChooserLbl.setEnabled(false);
                     useResourceColorOnThicken = true;
@@ -2712,7 +2708,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
             public void widgetSelected(SelectionEvent e) {
                 boolean isSelected = ((Button) e.getSource()).getSelection();
                 if (isSelected) {
-                    colorChooserLbl.setBackground(thickenOnSelectionColor);
+                    colorChooserLbl.setBackground(getThickenOnSelectionColor());
                     colorChooserLbl.setText("");
                     colorChooserLbl.setEnabled(true);
                     useResourceColorOnThicken = false;
@@ -2947,7 +2943,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         frameTimeUsingBasisLbl.setAlignment(SWT.CENTER);
         frameTimeUsingBasisLbl.setForeground(SWTResourceManager.getColor(0, 0,
                 0));
-        frameTimeUsingBasisLbl.setBackground(SWTResourceManager.LIGHT_YELLOW);
+        frameTimeUsingBasisLbl.setBackground(GlobalColor
+                .get(GlobalColor.LIGHT_YELLOW));
         GridData frameTimeUsingBasisLbl_gd = new GridData(SWT.FILL, SWT.CENTER,
                 true, false, 2, 1);
         frameTimeUsingBasisLbl_gd.heightHint = 22;
@@ -2964,7 +2961,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         timeMatchResourceLbl = new Label(planViewInfoTabComposite, SWT.BORDER);
         timeMatchResourceLbl.setFont(SWTResourceManager.getFont("Dialog", 9,
                 SWT.BOLD));
-        timeMatchResourceLbl.setBackground(SWTResourceManager.LIGHT_YELLOW);
+        timeMatchResourceLbl.setBackground(GlobalColor
+                .get(GlobalColor.LIGHT_YELLOW));
         timeMatchResourceLbl.setAlignment(SWT.CENTER);
         GridData timeMatchResourceLbl_gd = new GridData(SWT.FILL, SWT.CENTER,
                 true, false, 2, 1);
@@ -3008,7 +3006,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         timeSeriesPointValueLbl.setAlignment(SWT.CENTER);
         timeSeriesPointValueLbl.setForeground(SWTResourceManager.getColor(0, 0,
                 0));
-        timeSeriesPointValueLbl.setBackground(SWTResourceManager.LIGHT_YELLOW);
+        timeSeriesPointValueLbl.setBackground(GlobalColor
+                .get(GlobalColor.LIGHT_YELLOW));
         GridData timeSeriesPointValueLbl_gd = new GridData(SWT.FILL,
                 SWT.CENTER, true, false, 2, 1);
         timeSeriesPointValueLbl_gd.heightHint = 22;
@@ -3322,4 +3321,26 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         ensembleTreeViewer.getControl().setFocus();
     }
 
+    private Color getEnabledForegroundColor() {
+        return GlobalColor.get(GlobalColor.BLACK);
+    }
+
+    private Color getDisabledForegroundColor() {
+        return GlobalColor.get(GlobalColor.MEDIUM_GRAY);
+    }
+
+    private Color getThickenOnSelectionColor() {
+        Color tosc = null;
+        if (thickenOnSelectionColor != null
+                && !thickenOnSelectionColor.isDisposed()) {
+            tosc = thickenOnSelectionColor;
+        } else {
+            tosc = GlobalColor.get(GlobalColor.PASTEL_LIGHT_BLUE);
+        }
+        return tosc;
+    }
+
+    private void setThickenOnSelectionColor(Color c) {
+        thickenOnSelectionColor = c;
+    }
 }

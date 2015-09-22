@@ -4,6 +4,7 @@ import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
 import gov.noaa.gsd.viz.ensemble.display.calculate.Range;
 import gov.noaa.gsd.viz.ensemble.display.calculate.RangeType;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.util.GlobalColor;
 import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
 
 import org.eclipse.jface.dialogs.IDialogConstants;
@@ -174,7 +175,8 @@ public class ERFProductDialog_Modal extends CaveJFACEDialog {
         ensembleProductNameLbl.setAlignment(SWT.CENTER);
         ensembleProductNameLbl.setForeground(SWTResourceManager.getColor(0, 0,
                 0));
-        ensembleProductNameLbl.setBackground(SWTResourceManager.LIGHT_YELLOW);
+        ensembleProductNameLbl.setBackground(GlobalColor
+                .get(GlobalColor.LIGHT_YELLOW));
         GridData frameTimeUsingBasisLbl_gd = new GridData(SWT.FILL, SWT.CENTER,
                 true, false, 5, 1);
         ensembleProductNameLbl.setLayoutData(frameTimeUsingBasisLbl_gd);

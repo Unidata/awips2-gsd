@@ -3,8 +3,8 @@ package gov.noaa.gsd.viz.ensemble.display.control;
 import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResource;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -135,7 +135,7 @@ public class EnsembleToolDisplayCustomizer implements
                 /**
                  * Remove it from the resource manager and update GUI.
                  */
-                // DR Jing - Polster: How do we find the ensemble tool layer for
+                // TODO: How do we find the ensemble tool layer for
                 // the sync call?
                 // EnsembleResourceManager.getInstance().syncRegisteredResource(null);
                 EnsembleResourceManager.getInstance().notifyClientListChanged();
@@ -154,8 +154,7 @@ public class EnsembleToolDisplayCustomizer implements
             if (EnsembleTool.getInstance().isToolAvailable()) {
                 if ((rp.getResource().hasCapability(EditableCapability.class) == true)
                         && (!(rp.getResource() instanceof EnsembleToolLayer))) {
-                    EnsembleTool.getInstance()
-                            .setForeignEditableToolLoading();
+                    EnsembleTool.getInstance().setForeignEditableToolLoading();
                 }
             }
 

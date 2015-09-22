@@ -1,7 +1,7 @@
 package gov.noaa.gsd.viz.ensemble.util.diagnostic;
 
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
-import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
+import gov.noaa.gsd.viz.ensemble.util.GlobalColor;
 
 import java.util.List;
 
@@ -89,7 +89,8 @@ public class EnsembleToolDiagnosticStateDialog extends CaveJFACEDialog
         parent.setLayout(new GridLayout(1, true));
 
         Composite upperRootContainer = new Composite(parent, SWT.BORDER);
-        upperRootContainer.setBackground(SWTResourceManager.PALE_WEAK_GREEN);
+        upperRootContainer.setBackground(GlobalColor
+                .get(GlobalColor.PALE_WEAK_GREEN));
         GridLayout upperRootContainer_gl = new GridLayout();
         upperRootContainer_gl.marginTop = 2;
         upperRootContainer_gl.marginBottom = 0;
@@ -177,7 +178,8 @@ public class EnsembleToolDiagnosticStateDialog extends CaveJFACEDialog
         stackTraceTextArea.setLayoutData(stackTrace_gd);
 
         Composite lowerRootContainer = new Composite(parent, SWT.None);
-        lowerRootContainer.setBackground(SWTResourceManager.ATOMIC_TANGERINE);
+        lowerRootContainer.setBackground(GlobalColor
+                .get(GlobalColor.ATOMIC_TANGERINE));
         GridLayout lowerRootContainer_gl = new GridLayout();
         lowerRootContainer_gl.marginTop = 3;
         lowerRootContainer_gl.marginBottom = 9;
