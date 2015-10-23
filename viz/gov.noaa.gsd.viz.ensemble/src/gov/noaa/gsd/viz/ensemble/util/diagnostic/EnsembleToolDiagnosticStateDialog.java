@@ -104,8 +104,6 @@ public class EnsembleToolDiagnosticStateDialog extends CaveJFACEDialog
         upperUpperRootcontainer_gd.verticalAlignment = SWT.FILL;
         upperUpperRootcontainer_gd.grabExcessHorizontalSpace = true;
         upperUpperRootcontainer_gd.grabExcessVerticalSpace = false;
-        upperUpperRootcontainer_gd.heightHint = 450;
-        upperUpperRootcontainer_gd.widthHint = 927;
         upperUpperRootContainer.setLayoutData(upperUpperRootcontainer_gd);
 
         // define the TableViewer
@@ -164,7 +162,6 @@ public class EnsembleToolDiagnosticStateDialog extends CaveJFACEDialog
         middleContainer_gd.verticalAlignment = SWT.FILL;
         middleContainer_gd.grabExcessHorizontalSpace = true;
         middleContainer_gd.grabExcessVerticalSpace = true;
-        middleContainer_gd.heightHint = 320;
         middleUpperRootContainer.setLayoutData(middleContainer_gd);
 
         stackTraceTextArea = new Text(middleUpperRootContainer, SWT.BORDER
@@ -193,8 +190,6 @@ public class EnsembleToolDiagnosticStateDialog extends CaveJFACEDialog
         lowerContainer_gd.grabExcessHorizontalSpace = true;
         lowerContainer_gd.grabExcessVerticalSpace = false;
         lowerContainer_gd.horizontalAlignment = GridData.FILL;
-        lowerContainer_gd.heightHint = 189;
-        lowerContainer_gd.widthHint = DIALOG_WIDTH - 23;
         lowerContainer.setLayoutData(lowerContainer_gd);
 
         // define the TableViewer
@@ -217,8 +212,6 @@ public class EnsembleToolDiagnosticStateDialog extends CaveJFACEDialog
         toolLayerData_gd.grabExcessHorizontalSpace = true;
         toolLayerData_gd.grabExcessVerticalSpace = true;
         toolLayerData_gd.horizontalAlignment = GridData.FILL;
-        toolLayerData_gd.heightHint = 265;
-        toolLayerData_gd.widthHint = DIALOG_WIDTH;
         toolLayerDataViewer.getControl().setLayoutData(toolLayerData_gd);
 
         toolLayerDataViewer.setContentProvider(ArrayContentProvider

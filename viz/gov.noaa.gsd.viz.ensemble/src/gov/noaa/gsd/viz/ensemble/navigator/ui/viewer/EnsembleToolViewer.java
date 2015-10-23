@@ -170,8 +170,6 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
     protected static boolean WAS_MAP_CHECKBOX_SELECTION = false;;
 
-    private static int CLIENT_BODY_AREA_HEIGHT = 739;
-
     private boolean isDisabled = false;
 
     private TreeViewer ensembleTreeViewer = null;
@@ -311,7 +309,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
     final private ITreeViewerListener expandCollapseListener = new EnsembleTreeExpandCollapseListener();
 
-    private ERFProductDialog_Modal erfDialog = null;
+    private ERFProductDialog erfDialog = null;
 
     protected TreeItem calculationSelectedTreeItem = null;
 
@@ -396,7 +394,6 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         tabContainer_gl.marginHeight = 2;
         GridData tabContainer_gd = new GridData(SWT.FILL, SWT.FILL, true, true,
                 1, 1);
-        tabContainer_gd.heightHint = CLIENT_BODY_AREA_HEIGHT;
         rootTabComposite.setLayout(tabContainer_gl);
         rootTabComposite.setLayoutData(tabContainer_gd);
 
@@ -2478,7 +2475,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
     private void startAddERFLayer(String mousedEnsembleName) {
 
-        erfDialog = new ERFProductDialog_Modal(ownerComposite.getShell(),
+        erfDialog = new ERFProductDialog(ownerComposite.getShell(),
                 mousedEnsembleName);
         if (erfDialog.open() == Window.OK) {
             erfDialog.close();
@@ -2509,12 +2506,10 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
         Composite prefsRootComposite = new Composite(tabFolder_lowerSash,
                 SWT.BORDER);
-        prefsRootComposite.setLayout(new GridLayout(10, true));
-        GridData prefsComposite_gd = new GridData(SWT.LEFT, SWT.CENTER, false,
-                false, 1, 1);
-        prefsComposite_gd.heightHint = 205;
-        prefsComposite_gd.widthHint = 351;
-        prefsRootComposite.setLayoutData(prefsComposite_gd);
+        prefsRootComposite.setLayout(new GridLayout(8, false));
+        GridData prefsRootComposite_gd = new GridData(SWT.FILL, SWT.FILL, true,
+                true, 1, 1);
+        prefsRootComposite.setLayoutData(prefsRootComposite_gd);
         prefsRootComposite.setBackground(GlobalColor
                 .get(GlobalColor.MEDIUM_GRAY));
         preferencesTabItem = new TabItem(tabFolder_lowerSash, SWT.NONE);
@@ -2522,20 +2517,18 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                 .setImage(EnsembleToolViewerImageStore.TAB_OPTIONS_ENABLED_IMG);
         preferencesTabItem.setControl(prefsRootComposite);
 
-        final int numCols = 5;
+        final int numCols = 6;
         thickenOnSelectionComposite = new Composite(prefsRootComposite,
                 SWT.SHADOW_ETCHED_IN);
         thickenOnSelectionComposite.setLayout(new GridLayout(numCols, false));
 
         GridData thickenOnSelectionComposite_gd = new GridData(SWT.LEFT,
-                SWT.TOP, false, false, 1, 10);
-        thickenOnSelectionComposite_gd.widthHint = 152;
+                SWT.TOP, false, true, 4, 10);
         thickenOnSelectionComposite
                 .setLayoutData(thickenOnSelectionComposite_gd);
 
-        GridData separatorLbl_gd = new GridData(SWT.LEFT, SWT.CENTER, false,
+        GridData separatorLbl_gd = new GridData(SWT.FILL, SWT.CENTER, true,
                 false, numCols, 1);
-        separatorLbl_gd.widthHint = 218;
 
         Label separatorLbl_0 = new Label(thickenOnSelectionComposite,
                 SWT.SEPARATOR | SWT.HORIZONTAL);
@@ -2551,34 +2544,23 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                 false, false, 4, 1));
         thickenOnSelectionBtn.setFont(viewFont);
 
-        Label label_separator_A = new Label(thickenOnSelectionComposite,
-                SWT.SEPARATOR | SWT.HORIZONTAL);
-        label_separator_A.setLayoutData(separatorLbl_gd);
-        label_separator_A.setVisible(false);
-
         Label separatorLbl_1 = new Label(thickenOnSelectionComposite,
                 SWT.SEPARATOR | SWT.HORIZONTAL);
         separatorLbl_1.setLayoutData(separatorLbl_gd);
 
-        Label separatorLbl_B = new Label(thickenOnSelectionComposite,
-                SWT.SEPARATOR | SWT.HORIZONTAL);
-        separatorLbl_B.setLayoutData(separatorLbl_gd);
-        separatorLbl_B.setVisible(false);
-
         useResourceColorRdo = new Button(thickenOnSelectionComposite, SWT.RADIO);
         useResourceColorRdo.setSelection(true);
         useResourceColorRdo.setText("Use Product Color");
-        useResourceColorRdo.setLayoutData(new GridData(SWT.LEFT, SWT.BOTTOM,
-                false, false, numCols, 2));
+        useResourceColorRdo.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER,
+                true, false, 6, 1));
         useResourceColorRdo.setFont(smallViewFont);
 
         chooseColorRdo = new Button(thickenOnSelectionComposite, SWT.RADIO);
         GridData chooseColorBtn_gd = new GridData(SWT.LEFT, SWT.CENTER, false,
                 false, 3, 1);
-        chooseColorBtn_gd.widthHint = 93;
         chooseColorRdo.setLayoutData(chooseColorBtn_gd);
         chooseColorRdo.setFont(smallViewFont);
-        chooseColorRdo.setText("Choose Color ");
+        chooseColorRdo.setText("Choose Color");
         chooseColorRdo.setSelection(false);
 
         colorChooserLbl = new Label(thickenOnSelectionComposite, SWT.BORDER);
@@ -2586,37 +2568,27 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         colorChooserLbl.setFont(SWTResourceManager.getFont("Dialog", 14,
                 SWT.NONE));
         colorChooserLbl.setAlignment(SWT.CENTER);
-        GridData colorChooserLbl_gd = new GridData(SWT.LEFT, SWT.CENTER, false,
-                false, 2, 1);
-        colorChooserLbl_gd.widthHint = 40;
+        GridData colorChooserLbl_gd = new GridData(SWT.FILL, SWT.CENTER, true,
+                false, 3, 1);
         colorChooserLbl.setLayoutData(colorChooserLbl_gd);
         colorChooserLbl.setEnabled(false);
         colorChooserLbl.setBackground(GlobalColor.get(GlobalColor.LIGHT_GRAY));
         colorChooserLbl.setText("X");
 
-        Label separatorLbl_3 = new Label(thickenOnSelectionComposite,
-                SWT.SEPARATOR | SWT.HORIZONTAL);
-        separatorLbl_3.setLayoutData(separatorLbl_gd);
-        separatorLbl_3.setVisible(false);
-
         thicknessChooserLbl = new Label(thickenOnSelectionComposite, SWT.BORDER
                 | SWT.CENTER);
         GridData thicknessChooserLbl_gd = new GridData(SWT.LEFT, SWT.CENTER,
-                false, false, 2, 1);
-        thicknessChooserLbl_gd.widthHint = 65;
-        thicknessChooserLbl_gd.heightHint = 23;
+                true, true, 3, 1);
         thicknessChooserLbl.setLayoutData(thicknessChooserLbl_gd);
-        thicknessChooserLbl.setText("Thickness: ");
+        thicknessChooserLbl.setText("  Thickness:  ");
         thicknessChooserLbl.setFont(smallViewFont);
         thicknessChooserLbl.setAlignment(SWT.CENTER);
 
         thicknessChooserSpinner = new Spinner(thickenOnSelectionComposite,
                 SWT.BORDER);
         thicknessChooserSpinner.setValues(thickenWidth, 2, 7, 0, 1, 1);
-        GridData thicknessChooser_gd = new GridData(SWT.LEFT, SWT.CENTER,
-                false, false, 2, 1);
-        thicknessChooser_gd.widthHint = 45;
-        thicknessChooserLbl_gd.heightHint = 27;
+        GridData thicknessChooser_gd = new GridData(SWT.LEFT, SWT.CENTER, true,
+                false, 3, 1);
         thicknessChooserSpinner.setLayoutData(thicknessChooser_gd);
         thicknessChooserSpinner.setFont(viewFont);
         thicknessChooserSpinner.addSelectionListener(new SelectionListener() {
@@ -2722,9 +2694,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         smallFlagsComposite = new Composite(prefsRootComposite,
                 SWT.SHADOW_ETCHED_IN);
         smallFlagsComposite.setLayout(new GridLayout(5, false));
-        GridData smallFlagsComposite_gd = new GridData(SWT.LEFT, SWT.CENTER,
-                false, false, 4, 6);
-        smallFlagsComposite_gd.widthHint = 175;
+        GridData smallFlagsComposite_gd = new GridData(SWT.LEFT, SWT.TOP, true,
+                true, 4, 10);
         smallFlagsComposite.setLayoutData(smallFlagsComposite_gd);
 
         /*
@@ -2947,8 +2918,6 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                 .get(GlobalColor.LIGHT_YELLOW));
         GridData frameTimeUsingBasisLbl_gd = new GridData(SWT.FILL, SWT.CENTER,
                 true, false, 2, 1);
-        frameTimeUsingBasisLbl_gd.heightHint = 22;
-        frameTimeUsingBasisLbl_gd.widthHint = 150;
         frameTimeUsingBasisLbl.setLayoutData(frameTimeUsingBasisLbl_gd);
 
         primaryRscLbl = new Label(planViewInfoTabComposite, SWT.BORDER);
@@ -2966,8 +2935,6 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         timeMatchResourceLbl.setAlignment(SWT.CENTER);
         GridData timeMatchResourceLbl_gd = new GridData(SWT.FILL, SWT.CENTER,
                 true, false, 2, 1);
-        timeMatchResourceLbl_gd.widthHint = 130;
-        timeMatchResourceLbl_gd.heightHint = 20;
         timeMatchResourceLbl.setLayoutData(timeMatchResourceLbl_gd);
 
         // need to fill some space
@@ -2976,8 +2943,6 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         fillerComposite.setSize(20, 150);
         GridData filler_gd = new GridData(SWT.FILL, SWT.CENTER, true, false, 3,
                 1);
-        filler_gd.widthHint = 150;
-        filler_gd.heightHint = 22;
         fillerComposite.setLayoutData(filler_gd);
 
     }
@@ -3010,8 +2975,6 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                 .get(GlobalColor.LIGHT_YELLOW));
         GridData timeSeriesPointValueLbl_gd = new GridData(SWT.FILL,
                 SWT.CENTER, true, false, 2, 1);
-        timeSeriesPointValueLbl_gd.heightHint = 22;
-        timeSeriesPointValueLbl_gd.widthHint = 150;
         timeSeriesPointValueLbl.setLayoutData(timeSeriesPointValueLbl_gd);
 
         // need to fill some space
@@ -3020,8 +2983,6 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         fillerComposite.setSize(20, 150);
         GridData fillerComposite_gd = new GridData(SWT.FILL, SWT.CENTER, true,
                 false, 3, 1);
-        fillerComposite_gd.widthHint = 150;
-        fillerComposite_gd.heightHint = 22;
         fillerComposite.setLayoutData(fillerComposite_gd);
     }
 
