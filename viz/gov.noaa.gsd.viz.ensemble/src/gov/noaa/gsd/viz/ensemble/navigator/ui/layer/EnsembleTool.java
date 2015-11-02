@@ -176,8 +176,8 @@ public class EnsembleTool extends AbstractTool implements
 
     }
 
+    /* TODO This will be used in the next VLab Issue */
     public void dispose() {
-        EnsembleResourceManager.getInstance().stopSpooler();
     }
 
     /*
@@ -223,7 +223,6 @@ public class EnsembleTool extends AbstractTool implements
         EnsembleToolLayer etl = getActiveToolLayer();
         if (etl == null) {
             createToolLayer(editor);
-            EnsembleResourceManager.getInstance().startSpooler();
         }
         refreshTool(false);
 
@@ -320,7 +319,6 @@ public class EnsembleTool extends AbstractTool implements
                 if (ensembleToolViewer != null) {
                     if (ETLMResourceDataManager.getInstance().isEmpty()) {
                         setViewerWindowState(ViewerWindowState.CLOSE);
-                        EnsembleResourceManager.getInstance().stopSpooler();
                         ensembleToolViewer = null;
                     }
                 }

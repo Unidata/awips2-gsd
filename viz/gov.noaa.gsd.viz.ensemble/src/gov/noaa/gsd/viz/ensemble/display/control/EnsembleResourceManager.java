@@ -6,12 +6,10 @@ import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
@@ -98,15 +96,8 @@ public class EnsembleResourceManager implements IDisposeListener {
         registerIncomingResources = new PollForIncomingResources(
                 "Ensemble Resource Spooler");
         registerIncomingResources.setSystem(true);
-        registerIncomingResources.setPriority(Job.LONG);
+        registerIncomingResources.setPriority(Job.SHORT);
         registerIncomingResources.schedule();
-    }
-
-    public void stopSpooler() {
-        if (registerIncomingResources != null) {
-            registerIncomingResources.cancel();
-        }
-        registerIncomingResources = null;
     }
 
     /*
@@ -114,7 +105,9 @@ public class EnsembleResourceManager implements IDisposeListener {
      * queue.
      */
     protected void addResourceForRegistration(AbstractVizResource<?, ?> rsc) {
+
         incomingSpooler.add(rsc);
+        startSpooler();
     }
 
     /**
@@ -668,35 +661,11 @@ public class EnsembleResourceManager implements IDisposeListener {
         @Override
         protected IStatus run(IProgressMonitor monitor) {
 
-            final List<AbstractVizResource<?, ?>> items = new ArrayList<>();
-            try {
-                items.clear();
-                nextRsc = incomingSpooler.poll(60, TimeUnit.SECONDS);
-                if (!monitor.isCanceled()) {
-                    if (nextRsc != null) {
-                        EnsembleResourceManager.getInstance().registerResource(
-                                nextRsc);
-                    }
-                }
-                if (!monitor.isCanceled() && (!incomingSpooler.isEmpty())) {
-                    incomingSpooler.drainTo(items);
-                    if (!monitor.isCanceled()) {
-                        for (AbstractVizResource<?, ?> r : items) {
-                            if (r != null) {
-                                EnsembleResourceManager.getInstance()
-                                        .registerResource(r);
-                            }
-                        }
-                    }
-                }
-            } catch (InterruptedException e) {
-                /* ignore */
-            }
-
             if (!monitor.isCanceled()) {
-                setPriority(Job.LONG);
-                schedule();
-            } else {
+                nextRsc = incomingSpooler.poll();
+                EnsembleResourceManager.getInstance().registerResource(nextRsc);
+            }
+            if (monitor.isCanceled()) {
                 status = Status.CANCEL_STATUS;
             }
 
