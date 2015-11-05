@@ -97,6 +97,7 @@ import com.raytheon.viz.ui.tools.AbstractTool;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Nov 16, 2014    5056    polster     Initial creation
+ * Oct 30, 2015   12863    polster     clear all data members at close
  * 
  * </pre>
  * 
@@ -109,7 +110,11 @@ public class EnsembleTool extends AbstractTool implements
     private static final transient IUFStatusHandler statusHandler = UFStatus
             .getHandler(EnsembleTool.class);
 
+    private static boolean isToolRunning = false;
+
     private static EnsembleTool SINGLETON = null;
+
+    private static Thread shutdownHook = null;
 
     protected static final int MAX_TOOL_LAYER_COUNT = 5;
 
@@ -155,7 +160,12 @@ public class EnsembleTool extends AbstractTool implements
      * 
      * This ctor creates the ETLMResourceDataManager singleton and also adds a
      * shutdown hook which guarantees that this class is disposed of properly.
+     * 
+     * The entire tool is controlled by the isRunning static flag. Certain
+     * eternally living class instances (IRenderableDisplayCustomizer) should
+     * not interact with this tool when it is not isRunning.
      */
+
     private EnsembleTool() {
 
         ETLMResourceDataManager.getInstance();
@@ -167,17 +177,77 @@ public class EnsembleTool extends AbstractTool implements
                 EnsembleToolDiagnosticStateDialog.DIALOG_WIDTH,
                 EnsembleToolDiagnosticStateDialog.DIALOG_HEIGHT);
 
-        Runtime.getRuntime().addShutdownHook(new Thread() {
+        shutdownHook = new Thread() {
             @Override
             public void run() {
                 dispose();
             }
-        });
+        };
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
 
     }
 
-    /* TODO This will be used in the next VLab Issue */
+    /*
+     * Are they any ensemble tool layers still in existence? Yes then the
+     * ensemble tool is considered running.
+     */
+    public static boolean isToolRunning() {
+        return isToolRunning;
+    }
+
+    /**
+     * Is the ensemble tool layer not in the active editor?
+     */
+    public static boolean isToolNotLoaded() {
+        boolean notLoaded = true;
+
+        AbstractEditor activeEditor = (AbstractEditor) EditorUtil
+                .getActiveEditor();
+
+        IDisplayPane[] displayPanes = activeEditor.getDisplayPanes();
+
+        for (IDisplayPane pane : displayPanes) {
+            IDescriptor desc = pane.getDescriptor();
+            Iterator<ResourcePair> iter = desc.getResourceList().iterator();
+
+            while (iter.hasNext()) {
+                ResourcePair pair = iter.next();
+                AbstractVizResource<?, ?> rsc = pair.getResource();
+                if (rsc instanceof EnsembleToolLayer) {
+                    notLoaded = false;
+                    break;
+                }
+            }
+        }
+
+        return notLoaded;
+    }
+
+    /**
+     * Dispose/shutdown all owned references
+     */
     public void dispose() {
+
+        EnsembleResourceManager.getInstance().dispose();
+
+        theEditorsListener = null;
+        ensembleToolViewer = null;
+        diagnosticsDialog = null;
+        traceMessages = null;
+        toolLayerDataMessages = null;
+        lastKnownShellLocation = null;
+        lastKnownShellSize = null;
+        viewPartRef = null;
+
+        if (shutdownHook != null) {
+            Runtime.getRuntime().removeShutdownHook(shutdownHook);
+            shutdownHook = null;
+        }
+
+        isToolRunning = false;
+        /* next call to getInstance() turns the tool on again */
+        SINGLETON = null;
+
     }
 
     /*
@@ -225,6 +295,8 @@ public class EnsembleTool extends AbstractTool implements
             createToolLayer(editor);
         }
         refreshTool(false);
+
+        isToolRunning = true;
 
         return null;
 
@@ -316,10 +388,14 @@ public class EnsembleTool extends AbstractTool implements
 
                 ETLMResourceDataManager.getInstance().unload(toolLayer);
 
+                /*
+                 * Was this the very last ensemble tool layer? Then clean up and
+                 * shut down this tool.
+                 */
                 if (ensembleToolViewer != null) {
                     if (ETLMResourceDataManager.getInstance().isEmpty()) {
                         setViewerWindowState(ViewerWindowState.CLOSE);
-                        ensembleToolViewer = null;
+                        dispose();
                     }
                 }
             }
@@ -763,7 +839,7 @@ public class EnsembleTool extends AbstractTool implements
      */
     public void refreshView() {
 
-        if (isToolAvailable()) {
+        if (isToolEditable()) {
             ensembleToolViewer.updateInfoTab();
             ensembleToolViewer.refreshInput();
         }
@@ -835,10 +911,6 @@ public class EnsembleTool extends AbstractTool implements
     public void resourceChanged(EnsembleToolLayer etl, ChangeType type,
             Object object) {
 
-        if (!isToolAvailable()) {
-            return;
-        }
-
         if (type == ChangeType.CAPABILITY
                 && object instanceof EditableCapability) {
 
@@ -859,22 +931,6 @@ public class EnsembleTool extends AbstractTool implements
         if (etl != null) {
             etl.setEditable(makeEditable);
         }
-    }
-
-    /*
-     * Is the Ensemble Tool "on"? Is it filtering and trapping incoming
-     * resources? Only if the activeToolLayer is editable.
-     */
-    public boolean isToolEditable() {
-
-        boolean isReady = false;
-        EnsembleToolLayer etl = getActiveToolLayer();
-        if ((etl != null) && (ensembleToolViewer != null)) {
-            if (etl.isEditable()) {
-                isReady = true;
-            }
-        }
-        return isReady;
     }
 
     public boolean isDirty() {
@@ -898,8 +954,8 @@ public class EnsembleTool extends AbstractTool implements
     }
 
     /*
-     * Is the Ensemble Tool "on"? Is it filtering and trapping incoming
-     * resources? Only if the activeToolLayer is editable.
+     * Is the Ensemble Tool "on"? (i.e. is it filtering and trapping incoming
+     * resources). Only if the activeToolLayer is editable.
      */
     public boolean isToolAvailable() {
 
@@ -909,6 +965,22 @@ public class EnsembleTool extends AbstractTool implements
             isAvailable = true;
         }
         return isAvailable;
+    }
+
+    /*
+     * Is the Ensemble Tool "on"? (i.e. is it filtering and trapping incoming
+     * resources). Only if the activeToolLayer is editable.
+     */
+    public boolean isToolEditable() {
+
+        boolean isReady = false;
+        EnsembleToolLayer etl = getActiveToolLayer();
+        if ((etl != null) && (ensembleToolViewer != null)) {
+            if (etl.isEditable()) {
+                isReady = true;
+            }
+        }
+        return isReady;
     }
 
     /*
@@ -924,8 +996,8 @@ public class EnsembleTool extends AbstractTool implements
     }
 
     /*
-     * Is the user preference set to set the active ensemble tool layer to
-     * editable when
+     * Is the user preference set to make the active ensemble tool layer to
+     * editable when the viewer navigator is restored?
      */
     public boolean isMakeEditableOnRestorePreference() {
         boolean i = false;

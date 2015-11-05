@@ -46,6 +46,7 @@ import com.raytheon.viz.ui.perspectives.IRenderableDisplayCustomizer;
  * Date         Ticket#    Engineer          Description
  * ------------ ---------- -----------    --------------------------
  * Dec 9, 2014    5056    epolster jing      Initial creation
+ * Oct 30, 2015   12863    polster        clear all data members at close
  * 
  * </pre>
  * 
@@ -66,6 +67,7 @@ public class EnsembleToolDisplayCustomizer implements
     public void customizeDisplay(IRenderableDisplay display) {
 
         boolean add = true;
+
         for (EnsembleToolRscLoadListener listener : listeners) {
             if (display == listener.getDisplay()) {
                 add = false;
@@ -77,8 +79,16 @@ public class EnsembleToolDisplayCustomizer implements
             listeners.add(new EnsembleToolRscLoadListener(display));
         }
 
-        if (EnsembleTool.getInstance().isToolAvailable()) {
-            EnsembleTool.getInstance().prepareForNewEditor();
+        /*
+         * If the ensemble tool is running, and if the active editor has an
+         * ensemble tool layer in "editable on" state, then let the ensemble
+         * tool know to prepare for a the new editor so it can pull in any
+         * incoming resources into it.
+         */
+        if (EnsembleTool.isToolRunning()) {
+            if (EnsembleTool.getInstance().isToolEditable()) {
+                EnsembleTool.getInstance().prepareForNewEditor();
+            }
         }
     }
 
@@ -127,19 +137,11 @@ public class EnsembleToolDisplayCustomizer implements
          */
         @Override
         public void notifyRemove(ResourcePair rp) throws VizException {
+
             /**
-             * Ignore the resource if not compatible with the ensemble tool
-             * 
+             * The EnsembleResourceManager already listens for a dispose event
+             * on all the resources it owns.
              */
-            if (isCompatibleResource(rp) || isGeneratedResource(rp)) {
-                /**
-                 * Remove it from the resource manager and update GUI.
-                 */
-                // TODO: How do we find the ensemble tool layer for
-                // the sync call?
-                // EnsembleResourceManager.getInstance().syncRegisteredResource(null);
-                EnsembleResourceManager.getInstance().notifyClientListChanged();
-            }
         }
 
         /**
@@ -152,18 +154,25 @@ public class EnsembleToolDisplayCustomizer implements
         public void notifyAdd(ResourcePair rp) throws VizException {
 
             if (EnsembleTool.getInstance().isToolAvailable()) {
-                if ((rp.getResource().hasCapability(EditableCapability.class) == true)
-                        && (!(rp.getResource() instanceof EnsembleToolLayer))) {
-                    EnsembleTool.getInstance().setForeignEditableToolLoading();
-                }
-            }
+                EnsembleToolLayer toolLayer = EnsembleTool.getInstance()
+                        .getActiveToolLayer();
+                if (toolLayer != null && toolLayer.isEditable()) {
 
-            AbstractVizResource<?, ?> rsc = rp.getResource();
-            if ((rsc != null) && (isCompatibleResource(rp))) {
-                rsc.registerListener(this);
-                if (rsc.getStatus() == ResourceStatus.INITIALIZED) {
-                    EnsembleResourceManager.getInstance()
-                            .addResourceForRegistration(rsc);
+                    if ((rp.getResource().hasCapability(
+                            EditableCapability.class) == true)
+                            && (!(rp.getResource() instanceof EnsembleToolLayer))) {
+                        EnsembleTool.getInstance()
+                                .setForeignEditableToolLoading();
+                    }
+
+                    AbstractVizResource<?, ?> rsc = rp.getResource();
+                    if ((rsc != null) && (isCompatibleResource(rp))) {
+                        rsc.registerListener(this);
+                        if (rsc.getStatus() == ResourceStatus.INITIALIZED) {
+                            EnsembleResourceManager.getInstance()
+                                    .addResourceForRegistration(rsc);
+                        }
+                    }
                 }
             }
         }
@@ -185,30 +194,29 @@ public class EnsembleToolDisplayCustomizer implements
 
         private boolean isCompatibleResource(ResourcePair rp) {
 
-            /*
-             * If the ensemble tool is not ready or the ensemble tool layer in
-             * the active editor/display is not editable then all resources that
-             * are loading should be ignored.
-             */
-            if (!EnsembleTool.getInstance().isToolEditable()) {
-                return false;
-            }
-
+            /* ignore the tool layer itself */
             if (rp.getResource() instanceof EnsembleToolLayer) {
                 return false;
             }
 
+            /* ignore the null resources */
             AbstractVizResource<?, ?> resource = rp.getResource();
             if (resource == null) {
                 return false;
             }
 
+            /* ignore the image resources */
             if (resource instanceof D2DGridResource) {
                 D2DGridResource gr = (D2DGridResource) resource;
                 if (gr.getDisplayType() == DisplayType.IMAGE) {
                     return false;
                 }
             }
+
+            /*
+             * If this is not a generated resource, and is a gridded or time
+             * series data then the resource is compatible.
+             */
             if (!isGeneratedResource(rp)
                     && ((resource instanceof GridResource) || (resource instanceof TimeSeriesResource))) {
                 return true;

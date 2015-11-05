@@ -340,8 +340,8 @@ public class GeneratedDataLoader {
     private void searchLoadedResourcesMapEditor() {
         levels.clear();
         units.clear();
-        List<GenericResourceHolder> rscs = EnsembleResourceManager.instance
-                .getResourceList(toolLayer).getUserLoadedRscs();
+        List<GenericResourceHolder> rscs = EnsembleResourceManager
+                .getInstance().getResourceList(toolLayer).getUserLoadedRscs();
 
         // Search levels and units in the current loaded resource
         for (GenericResourceHolder gr : rscs) {
@@ -372,8 +372,8 @@ public class GeneratedDataLoader {
     private void searchLoadedResourcesTimeSeriesEditor() {
         levels.clear();
         units.clear();
-        List<GenericResourceHolder> rscs = EnsembleResourceManager.instance
-                .getResourceList(toolLayer).getUserLoadedRscs();
+        List<GenericResourceHolder> rscs = EnsembleResourceManager
+                .getInstance().getResourceList(toolLayer).getUserLoadedRscs();
 
         // Search levels and units in the current loaded resource
         for (GenericResourceHolder gr : rscs) {

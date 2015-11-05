@@ -6,7 +6,10 @@ import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -53,6 +56,7 @@ import com.raytheon.viz.ui.editor.AbstractEditor;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Feb, 2014      5056       jing     Initial creation
+ * Oct 30, 2015  12863    polster     clear all data members at close
  * 
  * </pre>
  */
@@ -63,6 +67,23 @@ public class EnsembleResourceManager implements IDisposeListener {
     private static final transient IUFStatusHandler statusHandler = UFStatus
             .getHandler(EnsembleResourceManager.class);
 
+    /*
+     * The single instance of this resource manager.
+     */
+    private static EnsembleResourceManager SINGLETON = null;
+
+    /**
+     * Get the resource manager singleton.
+     * 
+     * @return
+     */
+    public static EnsembleResourceManager getInstance() {
+        if (SINGLETON == null) {
+            SINGLETON = new EnsembleResourceManager();
+        }
+        return SINGLETON;
+    }
+
     /**
      * The ensemble marked resource list holds the loaded and generated
      * resources and flags, is used by ensemble display, GUI and calculation.
@@ -70,11 +91,6 @@ public class EnsembleResourceManager implements IDisposeListener {
     private ConcurrentHashMap<EnsembleToolLayer, NavigatorResourceList> ensembleToolResourcesMap;
 
     private ArrayBlockingQueue<AbstractVizResource<?, ?>> incomingSpooler = null;
-
-    /*
-     * The instance of the manager, a singleton.
-     */
-    public static EnsembleResourceManager instance = null;
 
     protected PollForIncomingResources registerIncomingResources = null;
 
@@ -108,18 +124,6 @@ public class EnsembleResourceManager implements IDisposeListener {
 
         incomingSpooler.add(rsc);
         startSpooler();
-    }
-
-    /**
-     * Get the resource manager.
-     * 
-     * @return
-     */
-    public static EnsembleResourceManager getInstance() {
-        if (instance == null) {
-            instance = new EnsembleResourceManager();
-        }
-        return instance;
     }
 
     /**
@@ -180,9 +184,14 @@ public class EnsembleResourceManager implements IDisposeListener {
 
         EnsembleToolLayer toolLayer = EnsembleTool.getInstance()
                 .getActiveToolLayer();
+        if (toolLayer == null) {
+            return;
+        }
 
-        // if this is the first resource ever registered using this editor
-        // then create the resource list and map it to the editor ...
+        /*
+         * is this a previously unknow tool layer? then create the resource list
+         * and map it to the tool layer ...
+         */
         if (ensembleToolResourcesMap.get(toolLayer) == null) {
             ensembleToolResourcesMap.put(toolLayer, new NavigatorResourceList(
                     toolLayer));
@@ -451,7 +460,7 @@ public class EnsembleResourceManager implements IDisposeListener {
      */
     public void checkExistingRegisteredResources(EnsembleToolLayer toolLayer) {
 
-        if (!EnsembleTool.getInstance().isToolAvailable()) {
+        if (!EnsembleTool.getInstance().isToolEditable()) {
             return;
         }
         if (ensembleToolResourcesMap.get(toolLayer) == null) {
@@ -560,16 +569,36 @@ public class EnsembleResourceManager implements IDisposeListener {
     }
 
     /**
-     * post process in this level
-     * 
-     * @param editor
+     * Completely delete all owned resources
      */
-    public void disposal(AbstractEditor editor) {
-        clearResourceList(editor);
-        saveResourceList(editor);
+    public void dispose() {
 
-        // notify client
-        notifyClientListChanged();
+        /*
+         * Clean out the managed resources ... this should be unnecessary as the
+         * ensemble tool layer controls the resource cleanup. But it never hurts
+         * to be a bit over precautious.
+         */
+        Set<Entry<EnsembleToolLayer, NavigatorResourceList>> set = ensembleToolResourcesMap
+                .entrySet();
+        Iterator<Entry<EnsembleToolLayer, NavigatorResourceList>> iterator = set
+                .iterator();
+        Entry<EnsembleToolLayer, NavigatorResourceList> entry = null;
+        while (iterator.hasNext()) {
+            entry = iterator.next();
+            NavigatorResourceList rscList = entry.getValue();
+            rscList.clear();
+        }
+
+        ensembleToolResourcesMap.clear();
+        ensembleToolResourcesMap = null;
+
+        incomingSpooler.clear();
+        incomingSpooler = null;
+
+        visibilityAndColorChangedListeners.clear();
+        visibilityAndColorChangedListeners = null;
+
+        SINGLETON = null;
     }
 
     /**
@@ -578,21 +607,9 @@ public class EnsembleResourceManager implements IDisposeListener {
      */
     protected void notifyClientListChanged() {
 
-        if (EnsembleTool.getInstance().isToolAvailable()) {
+        if (EnsembleTool.getInstance().isToolEditable()) {
             EnsembleTool.getInstance().refreshView();
         }
-    }
-
-    /**
-     * Save the registered resource list into a file
-     * 
-     * @param editor
-     */
-    private void saveResourceList(AbstractEditor editor) {
-        clearResourceList(editor);
-
-        // notify client
-        notifyClientListChanged();
     }
 
     /**
@@ -602,9 +619,6 @@ public class EnsembleResourceManager implements IDisposeListener {
     @Override
     public void disposed(AbstractVizResource<?, ?> rsc) {
 
-        // TODO Find editor for resource ...
-
-        // TODO ResourceManager.getInstance().unregisterResource(rsc);
         notifyClientListChanged();
     }
 

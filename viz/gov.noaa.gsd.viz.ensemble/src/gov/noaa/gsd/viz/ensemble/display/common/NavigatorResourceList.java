@@ -170,8 +170,8 @@ public class NavigatorResourceList {
         }
 
         // Generated resource add on
-        rscs = EnsembleResourceManager.instance.getResourceList(theToolLayer)
-                .getUserGeneratedRscs();
+        rscs = EnsembleResourceManager.getInstance()
+                .getResourceList(theToolLayer).getUserGeneratedRscs();
         for (GenericResourceHolder rsc : rscs) {
             currRscName = rsc.getUniqueName();
             if ((currRscName == null) || (currRscName.length() == 0)) {
@@ -198,8 +198,9 @@ public class NavigatorResourceList {
         EnsembleResourceManager.getInstance().checkExistingRegisteredResources(
                 theToolLayer);
 
-        List<GenericResourceHolder> rscs = EnsembleResourceManager.instance
-                .getResourceList(theToolLayer).getUserLoadedRscs();
+        List<GenericResourceHolder> rscs = EnsembleResourceManager
+                .getInstance().getResourceList(theToolLayer)
+                .getUserLoadedRscs();
 
         String currRscName = null;
 
@@ -224,8 +225,8 @@ public class NavigatorResourceList {
         }
 
         // Generated resource add on
-        rscs = EnsembleResourceManager.instance.getResourceList(theToolLayer)
-                .getUserGeneratedRscs();
+        rscs = EnsembleResourceManager.getInstance()
+                .getResourceList(theToolLayer).getUserGeneratedRscs();
         for (GenericResourceHolder rsc : rscs) {
             currRscName = rsc.getUniqueName();
             if ((currRscName == null) || (currRscName.length() == 0)) {
@@ -243,8 +244,9 @@ public class NavigatorResourceList {
     private List<GenericResourceHolder> findAssociatedMembers(
             String resourceGroupName) {
 
-        List<GenericResourceHolder> rscs = EnsembleResourceManager.instance
-                .getResourceList(theToolLayer).getUserLoadedRscs();
+        List<GenericResourceHolder> rscs = EnsembleResourceManager
+                .getInstance().getResourceList(theToolLayer)
+                .getUserLoadedRscs();
 
         List<GenericResourceHolder> members = new CopyOnWriteArrayList<GenericResourceHolder>();
 

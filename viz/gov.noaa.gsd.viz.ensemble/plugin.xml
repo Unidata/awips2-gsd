@@ -14,7 +14,7 @@
    <extension
          point="org.eclipse.ui.handlers">
       <handler
-            class="gov.noaa.gsd.viz.ensemble.navigator.action.EnsembleToolLayerManagerAction"
+            class="gov.noaa.gsd.viz.ensemble.action.EnsembleToolAction"
             commandId="gov.noaa.gsd.viz.ensemble.activate.layer">
       </handler>
    </extension>

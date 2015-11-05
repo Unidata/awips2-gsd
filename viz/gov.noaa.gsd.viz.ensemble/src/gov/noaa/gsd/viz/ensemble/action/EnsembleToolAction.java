@@ -1,4 +1,4 @@
-package gov.noaa.gsd.viz.ensemble.navigator.action;
+package gov.noaa.gsd.viz.ensemble.action;
 
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 
@@ -23,16 +23,18 @@ import com.raytheon.viz.ui.tools.AbstractTool;
  * @author polster
  * @version 1.0
  */
-public class EnsembleToolLayerManagerAction extends AbstractTool {
+public class EnsembleToolAction extends AbstractTool {
 
-    public EnsembleToolLayerManagerAction() {
+    public EnsembleToolAction() {
 
     }
 
     @Override
     public Object execute(ExecutionEvent event) throws ExecutionException {
 
-        EnsembleTool.getInstance().execute(event);
+        if (EnsembleTool.isToolNotLoaded()) {
+            EnsembleTool.getInstance().execute(event);
+        }
 
         return null;
 
