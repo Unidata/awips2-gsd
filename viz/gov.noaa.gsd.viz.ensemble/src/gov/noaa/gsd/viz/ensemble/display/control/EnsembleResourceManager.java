@@ -169,6 +169,32 @@ public class EnsembleResourceManager implements IDisposeListener {
     }
 
     /**
+     * Given a resource to load, find the EnsembleToolLayer in the same display
+     * in order to be able to associate the incoming resource with the proper
+     * tool layer.
+     */
+    public static EnsembleToolLayer getToolLayer(AbstractVizResource<?, ?> rsc) {
+        EnsembleToolLayer toolLayer = null;
+
+        /* find the ensemble tool layer */
+        ResourceList r = rsc.getDescriptor().getResourceList();
+        List<AbstractVizResource<?, ?>> resources = r
+                .getResourcesByType(EnsembleToolLayer.class);
+
+        AbstractVizResource<?, ?> innerResource = null;
+        try {
+            innerResource = resources.get(0);
+        } catch (IndexOutOfBoundsException e) {
+            innerResource = null;
+        }
+        if (innerResource == null) {
+            return null;
+        }
+        toolLayer = (EnsembleToolLayer) innerResource;
+        return toolLayer;
+    }
+
+    /**
      * Register a loaded model product in ensemble status
      * 
      * @param rsc
@@ -178,12 +204,11 @@ public class EnsembleResourceManager implements IDisposeListener {
      */
     public synchronized void registerResource(AbstractVizResource<?, ?> rsc) {
 
-        if ((rsc == null) || (!EnsembleTool.getInstance().isToolAvailable())) {
+        if (rsc == null) {
             return;
         }
 
-        EnsembleToolLayer toolLayer = EnsembleTool.getInstance()
-                .getActiveToolLayer();
+        EnsembleToolLayer toolLayer = EnsembleResourceManager.getToolLayer(rsc);
         if (toolLayer == null) {
             return;
         }
@@ -287,12 +312,14 @@ public class EnsembleResourceManager implements IDisposeListener {
      */
     public synchronized void registerGenerated(AbstractVizResource<?, ?> rsc) {
 
-        if ((rsc == null) || (!EnsembleTool.getInstance().isToolAvailable())) {
+        if (rsc == null) {
             return;
         }
 
-        EnsembleToolLayer toolLayer = EnsembleTool.getInstance()
-                .getActiveToolLayer();
+        EnsembleToolLayer toolLayer = EnsembleResourceManager.getToolLayer(rsc);
+        if (toolLayer == null) {
+            return;
+        }
 
         // This may be the first resource ever registered using this editor. If
         // so, then create the resource list and associate it with the editor

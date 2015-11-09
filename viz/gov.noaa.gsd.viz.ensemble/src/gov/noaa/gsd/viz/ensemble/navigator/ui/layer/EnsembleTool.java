@@ -954,8 +954,7 @@ public class EnsembleTool extends AbstractTool implements
     }
 
     /*
-     * Is the Ensemble Tool "on"? (i.e. is it filtering and trapping incoming
-     * resources). Only if the activeToolLayer is editable.
+     * Is the Ensemble Tool running but not necessarily editable?
      */
     public boolean isToolAvailable() {
 

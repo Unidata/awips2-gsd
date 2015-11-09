@@ -153,25 +153,21 @@ public class EnsembleToolDisplayCustomizer implements
         @Override
         public void notifyAdd(ResourcePair rp) throws VizException {
 
-            if (EnsembleTool.getInstance().isToolAvailable()) {
-                EnsembleToolLayer toolLayer = EnsembleTool.getInstance()
-                        .getActiveToolLayer();
-                if (toolLayer != null && toolLayer.isEditable()) {
+            EnsembleToolLayer toolLayer = EnsembleResourceManager
+                    .getToolLayer(rp.getResource());
+            if (toolLayer != null && toolLayer.isEditable()) {
 
-                    if ((rp.getResource().hasCapability(
-                            EditableCapability.class) == true)
-                            && (!(rp.getResource() instanceof EnsembleToolLayer))) {
-                        EnsembleTool.getInstance()
-                                .setForeignEditableToolLoading();
-                    }
+                if ((rp.getResource().hasCapability(EditableCapability.class) == true)
+                        && (!(rp.getResource() instanceof EnsembleToolLayer))) {
+                    EnsembleTool.getInstance().setForeignEditableToolLoading();
+                }
 
-                    AbstractVizResource<?, ?> rsc = rp.getResource();
-                    if ((rsc != null) && (isCompatibleResource(rp))) {
-                        rsc.registerListener(this);
-                        if (rsc.getStatus() == ResourceStatus.INITIALIZED) {
-                            EnsembleResourceManager.getInstance()
-                                    .addResourceForRegistration(rsc);
-                        }
+                AbstractVizResource<?, ?> rsc = rp.getResource();
+                if ((rsc != null) && (isCompatibleResource(rp))) {
+                    rsc.registerListener(this);
+                    if (rsc.getStatus() == ResourceStatus.INITIALIZED) {
+                        EnsembleResourceManager.getInstance()
+                                .addResourceForRegistration(rsc);
                     }
                 }
             }
