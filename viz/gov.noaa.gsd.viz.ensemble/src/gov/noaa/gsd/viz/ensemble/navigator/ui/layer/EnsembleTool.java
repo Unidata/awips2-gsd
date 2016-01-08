@@ -6,10 +6,6 @@ import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.control.EnsembleResourceManager;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.EnsembleToolViewer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.ViewerWindowState;
-import gov.noaa.gsd.viz.ensemble.util.Utilities;
-import gov.noaa.gsd.viz.ensemble.util.diagnostic.EnsembleToolDiagnosticStateDialog;
-import gov.noaa.gsd.viz.ensemble.util.diagnostic.EnsembleToolDiagnosticTraceMessage;
-import gov.noaa.gsd.viz.ensemble.util.diagnostic.EnsembleToolLayerDataMessage;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,7 +16,6 @@ import java.util.Map;
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
 import org.eclipse.jface.dialogs.MessageDialog;
-import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.ISaveablePart2;
 import org.eclipse.ui.IViewPart;
@@ -53,7 +48,6 @@ import com.raytheon.uf.viz.d2d.ui.map.SideView;
 import com.raytheon.uf.viz.xy.timeseries.TimeSeriesEditor;
 import com.raytheon.uf.viz.xy.timeseries.display.TimeSeriesDescriptor;
 import com.raytheon.viz.ui.EditorUtil;
-import com.raytheon.viz.ui.UiUtil;
 import com.raytheon.viz.ui.editor.AbstractEditor;
 import com.raytheon.viz.ui.editor.IMultiPaneEditor;
 import com.raytheon.viz.ui.editor.VizMultiPaneEditor;
@@ -124,23 +118,6 @@ public class EnsembleTool extends AbstractTool implements
 
     private boolean foreignEditableToolLoading = false;
 
-    /*
-     * Diagnostics display and content
-     */
-    private EnsembleToolDiagnosticStateDialog diagnosticsDialog = null;
-
-    private List<EnsembleToolDiagnosticTraceMessage> traceMessages = null;
-
-    private List<EnsembleToolLayerDataMessage> toolLayerDataMessages = null;
-
-    private static int DiagnosticCount = 0;
-
-    private boolean showDiagnostic = false;
-
-    private Point lastKnownShellLocation = null;
-
-    private Point lastKnownShellSize = null;
-
     private EnsembleEditorPartListener theEditorsListener = null;
 
     /*
@@ -169,13 +146,6 @@ public class EnsembleTool extends AbstractTool implements
     private EnsembleTool() {
 
         ETLMResourceDataManager.getInstance();
-
-        traceMessages = new ArrayList<>();
-
-        lastKnownShellLocation = new Point(25, 25);
-        lastKnownShellSize = new Point(
-                EnsembleToolDiagnosticStateDialog.DIALOG_WIDTH,
-                EnsembleToolDiagnosticStateDialog.DIALOG_HEIGHT);
 
         shutdownHook = new Thread() {
             @Override
@@ -232,11 +202,6 @@ public class EnsembleTool extends AbstractTool implements
 
         theEditorsListener = null;
         ensembleToolViewer = null;
-        diagnosticsDialog = null;
-        traceMessages = null;
-        toolLayerDataMessages = null;
-        lastKnownShellLocation = null;
-        lastKnownShellSize = null;
         viewPartRef = null;
 
         if (shutdownHook != null) {
@@ -1082,92 +1047,6 @@ public class EnsembleTool extends AbstractTool implements
     }
 
     /*
-     * Diagnostic tool/behavior - Start
-     */
-
-    public void toggleDiagnosticDialog() {
-
-        showDiagnostic = !showDiagnostic;
-
-        if (showDiagnostic == true) {
-            diagnosticsDialog = new EnsembleToolDiagnosticStateDialog(UiUtil
-                    .getCurrentWindow().getShell());
-            diagnosticsDialog.open();
-        } else {
-            if (diagnosticsDialog != null) {
-                diagnosticsDialog.close();
-                diagnosticsDialog = null;
-            }
-        }
-    }
-
-    public void diagnosticTrace(String action) {
-        EnsembleToolDiagnosticTraceMessage msg = null;
-        msg = new EnsembleToolDiagnosticTraceMessage(
-                Integer.toString(DiagnosticCount++), action);
-        traceMessages.add(msg);
-        if (diagnosticsDialog != null) {
-            diagnosticsDialog.setTraceMessages(traceMessages);
-        }
-    }
-
-    public void diagnosticTrace(String action, String toolLayer,
-            boolean isEditable, String editor, String activeEditor,
-            String method) {
-        EnsembleToolDiagnosticTraceMessage msg = null;
-        msg = new EnsembleToolDiagnosticTraceMessage(
-                Integer.toString(DiagnosticCount++), action, toolLayer,
-                isEditable, editor, activeEditor, method);
-        traceMessages.add(msg);
-        if (diagnosticsDialog != null) {
-            diagnosticsDialog.setTraceMessages(traceMessages);
-        }
-    }
-
-    protected void diagnosticToolLayerDataRefresh() {
-        if (diagnosticsDialog != null) {
-            diagnosticsDialog
-                    .setToolLayerDataMessages(getDiagnosticToolLayerDataMessages());
-        }
-
-    }
-
-    public void resetDiagnosticToggle() {
-        showDiagnostic = false;
-    }
-
-    public List<EnsembleToolDiagnosticTraceMessage> getDiagnosticTraceMessages() {
-        return traceMessages;
-    }
-
-    public List<EnsembleToolLayerDataMessage> getDiagnosticToolLayerDataMessages() {
-        toolLayerDataMessages = null;
-        toolLayerDataMessages = ETLMResourceDataManager.getInstance()
-                .getDiagnosticToolLayerDataMessages();
-        return toolLayerDataMessages;
-    }
-
-    public Point getLastKnownShellLocation() {
-        return lastKnownShellLocation;
-    }
-
-    public void setLastKnownShellLocation(Point previousShellLocation) {
-        lastKnownShellLocation = previousShellLocation;
-    }
-
-    public Point getLastKnownShellSize() {
-        return lastKnownShellSize;
-    }
-
-    public void setLastKnownShellSize(Point size) {
-        lastKnownShellSize = size;
-    }
-
-    /*
-     * Diagnostic tool/behavior - End
-     */
-
-    /*
      * The resource data manager keeps track of the associated components of a
      * given tool layer including whether the tool layer is in use, the owning
      * editor, and the editor part listener. These components are stored in
@@ -1313,19 +1192,6 @@ public class EnsembleTool extends AbstractTool implements
 
             return tool;
 
-        }
-
-        public ArrayList<EnsembleToolLayerDataMessage> getDiagnosticToolLayerDataMessages() {
-            EnsembleToolLayerDataMessage msg = null;
-            ArrayList<EnsembleToolLayerDataMessage> msgs = new ArrayList<>();
-            for (ETLMResourceData rd : toolLayerMetaData) {
-                msg = new EnsembleToolLayerDataMessage(
-                        Utilities.getReference(rd.workbenchPart),
-                        rd.toolLayer.getInnerName(),
-                        Utilities.getReference(null));
-                msgs.add(msg);
-            }
-            return msgs;
         }
 
         private class ETLMResourceData {
