@@ -1,9 +1,5 @@
-package gov.noaa.gsd.viz.ensemble.display.control;
+package gov.noaa.gsd.viz.ensemble.control;
 
-import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResource;
-import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
-import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResource;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
 import java.util.ArrayList;
@@ -17,15 +13,11 @@ import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource.ResourceStatus;
-import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.uf.viz.core.rsc.IInitListener;
 import com.raytheon.uf.viz.core.rsc.ResourceList;
 import com.raytheon.uf.viz.core.rsc.ResourceList.AddListener;
 import com.raytheon.uf.viz.core.rsc.ResourceList.RemoveListener;
 import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
-import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
-import com.raytheon.viz.grid.rsc.general.D2DGridResource;
-import com.raytheon.viz.grid.rsc.general.GridResource;
 import com.raytheon.viz.ui.perspectives.IRenderableDisplayCustomizer;
 
 /**
@@ -46,7 +38,6 @@ import com.raytheon.viz.ui.perspectives.IRenderableDisplayCustomizer;
  * Date         Ticket#    Engineer          Description
  * ------------ ---------- -----------    --------------------------
  * Dec 9, 2014    5056    epolster jing      Initial creation
- * Oct 30, 2015   12863    polster        clear all data members at close
  * 
  * </pre>
  * 
@@ -163,7 +154,16 @@ public class EnsembleToolDisplayCustomizer implements
                 }
 
                 AbstractVizResource<?, ?> rsc = rp.getResource();
-                if ((rsc != null) && (isCompatibleResource(rp))) {
+                if ((rsc != null) && (toolLayer.isResourceCompatible(rp))) {
+
+                    /**
+                     * TODO: This needs to be controlled/vetted by the tool
+                     * layer
+                     */
+                    if (toolLayer.getToolMode() == EnsembleTool.EnsembleToolMode.MATRIX) {
+                        rsc.getProperties().setVisible(false);
+                    }
+
                     rsc.registerListener(this);
                     if (rsc.getStatus() == ResourceStatus.INITIALIZED) {
                         EnsembleResourceManager.getInstance()
@@ -186,54 +186,6 @@ public class EnsembleToolDisplayCustomizer implements
                 EnsembleResourceManager.getInstance()
                         .addResourceForRegistration(rsc);
             }
-        }
-
-        private boolean isCompatibleResource(ResourcePair rp) {
-
-            /* ignore the tool layer itself */
-            if (rp.getResource() instanceof EnsembleToolLayer) {
-                return false;
-            }
-
-            /* ignore the null resources */
-            AbstractVizResource<?, ?> resource = rp.getResource();
-            if (resource == null) {
-                return false;
-            }
-
-            /* ignore the image resources */
-            if (resource instanceof D2DGridResource) {
-                D2DGridResource gr = (D2DGridResource) resource;
-                if (gr.getDisplayType() == DisplayType.IMAGE) {
-                    return false;
-                }
-            }
-
-            /*
-             * If this is not a generated resource, and is a gridded or time
-             * series data then the resource is compatible.
-             */
-            if (!isGeneratedResource(rp)
-                    && ((resource instanceof GridResource) || (resource instanceof TimeSeriesResource))) {
-                return true;
-            }
-            return false;
-        }
-
-        /**
-         * Check if the resource is interested by the ensemble tool.
-         * 
-         * @param rp
-         * @return
-         */
-        private boolean isGeneratedResource(ResourcePair rp) {
-            if (rp.getResource() instanceof HistogramResource
-                    || rp.getResource() instanceof GeneratedEnsembleGridResource
-                    || rp.getResource() instanceof GeneratedTimeSeriesResource) {
-                return true;
-            }
-
-            return false;
         }
 
         /**

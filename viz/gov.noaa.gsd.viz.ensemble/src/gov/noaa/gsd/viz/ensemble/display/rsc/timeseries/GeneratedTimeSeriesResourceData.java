@@ -1,8 +1,8 @@
 package gov.noaa.gsd.viz.ensemble.display.rsc.timeseries;
 
+import gov.noaa.gsd.viz.ensemble.control.EnsembleResourceManager;
 import gov.noaa.gsd.viz.ensemble.display.calculate.EnsembleCalculator;
-import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
-import gov.noaa.gsd.viz.ensemble.display.control.EnsembleResourceManager;
+import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
 import java.util.ArrayList;
@@ -47,7 +47,7 @@ import com.raytheon.viz.core.graphing.xy.XYDataList;
 public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData
         implements IInitListener {
 
-    private Map<String, List<GenericResourceHolder>> dataHolders = new ConcurrentHashMap<String, List<GenericResourceHolder>>();
+    private Map<String, List<AbstractResourceHolder>> dataHolders = new ConcurrentHashMap<String, List<AbstractResourceHolder>>();
 
     /**
      * Calculate loaded ensemble data to generate new data, such as mean.
@@ -265,7 +265,7 @@ public class GeneratedTimeSeriesResourceData extends TimeSeriesResourceData
         Set<String> keys = dataHolders.keySet();
         List<TimeSeriesResource> members = new ArrayList<TimeSeriesResource>();
         for (String key : keys) {
-            List<GenericResourceHolder> rcsList = dataHolders.get(key);
+            List<AbstractResourceHolder> rcsList = dataHolders.get(key);
             if (rcsList == null || rcsList.size() == 0) {
                 continue;
             }

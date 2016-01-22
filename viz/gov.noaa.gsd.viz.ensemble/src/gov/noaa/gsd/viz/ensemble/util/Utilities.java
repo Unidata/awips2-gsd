@@ -1,6 +1,10 @@
 package gov.noaa.gsd.viz.ensemble.util;
 
+import java.io.PrintStream;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.RGB;
@@ -185,4 +189,57 @@ public class Utilities {
         es = es.toUpperCase();
         return es;
     }
+
+    /* TODO: diagnostic only: uses standard-out file descriptor */
+    public static void dumpMap(PrintStream out, Map<String, String> map,
+            String keyDescr, String valueDescr) {
+
+        String variable = null;
+        String value = null;
+
+        out.println("");
+        out.println("----------------------------------------------------------");
+        Set<String> keySet = map.keySet();
+        Iterator<String> variablesIter = keySet.iterator();
+        while (variablesIter.hasNext()) {
+            variable = variablesIter.next();
+            value = map.get(variable);
+            out.println(">>>>>>>>> " + keyDescr + " " + variable + " "
+                    + valueDescr + ": " + value);
+        }
+        out.println("----------------------------------------------------------");
+        out.println("");
+
+    }
+
+    public static String bytesIntoHumanReadable(long bytes) {
+        final float kilobyte = 1024.0f;
+        final float megabyte = kilobyte * 1024.0f;
+        final float gigabyte = megabyte * 1024.0f;
+        final float terabyte = gigabyte * 1024.0f;
+        String result = null;
+        if ((bytes >= 0) && (bytes < kilobyte)) {
+            result = String.format("%.1f %s", Float.valueOf(bytes), "B");
+
+        } else if ((bytes >= kilobyte) && (bytes < megabyte)) {
+            result = String.format("%.1f %s",
+                    Float.valueOf(((float) bytes / kilobyte)), "KB");
+
+        } else if ((bytes >= megabyte) && (bytes < gigabyte)) {
+            result = String.format("%.1f %s",
+                    Float.valueOf(((float) bytes / megabyte)), "MB");
+
+        } else if ((bytes >= gigabyte) && (bytes < terabyte)) {
+            result = String.format("%.1f %s",
+                    Float.valueOf(((float) bytes / gigabyte)), "GB");
+
+        } else if (bytes >= terabyte) {
+            result = String.format("%.1f %s",
+                    Float.valueOf(((float) bytes / terabyte)), "TB");
+        } else {
+            return bytes + " Bytes";
+        }
+        return result;
+    }
+
 }

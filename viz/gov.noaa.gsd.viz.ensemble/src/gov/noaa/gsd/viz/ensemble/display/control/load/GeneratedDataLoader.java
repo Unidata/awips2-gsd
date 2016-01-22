@@ -1,10 +1,10 @@
 package gov.noaa.gsd.viz.ensemble.display.control.load;
 
+import gov.noaa.gsd.viz.ensemble.control.EnsembleResourceManager;
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
 import gov.noaa.gsd.viz.ensemble.display.calculate.EnsembleCalculator;
-import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.TimeSeriesResourceHolder;
-import gov.noaa.gsd.viz.ensemble.display.control.EnsembleResourceManager;
 import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResourceData;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResourceData;
@@ -50,6 +50,7 @@ import com.raytheon.viz.ui.editor.AbstractEditor;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Jan 2014        5056      jing    Initial creation
+ * Jan 15 2016     12301     jing    Added distribution feature
  * 
  * </pre>
  */
@@ -115,7 +116,7 @@ public class GeneratedDataLoader {
                          * 
                          **/
                         // Same level and unit case
-                        Map<String, List<GenericResourceHolder>> dataHolders = new ConcurrentHashMap<String, List<GenericResourceHolder>>();
+                        Map<String, List<AbstractResourceHolder>> dataHolders = new ConcurrentHashMap<>();
                         try {
                             dataHolders = EnsembleResourceManager
                                     .getInstance()
@@ -126,6 +127,7 @@ public class GeneratedDataLoader {
                         } catch (VizException e) {
                             statusHandler.handle(Priority.PROBLEM,
                                     e.getLocalizedMessage(), e);
+                            continue;
                         }
                         if (!dataHolders.isEmpty()) {
                             LoadGeneratedResourceToMapEditorJob ccj = new LoadGeneratedResourceToMapEditorJob(
@@ -229,7 +231,7 @@ public class GeneratedDataLoader {
                          * 
                          **/
                         // Same level and unit case
-                        Map<String, List<GenericResourceHolder>> dataHolders = new ConcurrentHashMap<String, List<GenericResourceHolder>>();
+                        Map<String, List<AbstractResourceHolder>> dataHolders = new ConcurrentHashMap<>();
                         try {
                             dataHolders = EnsembleResourceManager
                                     .getInstance()
@@ -240,6 +242,7 @@ public class GeneratedDataLoader {
                         } catch (VizException e) {
                             statusHandler.handle(Priority.PROBLEM,
                                     e.getLocalizedMessage(), e);
+                            continue;
                         }
                         if (!dataHolders.isEmpty()) {
                             LoadOverlayJob ccj = new LoadOverlayJob(
@@ -338,16 +341,25 @@ public class GeneratedDataLoader {
      * resource(s)
      */
     private void searchLoadedResourcesMapEditor() {
-        levels.clear();
         units.clear();
-        List<GenericResourceHolder> rscs = EnsembleResourceManager
+        levels.clear();
+
+        if (EnsembleResourceManager.getInstance().getResourceList(toolLayer) == null) {
+            return;
+        }
+
+        List<AbstractResourceHolder> rscs = EnsembleResourceManager
                 .getInstance().getResourceList(toolLayer).getUserLoadedRscs();
 
+        if (rscs == null || rscs.isEmpty()) {
+            return;
+        }
+
         // Search levels and units in the current loaded resource
-        for (GenericResourceHolder gr : rscs) {
+        for (AbstractResourceHolder gr : rscs) {
 
             // TODO: How about resource with other descriptors?
-            if (gr.getUniqueName() == null || gr.getUniqueName().equals(""))
+            if (gr.getSpecificName() == null || gr.getSpecificName().equals(""))
                 continue;
 
             // levels.add(..)
@@ -366,17 +378,24 @@ public class GeneratedDataLoader {
 
     /**
      * Search the levels and units in the loaded resources
-     * 
-     * @param editor
      */
     private void searchLoadedResourcesTimeSeriesEditor() {
         levels.clear();
         units.clear();
-        List<GenericResourceHolder> rscs = EnsembleResourceManager
+
+        if (EnsembleResourceManager.getInstance().getResourceList(toolLayer) == null) {
+            return;
+        }
+
+        List<AbstractResourceHolder> rscs = EnsembleResourceManager
                 .getInstance().getResourceList(toolLayer).getUserLoadedRscs();
 
+        if (rscs == null || rscs.isEmpty()) {
+            return;
+        }
+
         // Search levels and units in the current loaded resource
-        for (GenericResourceHolder gr : rscs) {
+        for (AbstractResourceHolder gr : rscs) {
 
             if (gr instanceof TimeSeriesResourceHolder) {
 
@@ -463,8 +482,26 @@ public class GeneratedDataLoader {
                             e.getLocalizedMessage(), e);
                 }
 
-            }
+            } else if (overlay == Calculation.HISTOGRAM_GRAPHICS) {
+                // how to pass the level and unit into the
+                // HistogramResource
+                HistogramResourceData resourceData = new HistogramResourceData(
+                        toolLayer, level, unit,
+                        HistogramResource.DisplayMode.GRAPHIC_HISTGRAM);
 
+                LoadProperties loadProperties = new LoadProperties();
+
+                try {
+                    resourceData
+                            .construct(loadProperties, toolLayer.getEditor()
+                                    .getActiveDisplayPane().getDescriptor());
+                    status = Status.OK_STATUS;
+                } catch (VizException e) {
+                    statusHandler.handle(Priority.PROBLEM,
+                            e.getLocalizedMessage(), e);
+                }
+
+            }
             toolLayer.getEditor().refresh();
 
             return status;

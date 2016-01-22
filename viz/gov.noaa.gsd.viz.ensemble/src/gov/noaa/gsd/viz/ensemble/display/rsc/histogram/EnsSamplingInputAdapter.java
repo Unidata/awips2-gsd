@@ -19,6 +19,8 @@
  **/
 package gov.noaa.gsd.viz.ensemble.display.rsc.histogram;
 
+import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource.DisplayMode;
+
 import org.eclipse.swt.widgets.Event;
 
 import com.raytheon.uf.common.geospatial.ReferencedCoordinate;
@@ -40,6 +42,7 @@ import com.vividsolutions.jts.geom.Coordinate;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * July, 2014      5056     jing       Initial creation
+ * January 12, 2016 12301   jing       Added  click-move-click sampling
  * </pre>
  * @param <T>
  */
@@ -48,12 +51,28 @@ public class EnsSamplingInputAdapter<T extends EnsSamplingResource> extends
 
     private T resource;
 
+    /**
+     * The flag implement 'click-move-click' sampling for distribution view. If
+     * it is true, do distribution sampling. mouse-left click , sets the flag
+     * isGraphicsSample to true (starts sampling), move the mouse to continue
+     * sampling, and mouse-left click again, to stop sampling.
+     * 
+     */
+    private boolean isGraphicsSample = false;
+
     public EnsSamplingInputAdapter(T resource) {
         this.resource = resource;
     }
 
     @Override
     public boolean handleMouseMove(int x, int y) {
+        /** Do nothing in graphics histogram case if isGraphicsSample is false */
+        if (((HistogramResource<?>) resource).getMode() == DisplayMode.GRAPHIC_HISTGRAM
+                && !isGraphicsSample) {
+            return false;
+        }
+
+        /** Sample for all other case */
         IDisplayPaneContainer container = resource.getResourceContainer();
         Coordinate c = container.translateClick(x, y);
         if (c != null) {
@@ -70,6 +89,30 @@ public class EnsSamplingInputAdapter<T extends EnsSamplingResource> extends
     @Override
     public boolean handleMouseDownMove(int x, int y, int mouseButton) {
         return handleMouseMove(x, y);
+    }
+
+    @Override
+    public boolean handleMouseUp(int x, int y, int mouseButton) {
+
+        /** Only allow sampling if the graphics histogram is turned off. */
+        if (((HistogramResource<?>) resource).getMode() != DisplayMode.GRAPHIC_HISTGRAM) {
+            return handleMouseMove(x, y);
+        }
+        IDisplayPaneContainer container = resource.getResourceContainer();
+        Coordinate c = container.translateClick(x, y);
+        if (c != null) {
+            resource.sampleCoord = new ReferencedCoordinate(c);
+        } else {
+            resource.sampleCoord = null;
+        }
+        if (resource.isSampling()) {
+            resource.issueRefresh();
+        }
+
+        /** toggle the flag value for graphics histogram mode */
+        isGraphicsSample = !isGraphicsSample;
+        return false;
+
     }
 
     public boolean handleMouseExit(Event event) {

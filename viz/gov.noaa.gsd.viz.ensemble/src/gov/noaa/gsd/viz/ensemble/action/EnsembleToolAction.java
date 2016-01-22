@@ -1,6 +1,6 @@
 package gov.noaa.gsd.viz.ensemble.action;
 
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
 
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
@@ -8,7 +8,8 @@ import org.eclipse.core.commands.ExecutionException;
 import com.raytheon.viz.ui.tools.AbstractTool;
 
 /**
- * This is how you start the Ensemble Tool.
+ * This is how you start the Ensemble Tool. Only allow the Ensemble Tool to be
+ * started if it is not already started.
  * 
  * <pre>
  * 
@@ -32,10 +33,13 @@ public class EnsembleToolAction extends AbstractTool {
     @Override
     public Object execute(ExecutionEvent event) throws ExecutionException {
 
+        /*
+         * Only execute the action if an ensemble tool layer is not already in
+         * the active editor
+         */
         if (EnsembleTool.isToolNotLoaded()) {
             EnsembleTool.getInstance().execute(event);
         }
-
         return null;
 
     }

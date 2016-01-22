@@ -1,9 +1,9 @@
-package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer;
+package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.legend;
 
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
 import gov.noaa.gsd.viz.ensemble.display.calculate.Range;
 import gov.noaa.gsd.viz.ensemble.display.calculate.RangeType;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.util.GlobalColor;
 import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
 
@@ -37,7 +37,7 @@ import com.raytheon.viz.ui.dialogs.CaveJFACEDialog;
  * 
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
- * Jun 4, 2015               polster     Initial creation
+ * Jun 4, 2015   6863      polster     Initial creation
  * 
  * </pre>
  * 

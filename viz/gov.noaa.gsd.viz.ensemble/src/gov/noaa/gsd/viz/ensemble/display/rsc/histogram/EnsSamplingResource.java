@@ -19,7 +19,7 @@
  **/
 package gov.noaa.gsd.viz.ensemble.display.rsc.histogram;
 
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
 
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;

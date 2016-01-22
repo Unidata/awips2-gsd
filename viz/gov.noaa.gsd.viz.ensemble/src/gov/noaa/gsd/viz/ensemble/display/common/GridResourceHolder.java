@@ -28,7 +28,7 @@ import com.raytheon.viz.grid.rsc.GridNameGenerator.LegendParameters;
  * @author jing
  * @version 1.0
  */
-public class GridResourceHolder extends GenericResourceHolder {
+public class GridResourceHolder extends AbstractResourceHolder {
 
     GridNameGenerator.IGridNameResource currRsc = null;
 
@@ -78,7 +78,7 @@ public class GridResourceHolder extends GenericResourceHolder {
         String datatime;
         if ((currRsc.getLegendParameters() == null)
                 || (currRsc.getLegendParameters().dataTime == null)) {
-            datatime = "<datatime missing>";
+            datatime = "<not loaded>";
         } else {
             LegendParameters legendParams = ((IGridNameResource) rsc)
                     .getLegendParameters();
@@ -150,7 +150,7 @@ public class GridResourceHolder extends GenericResourceHolder {
         return sb;
     }
 
-    public String getUniqueName() {
+    public String getSpecificName() {
 
         String sb = String
                 .format("%s %s %s %s %s",
@@ -184,13 +184,13 @@ public class GridResourceHolder extends GenericResourceHolder {
     }
 
     @Override
-    public int hashCode() {
-        return getUniqueName().hashCode();
+    public boolean requiresLoadCheck() {
+        return true;
     }
 
     @Override
-    public boolean requiresLoadCheck() {
-        return true;
+    public String getGeneralName() {
+        return getSpecificName();
     }
 
 }

@@ -1,5 +1,7 @@
 package gov.noaa.gsd.viz.ensemble.navigator.ui.layer;
 
+import gov.noaa.gsd.viz.ensemble.control.EnsembleResourceManager;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.display.calculate.AvgM1StddevCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.AvgP1StddevCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
@@ -13,18 +15,23 @@ import gov.noaa.gsd.viz.ensemble.display.calculate.Range;
 import gov.noaa.gsd.viz.ensemble.display.calculate.RangeCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.StddevCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.SumCalculator;
-import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
-import gov.noaa.gsd.viz.ensemble.display.common.NavigatorResourceList;
-import gov.noaa.gsd.viz.ensemble.display.control.EnsembleResourceManager;
+import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.control.load.GeneratedDataLoader;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.ViewerWindowState;
+import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResource;
+import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
+import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResource;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.FieldPlanePair;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.ModelSources;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.VizMatrixEditor;
+import gov.noaa.gsd.viz.ensemble.util.RequestableResourceMetadata;
+import gov.noaa.gsd.viz.ensemble.util.ViewerWindowState;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
@@ -33,6 +40,7 @@ import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jface.viewers.TreePath;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.ui.IEditorPart;
+import org.eclipse.ui.IEditorReference;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PlatformUI;
 
@@ -50,8 +58,10 @@ import com.raytheon.uf.viz.core.drawables.PaintProperties;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.rsc.AbstractNameGenerator;
+import com.raytheon.uf.viz.core.rsc.AbstractRequestableResourceData;
 import com.raytheon.uf.viz.core.rsc.AbstractResourceData;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.uf.viz.core.rsc.IInitListener;
 import com.raytheon.uf.viz.core.rsc.IInputHandler;
 import com.raytheon.uf.viz.core.rsc.IRefreshListener;
@@ -62,7 +72,11 @@ import com.raytheon.uf.viz.core.rsc.ResourceList;
 import com.raytheon.uf.viz.core.rsc.ResourceProperties;
 import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
 import com.raytheon.uf.viz.core.rsc.tools.GenericToolsResourceData;
+import com.raytheon.uf.viz.xy.timeseries.TimeSeriesEditor;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
+import com.raytheon.viz.core.rsc.BestResResource;
+import com.raytheon.viz.grid.rsc.general.D2DGridResource;
+import com.raytheon.viz.grid.rsc.general.GridResource;
 import com.raytheon.viz.ui.input.EditableManager;
 import com.vividsolutions.jts.geom.Coordinate;
 
@@ -79,13 +93,27 @@ import com.vividsolutions.jts.geom.Coordinate;
  * editor that has an EnsembleToolLayer that is "editable", the manager will
  * become active again.
  * 
+ * This class is constructed to be associated with either the Matrix or Legends
+ * mode of the Ensemble Tool. (TODO: The better way of doing this would be to
+ * make this EnsembleToolLayer class, instead, abstract, and derive both a
+ * LegendsBrowserToolLayer and MatrixNavigatorToolLayer from this class. We
+ * chose against this direction, for now, because creating different flavors of
+ * base class from the AbstractResourceData's construct method seemed not easily
+ * do-able.)
+ * 
+ * This class is either a legend-browser mode tool layer, or a matrix-navigator
+ * mode tool layer. The method <code>isResourceCompatible</code> defines what
+ * types of resources the tool mode accepts.
+ * 
  * <pre>
  * 
  * SOFTWARE HISTORY
  * 
- * Date         Ticket#    Engineer    Description
+ * Date         Ticket#      Engineer   Description
  * ------------ ---------- ----------- --------------------------
- * Nov 16, 2014    5056    polster     Initial creation
+ * Nov 16, 2014    5056      polster    Initial creation
+ * Nov 13, 2015   13211      polster    Changes in support of Matrix vs Legend
+ * Jan 15, 2016   12301      jing       Added distribution feature
  * 
  * </pre>
  * 
@@ -120,32 +148,123 @@ public class EnsembleToolLayer extends
 
     private TreePath[] expandedTreePaths = new TreePath[0];
 
-    private Map<String, List<GenericResourceHolder>> ensemblesTree = null;
+    private Map<String, List<AbstractResourceHolder>> ensemblesTree = null;
 
     private List<IToolLayerChanged> changeListeners = null;
+
+    private EnsembleTool.EnsembleToolMode toolMode = EnsembleTool.EnsembleToolMode.LEGENDS_PLAN_VIEW;
 
     public EnsembleToolLayer(
             GenericToolsResourceData<EnsembleToolLayer> resourceData,
             LoadProperties loadProperties) {
         super(resourceData, loadProperties);
+        ensemblesTree = new ConcurrentHashMap<>();
         registerListener((IInitListener) this);
 
         changeListeners = new ArrayList<IToolLayerChanged>();
 
     }
 
-    synchronized public Map<String, List<GenericResourceHolder>> getEnsembleResources() {
+    public EnsembleTool.EnsembleToolMode getToolMode() {
+        return toolMode;
+    }
+
+    public void setToolMode(EnsembleTool.EnsembleToolMode toolMode) {
+        this.toolMode = toolMode;
+    }
+
+    public boolean isEmpty() {
+        boolean isEmpty = false;
+        if (EnsembleResourceManager.getInstance().isEmpty(this)) {
+            isEmpty = true;
+        }
+        return isEmpty;
+    }
+
+    synchronized public Map<String, List<AbstractResourceHolder>> getEnsembleResources() {
 
         if (EnsembleResourceManager.getInstance().getResourceList(this) != null) {
             ensemblesTree = EnsembleResourceManager.getInstance()
                     .getResourceList(this).getAllRscsAsMap(ensemblesTree);
         } else {
             if (ensemblesTree == null) {
-                ensemblesTree = new HashMap<String, List<GenericResourceHolder>>();
+                ensemblesTree = new ConcurrentHashMap<String, List<AbstractResourceHolder>>();
             }
         }
 
         return ensemblesTree;
+    }
+
+    /**
+     * Is the tool layer is supposed to keep track of the resource inside this
+     * resource pair?
+     * 
+     * TODO: This method contains selection based on the state of the tool layer
+     * mode (Legend vs Matrix). The better way of doing this would be to make
+     * the EnsembleToolLayer class abstract, and derive both a
+     * LegendsBrowserToolLayer and MatrixNavigatorToolLayer from this class. We
+     * chose against this direction (for now) because creating different flavors
+     * of base class from the AbstractResourceData's construct method seemed not
+     * easily do-able.
+     */
+    public boolean isResourceCompatible(ResourcePair rp) {
+        boolean isCompatible = false;
+
+        /* ignore null resource pair and the tool layer itself */
+        if (rp == null || rp.getResource() instanceof EnsembleToolLayer) {
+            isCompatible = false;
+        } else {
+            /* ignore a null resource */
+            AbstractVizResource<?, ?> resource = rp.getResource();
+            if (resource == null) {
+                isCompatible = false;
+            } else {
+                if (toolMode == EnsembleTool.EnsembleToolMode.LEGENDS_PLAN_VIEW
+                        || toolMode == EnsembleTool.EnsembleToolMode.LEGENDS_TIME_SERIES) {
+
+                    /* ignore the image resources in legend mode */
+                    if (resource instanceof D2DGridResource) {
+                        D2DGridResource gr = (D2DGridResource) resource;
+                        if (gr.getDisplayType() == DisplayType.IMAGE) {
+                            isCompatible = false;
+                        }
+                    }
+
+                    /*
+                     * Ignore an ensemble-tool generated resource.
+                     * 
+                     * Otherwise, if resource is gridded or time series data
+                     * then the resource is compatible.
+                     */
+                    if (!isGeneratedResource(rp)
+                            && ((resource instanceof GridResource) || (resource instanceof TimeSeriesResource))) {
+                        isCompatible = true;
+                    }
+
+                } else if (toolMode == EnsembleTool.EnsembleToolMode.MATRIX) {
+                    // if (resource instanceof GridResource
+                    // || resource instanceof BestResResource) {
+                    isCompatible = true;
+                    // }
+                }
+            }
+        }
+
+        return isCompatible;
+
+    }
+
+    /**
+     * Is this an ensemble tool generated resource?
+     */
+    private boolean isGeneratedResource(ResourcePair rp) {
+        if (rp.getResource() instanceof HistogramResource
+                || rp.getResource() instanceof GeneratedEnsembleGridResource
+                || rp.getResource() instanceof GeneratedTimeSeriesResource) {
+            return true;
+        }
+
+        return false;
     }
 
     public List<String> getExpandedElements() {
@@ -169,16 +288,18 @@ public class EnsembleToolLayer extends
         if (EnsembleResourceManager.getInstance().getResourceList(this) == null) {
             return;
         }
-        Map<String, List<GenericResourceHolder>> allRscs = EnsembleResourceManager
+        Map<String, List<AbstractResourceHolder>> allRscs = EnsembleResourceManager
                 .getInstance().getResourceList(this).getAllRscsAsMap();
 
-        List<GenericResourceHolder> currEnsembleMembers = null;
+        List<AbstractResourceHolder> currEnsembleMembers = null;
         Set<String> keySet = allRscs.keySet();
         Iterator<String> iter = keySet.iterator();
         while (iter.hasNext()) {
             String currRscListName = iter.next();
             currEnsembleMembers = allRscs.get(currRscListName);
-            for (GenericResourceHolder gr : currEnsembleMembers) {
+            for (AbstractResourceHolder gr : currEnsembleMembers) {
+                EnsembleResourceManager.getInstance().unregisterResource(gr,
+                        this, false);
                 if (gr.getRsc() instanceof TimeSeriesResource) {
                     gr.getRsc().unload(
                             getEditor().getActiveDisplayPane().getDescriptor()
@@ -188,8 +309,6 @@ public class EnsembleToolLayer extends
                     gr.getRsc().unload();
                     gr.getRsc().dispose();
                 }
-                EnsembleResourceManager.getInstance().unregisterResource(gr,
-                        this, false);
             }
         }
 
@@ -201,24 +320,41 @@ public class EnsembleToolLayer extends
 
     }
 
-    public ResourcePair getResourcePair(AbstractVizResource<?, ?> rsc) {
+    public ResourcePair getResourcePair(FieldPlanePair e, ModelSources modelSrc) {
 
         ResourcePair foundRp = null;
-        ResourceList rscList = null;
-
-        if (TimeSeriesResource.class.isAssignableFrom(rsc.getClass())) {
-            IDisplayPaneContainer editor = EnsembleTool.getInstance()
-                    .findEditor(this);
-            rscList = editor.getActiveDisplayPane().getDescriptor()
-                    .getResourceList();
-        } else {
-            rscList = getResourceContainer().getActiveDisplayPane()
-                    .getDescriptor().getResourceList();
-        }
+        ResourceList rscList = getResourceContainer().getActiveDisplayPane()
+                .getDescriptor().getResourceList();
+        String fieldAbbrev = null;
+        String plane = null;
         for (ResourcePair rp : rscList) {
-            if (rsc.equals(rp.getResource())) {
-                foundRp = rp;
-                break;
+            if (rp != null && rp.getResourceData() != null
+                    && rp.getResource() != null) {
+                /**
+                 * TODO: Get the gest resolution resource and return it with the
+                 * resource pair.
+                 */
+                // if (rp.getResource() instanceof BestResResource) {
+                // BestResResource brr = (BestResResource) rp.getResource();
+                // brr.getBestResResource(time);
+                // } else
+                if (rp.getResourceData() instanceof AbstractRequestableResourceData) {
+                    AbstractRequestableResourceData ard = (AbstractRequestableResourceData) rp
+                            .getResourceData();
+                    RequestableResourceMetadata rrmd = new RequestableResourceMetadata(
+                            ard);
+                    fieldAbbrev = rrmd.getFieldAbbrev();
+                    plane = rrmd.getPlane();
+                    String rscName = rp.getResource().getName();
+                    String modelName = modelSrc.getModelName();
+                    if (rscName.startsWith(modelName)) {
+                        if (e.getFieldAbbrev().equals(fieldAbbrev)
+                                && e.getPlane().equals(plane)) {
+                            foundRp = rp;
+                            break;
+                        }
+                    }
+                }
             }
         }
 
@@ -226,14 +362,52 @@ public class EnsembleToolLayer extends
 
     }
 
+    public ResourcePair getResourcePair(AbstractVizResource<?, ?> rsc) {
+
+        ResourcePair foundRp = null;
+        ResourceList rscList = null;
+
+        /**
+         * TODO: Need to make the context menu work for BestResResource.
+         */
+        if (rsc instanceof BestResResource) {
+            BestResResource brr = (BestResResource) rsc;
+            rscList = brr.getResourceList();
+            for (ResourcePair rp : rscList) {
+                if (rsc.equals(rp.getResource())) {
+                    foundRp = rp;
+                    break;
+                }
+            }
+        } else {
+            if (TimeSeriesResource.class.isAssignableFrom(rsc.getClass())) {
+                IDisplayPaneContainer editor = EnsembleTool.getInstance()
+                        .findEditor(this);
+                rscList = editor.getActiveDisplayPane().getDescriptor()
+                        .getResourceList();
+            } else {
+                rscList = getResourceContainer().getActiveDisplayPane()
+                        .getDescriptor().getResourceList();
+            }
+            for (ResourcePair rp : rscList) {
+                if (rsc.equals(rp.getResource())) {
+                    foundRp = rp;
+                    break;
+                }
+            }
+        }
+        return foundRp;
+
+    }
+
     public void unloadAllResourcesByName(String ensembleName) {
 
-        List<GenericResourceHolder> ensembleMembers = EnsembleResourceManager
+        List<AbstractResourceHolder> ensembleMembers = EnsembleResourceManager
                 .getInstance().getResourceList(this)
                 .getUserLoadedRscs(ensembleName);
         int total = ensembleMembers.size();
         int count = 0;
-        for (GenericResourceHolder gr : ensembleMembers) {
+        for (AbstractResourceHolder gr : ensembleMembers) {
             count++;
             if (count < total) {
                 EnsembleResourceManager.getInstance().unregisterResource(gr,
@@ -252,7 +426,6 @@ public class EnsembleToolLayer extends
     }
 
     public void propertiesChanged(ResourceProperties updatedProps) {
-        // TODO
     }
 
     public boolean isDisposed() {
@@ -265,8 +438,47 @@ public class EnsembleToolLayer extends
         return editor;
     }
 
+    /**
+     * If the tool layer is associated with a Time Series or Matrix editor then
+     * close (i.e. hide) those editors when
+     */
     @Override
     protected void disposeInternal() {
+
+        IDisplayPaneContainer editor = EnsembleTool.getInstance().getEditor(
+                this);
+
+        if (!PlatformUI.getWorkbench().isClosing()) {
+            if (editor instanceof TimeSeriesEditor) {
+                TimeSeriesEditor tsEditor = (TimeSeriesEditor) editor;
+                if (tsEditor != null) {
+                    for (IEditorReference ref : PlatformUI.getWorkbench()
+                            .getActiveWorkbenchWindow().getActivePage()
+                            .getEditorReferences()) {
+                        IEditorPart partEditor = ref.getEditor(false);
+                        if (editor == partEditor) {
+                            PlatformUI.getWorkbench()
+                                    .getActiveWorkbenchWindow().getActivePage()
+                                    .hideEditor(ref);
+                        }
+                    }
+                }
+            } else if (editor instanceof VizMatrixEditor) {
+                VizMatrixEditor vmEditor = (VizMatrixEditor) editor;
+                if (vmEditor != null) {
+                    for (IEditorReference ref : PlatformUI.getWorkbench()
+                            .getActiveWorkbenchWindow().getActivePage()
+                            .getEditorReferences()) {
+                        IEditorPart partEditor = ref.getEditor(false);
+                        if (editor == partEditor) {
+                            PlatformUI.getWorkbench()
+                                    .getActiveWorkbenchWindow().getActivePage()
+                                    .hideEditor(ref);
+                        }
+                    }
+                }
+            }
+        }
 
         descriptor.removeFrameChangedListener(this);
         resourceData.removeChangeListener((IResourceDataChanged) this);
@@ -611,10 +823,23 @@ public class EnsembleToolLayer extends
                 }
             };
             t.start();
+        } else if (algorithm == Calculation.HISTOGRAM_GRAPHICS) {
+
+            Thread t = null;
+            t = new Thread() {
+                public void run() {
+
+                    GeneratedDataLoader loader = new GeneratedDataLoader(
+                            thisToolLayer,
+                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
+                    loader.loadOverlay(Calculation.HISTOGRAM_GRAPHICS);
+                }
+            };
+            t.start();
         }
     }
 
-    protected void setEditable(boolean makeEditable) {
+    public void setEditable(boolean makeEditable) {
         isEditable = makeEditable;
         EditableManager.makeEditable(this, makeEditable);
     }
@@ -638,14 +863,15 @@ public class EnsembleToolLayer extends
 
         @Override
         public String getName(AbstractVizResource<?, ?> resource) {
-            String timeBasis = EnsembleTool.getInstance()
-                    .getTimeBasisLegendTime();
-            if (NavigatorResourceList.isTimeEmpty(timeBasis)) {
-                timeBasis = "";
-            } else {
-                timeBasis = " (" + timeBasis + ") ";
+            String timeBasis = "";
+            if (!isEmpty()) {
+                timeBasis = EnsembleTool.getInstance().getActiveResourceTime();
+                if (EnsembleResourceManager.isTimeEmpty(timeBasis)) {
+                    timeBasis = "";
+                } else {
+                    timeBasis = " (" + timeBasis + ") ";
+                }
             }
-
             String fullName = innerName + " " + timeBasis;
             return fullName;
         }
@@ -736,7 +962,7 @@ public class EnsembleToolLayer extends
                 && object instanceof EditableCapability) {
             EditableCapability editability = (EditableCapability) object;
             isEditable = editability.isEditable();
-            // issueRefresh();
+            EnsembleTool.getInstance().setEditable(isEditable);
         }
         for (IToolLayerChanged etl : changeListeners) {
             etl.resourceChanged(this, type, object);

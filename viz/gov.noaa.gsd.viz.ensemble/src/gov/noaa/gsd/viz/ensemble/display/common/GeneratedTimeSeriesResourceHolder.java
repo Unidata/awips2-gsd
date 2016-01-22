@@ -63,7 +63,7 @@ public class GeneratedTimeSeriesResourceHolder extends TimeSeriesResourceHolder 
     }
 
     @Override
-    public String getUniqueName() {
+    public String getSpecificName() {
 
         String s = currRsc.getName();
         String nodeLabel = Utilities.removeExtraSpaces(s);

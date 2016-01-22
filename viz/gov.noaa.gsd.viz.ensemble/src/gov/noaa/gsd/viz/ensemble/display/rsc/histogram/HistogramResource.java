@@ -1,7 +1,9 @@
 package gov.noaa.gsd.viz.ensemble.display.rsc.histogram;
 
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.display.chart.SingleSampleInfo;
 
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -37,12 +39,14 @@ import com.raytheon.viz.grid.rsc.general.D2DGridResource;
 import com.raytheon.viz.ui.editor.IMultiPaneEditor;
 import com.raytheon.viz.ui.input.preferences.MousePreferenceManager;
 
-
 /**
- * D2D ensemble sampling resources, supports all pane sampling and long left
- * click sampling as well Implement steps: 1, ensemble text values
- * sampling--done 100% 2, Text histogram/ color Text histogram--done 90% 3,
- * Graphics histogram/distribution view 4, interactive graphics histogram.
+ * D2D ensemble sampling resources, supports all pane sampling and left-click
+ * sampling as well. Implement steps: 1) Ensemble text value sampling; 2) Text
+ * histogram (no color text yet), simple distribution over main display window;
+ * 3) Graphics histogram/distribution view; 4) Interactive display in
+ * distribution view for multiple chart styles. Implemented PDF and CDF charts
+ * only in this version, as the basic probability forecasting tool. 5) A lot of
+ * tools can be developed on this framework in the later release.
  * 
  * @author jing
  * @version 1.0
@@ -54,6 +58,7 @@ import com.raytheon.viz.ui.input.preferences.MousePreferenceManager;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * July, 2014     5056       jing       Initial creation
+ * Jan 12 2016    12301      jing       Added the distribution view tool
  * 
  * </pre>
  */
@@ -65,7 +70,6 @@ public class HistogramResource<HistogramResoureData> extends
         POINT_SAMPLING, HISTOGRAM_SAMPLING, COLOR_TEXT_HISTGRAM, GRAPHIC_HISTGRAM
     }
 
-    // Level+name:500MB
     private String level;
 
     private String unit;
@@ -74,15 +78,22 @@ public class HistogramResource<HistogramResoureData> extends
 
     protected DisplayMode mode;
 
-    public DisplayMode getMode() {
-        return mode;
-    }
-
     /**
-     * Constructor
+     * Constructor of this class
+     * 
      * 
      * @param histogramResourceData
+     *            : The resource data for the histogram
      * @param loadProperties
+     *            : load properties.
+     * @param descriptor
+     *            : Should MapDescriptor
+     * @param level
+     *            : a selected products level
+     * @param unit
+     *            : a selected products unit
+     * @param mode
+     *            : a selected histogram display mode
      */
     public HistogramResource(HistogramResourceData histogramResourceData,
             LoadProperties loadProperties, IDescriptor descriptor,
@@ -105,8 +116,6 @@ public class HistogramResource<HistogramResoureData> extends
     private class D2DMouseAdapter extends
             EnsSamplingInputAdapter<HistogramResource<?>> {
 
-        // private static final String INSPECT_PREF =
-        // "com.raytheon.viz.ui.input.inspect";
         private static final String INSPECT_PREF_HIST = "com.raytheon.viz.ui.input.inspect.hist";
 
         protected Job job;
@@ -180,6 +189,7 @@ public class HistogramResource<HistogramResoureData> extends
                 setSampling(false);
                 issueRefresh();
             }
+
             return false;
         }
 
@@ -210,7 +220,6 @@ public class HistogramResource<HistogramResoureData> extends
      * com.raytheon.uf.viz.d2d.core.sampling.ID2DSamplingResource#isAllPanelSampling
      * ()
      */
-    // @Override
     public boolean isAllPanelSampling() {
         IDisplayPaneContainer container = getResourceContainer();
         if (container instanceof IMultiPaneEditor) {
@@ -240,18 +249,20 @@ public class HistogramResource<HistogramResoureData> extends
             result = doHoverSampling(coord, resources);
         } else if (mode == DisplayMode.HISTOGRAM_SAMPLING) {
             result = doHoverText(coord, resources);
+        } else if (mode == DisplayMode.GRAPHIC_HISTGRAM) {
+            result = doHoverGraphics(coord, resources);
         }
         return result;
     }
 
     /**
-     * Get the sampling lables and colors of current location
+     * Get the sampling labels and colors of current location
      * 
      * @param coord
      *            - current location
      * @param resources
-     *            - member resources of the caculations
-     * @return
+     *            - member resources of the calculations
+     * @return text string of values
      * @throws VizException
      */
     protected SampleResult doHoverSampling(ReferencedCoordinate coord,
@@ -260,7 +271,7 @@ public class HistogramResource<HistogramResoureData> extends
 
         List<String> labelList = new ArrayList<String>();
         List<RGB> colorList = new ArrayList<RGB>();
-        // List<>
+
         try {
             int size = resources.size();
             for (int i = size - 1; i >= 0; --i) {
@@ -306,7 +317,7 @@ public class HistogramResource<HistogramResoureData> extends
      *            - one resource pair
      * @param coordinate
      *            - current location
-     * @return - lable string
+     * @return - label string
      * @throws VizException
      */
     private String recursiveHoverSearchSampling(ResourcePair rp,
@@ -332,13 +343,10 @@ public class HistogramResource<HistogramResoureData> extends
                 if (key.contains("unit"))
                     continue;
                 if (curVal != null) {
-                    // curVal = curVal + "/"+key+ ":"+ String.format("%.2f",
-                    // result.get(key));
+
                     curVal = curVal + "/"
                             + String.format("%.2f", result.get(key));
                 } else {
-                    // curVal = key+ ":"+ String.format("%.2f",
-                    // result.get(key));
 
                     curVal = String.format("%.2f", result.get(key));
                 }
@@ -357,8 +365,10 @@ public class HistogramResource<HistogramResoureData> extends
      * histogram text.
      * 
      * @param coord
+     *            - sample location
      * @param resources
-     * @return
+     *            -a group grid resources
+     * @return sample result for text histogram
      * @throws VizException
      */
     protected SampleResult doHoverText(ReferencedCoordinate coord,
@@ -366,7 +376,7 @@ public class HistogramResource<HistogramResoureData> extends
         SampleResult result = new SampleResult();
 
         List<String> labelList = new ArrayList<String>();
-        // List<RGB> colorList = new ArrayList<RGB>();
+
         List<Float> values = new ArrayList<Float>();
         List<AbstractVizResource<?, ?>> rscs = new ArrayList<AbstractVizResource<?, ?>>();
 
@@ -400,11 +410,13 @@ public class HistogramResource<HistogramResoureData> extends
     }
 
     /**
-     * Searxh sampling data for text histogram in one resource pair
+     * Search for sampling data for the text histogram in one resource pair
      * 
      * @param rp
+     *            - a resource pair of a grid data
      * @param coordinate
-     * @return
+     *            - location
+     * @return sampled value at this location of this grid
      * @throws VizException
      */
     private float recursiveHoverSearchText(ResourcePair rp,
@@ -440,10 +452,77 @@ public class HistogramResource<HistogramResoureData> extends
     }
 
     /**
+     * For displaying distribution view, this method samples each member
+     * resource under the cursor, and passes the data set to the distribution
+     * view GUI.
+     * 
+     * @param coord
+     *            - location of the cursor
+     * @param resources
+     *            - a group resources to sample
+     * @return null
+     * @throws VizException
+     */
+    protected SampleResult doHoverGraphics(ReferencedCoordinate coord,
+            ResourceList resources) throws VizException {
+
+        List<Float> values = new ArrayList<Float>();
+
+        try {
+            int size = resources.size();
+            for (int i = size - 1; i >= 0; --i) {
+                ResourcePair rp = resources.get(i);
+                float retVal = recursiveHoverSearchText(rp, coord);
+                if (retVal != Float.NaN) {
+                    values.add(retVal);
+
+                }
+            }
+        } catch (Throwable t) {
+            statusHandler.handle(Priority.PROBLEM, "Error sampling resources: "
+                    + t.getLocalizedMessage(), t);
+        }
+
+        // Create the data information
+        // Make legend for the location data
+        NumberFormat nf = NumberFormat.getInstance();
+        nf.setMaximumFractionDigits(1);
+        double x = coord.getObject().x;
+        double y = coord.getObject().y;
+        String lon = nf.format(Math.abs(x));
+        String lat = nf.format(Math.abs(y));
+        String location = String.format(" %s%s %s%s", lat, y >= 0 ? "N" : "S",
+                lon, x >= 0 ? "E" : "W");
+
+        SingleSampleInfo info = new SingleSampleInfo(" ", location, level,
+                unit, values);
+
+        /**
+         * Pass sampled data into the distribution view GUI, to update the
+         * current chart display. Note: Here is the very important place where
+         * the HistogramResource communicates with the distribution view GUI.
+         * Currently there is only one-way communication, only from the
+         * HistogramResource to the distribution view GUI. Later, more
+         * complicated sampling will depend on the chart configuration/feature
+         * selection from the distribution view GUI (so there will be two-way
+         * communication). For example, in two-way communication, if user
+         * selected Slope Chart to watch the trend, the sampled data will be for
+         * all frames; if user selected Multiple Distribution Chart, the user
+         * selected grid groups will be passed to the sampling side. Many
+         * interesting chart style implementations will be possible here.
+         */
+        EnsembleTool.getInstance().getEnsembleToolViewer()
+                .getDistributionViewer().getGhGUI().updateDisplay(info);
+
+        return null;
+
+    }
+
+    /**
      * Remove any resource not existing in the resource manager.
      * 
      * @param resources
-     * @return
+     * @return selected resources
      */
     private ResourceList filterResource(ResourceList resources) {
         ResourceList filteredlist = new ResourceList();
@@ -481,12 +560,19 @@ public class HistogramResource<HistogramResoureData> extends
         return unit;
     }
 
+    public DisplayMode getMode() {
+        return mode;
+    }
+
     @Override
     public String getName() {
-        if (mode == DisplayMode.POINT_SAMPLING)
+        if (mode == DisplayMode.POINT_SAMPLING) {
             return level + " " + unit + " Ensemble Sampling";
-        else
+        } else if (mode == DisplayMode.GRAPHIC_HISTGRAM) {
+            return level + " " + unit + " Distribution Viewer";
+        } else {
             return level + " " + unit + " Histogram Text";
+        }
     }
 
     /*

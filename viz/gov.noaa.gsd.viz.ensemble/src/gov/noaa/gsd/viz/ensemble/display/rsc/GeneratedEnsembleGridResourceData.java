@@ -1,10 +1,10 @@
 package gov.noaa.gsd.viz.ensemble.display.rsc;
 
+import gov.noaa.gsd.viz.ensemble.control.EnsembleResourceManager;
 import gov.noaa.gsd.viz.ensemble.display.calculate.ERFCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.EnsembleCalculator;
-import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.Utilities;
-import gov.noaa.gsd.viz.ensemble.display.control.EnsembleResourceManager;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
 import java.util.ArrayList;
@@ -65,7 +65,7 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
      * more interfaces
      * 
      */
-    private Map<String, List<GenericResourceHolder>> dataHolders = new ConcurrentHashMap<String, List<GenericResourceHolder>>();
+    private Map<String, List<AbstractResourceHolder>> dataHolders = new ConcurrentHashMap<String, List<AbstractResourceHolder>>();
 
     /**
      * Calculate loaded ensemble data to generate new data, such as mean.
@@ -267,7 +267,7 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
         Set<String> keys = dataHolders.keySet();
         List<D2DGridResource> members = new ArrayList<D2DGridResource>();
         for (String key : keys) {
-            List<GenericResourceHolder> rcsList = dataHolders.get(key);
+            List<AbstractResourceHolder> rcsList = dataHolders.get(key);
             if (rcsList == null || rcsList.size() == 0) {
                 continue;
             }
@@ -316,10 +316,11 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
             return allData;
         }
         int i;
-        for (i = 0; i < frameTimes.length; i++)
+        for (i = 0; i < frameTimes.length; i++){
             if (time.equals(frameTimes[i])) {
                 break;
             }
+        }
         if (i >= frameTimes.length) {
             return allData;
         }
@@ -436,7 +437,7 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
         this.isFrozenData = isFrozenData;
     }
 
-    public Map<String, List<GenericResourceHolder>> getDataHolders() {
+    public Map<String, List<AbstractResourceHolder>> getDataHolders() {
         return dataHolders;
     }
 

@@ -27,7 +27,7 @@ import com.vividsolutions.jts.geom.Coordinate;
  * @version 1.0
  */
 
-public class TimeSeriesResourceHolder extends GenericResourceHolder {
+public class TimeSeriesResourceHolder extends AbstractResourceHolder {
 
     TimeSeriesResource currRsc = null;
 
@@ -60,9 +60,9 @@ public class TimeSeriesResourceHolder extends GenericResourceHolder {
             Coordinate c = currRsc.getResourceData().getCoordinate();
             String ns = c.y >= 0 ? "N" : "S";
             String ew = c.x >= 0 ? "E" : "W";
-            latlon = String.format("pt%s %d%s %d%s", currRsc.getResourceData()
-                    .getPointLetter(), Math.round(Math.abs(c.y)), ns, Math
-                    .round(Math.abs(c.x)), ew);
+            latlon = String.format("Point %s: %d%s %d%s", currRsc
+                    .getResourceData().getPointLetter(), Math.round(Math
+                    .abs(c.y)), ns, Math.round(Math.abs(c.x)), ew);
         }
 
         return latlon;
@@ -74,18 +74,27 @@ public class TimeSeriesResourceHolder extends GenericResourceHolder {
     public String getLevel() {
 
         String levelKey = currRsc.getResourceData().getLevelKey();
+        if (levelKey == null) {
+            levelKey = "";
+        }
         String levelUnit = levelKey.replaceAll("[^a-zA-Z]", "");
         boolean isHeight = levelUnit.equalsIgnoreCase("mb")
                 || levelUnit.equalsIgnoreCase("agl")
                 || levelUnit.contains("Agl");
 
+        /**
+         * If there is an AbstractTimeSeriesAdapter then assume this is a
+         * regular time series resource and use the adapter to get the level.
+         * 
+         * Otherwise, if there is no AbstractTimeSeriesAdapter then assume this
+         * is a generated resource (i.e. user-requested calculation) and use the
+         * level key already supplied above.
+         */
         if (currRsc.getAdapter() != null) {
             if (!isHeight) {
                 SingleLevel level = currRsc.getAdapter().getLevel();
                 levelKey = (int) level.getValue() + level.getTypeString();
             }
-        } else {
-            levelKey = "";
         }
         return levelKey;
     }
@@ -129,12 +138,10 @@ public class TimeSeriesResourceHolder extends GenericResourceHolder {
 
                     ensId = adapter.getArbitraryRecord().getInfo()
                             .getEnsembleId();
-                    if (ensId == null) {
-                        ensId = currRsc.getName();
-                    }
 
                     if ((getModel() != null)
-                            && ((ensId != null) && (getModel().indexOf("SREF") >= 0))) {
+                            && ((ensId != null && ensId.length() > 0) && (getModel()
+                                    .indexOf("SREF") >= 0))) {
                         ensId = srefPerturbationPrettyfied(ensId);
                     }
                 }
@@ -162,18 +169,37 @@ public class TimeSeriesResourceHolder extends GenericResourceHolder {
         return stnID;
     }
 
+    @Override
     public String getGroupName() {
 
         String sb = String.format("%s %s %s %s %s", getModel(), getLevel(),
                 getParameter(), getLocation(), getUnits() != null
                         && getUnits().equals("") == false ? "(" + getUnits()
                         + ")" : "");
-        String nodeLabel = Utilities.removeExtraSpaces(sb);
+        String nodeLabel = Utilities.removeExtraSpaces(sb.toString());
         return nodeLabel;
 
     }
 
-    public String getUniqueName() {
+    @Override
+    public String getGeneralName() {
+        String sb = String
+                .format("%s %s %s %s %s",
+                        getModel(),
+                        getLevel(),
+                        getParameter(),
+                        getUnits() != null && getUnits().equals("") == false ? "("
+                                + getUnits() + ")"
+                                : "",
+                        getEnsembleId() != null
+                                && getEnsembleId().equals("") == false ? getEnsembleId()
+                                : "");
+        String nodeLabel = Utilities.removeExtraSpaces(sb.toString());
+        return nodeLabel;
+    }
+
+    @Override
+    public String getSpecificName() {
 
         String sb = String
                 .format("%s %s %s %s %s %s",
@@ -187,13 +213,18 @@ public class TimeSeriesResourceHolder extends GenericResourceHolder {
                         getEnsembleId() != null
                                 && getEnsembleId().equals("") == false ? getEnsembleId()
                                 : "");
-        String nodeLabel = Utilities.removeExtraSpaces(sb);
+        String nodeLabel = Utilities.removeExtraSpaces(sb.toString());
         return nodeLabel;
     }
 
     @Override
     public String getDataTime() {
-        return "";
+        String datatime = "<not loaded>";
+        if (currRsc != null && currRsc.getDataTimes().length > 0
+                && currRsc.getDataTimes()[0].getDisplayString() != null) {
+            datatime = currRsc.getDataTimes()[0].getDisplayString();
+        }
+        return datatime;
     }
 
     @Override
@@ -204,11 +235,6 @@ public class TimeSeriesResourceHolder extends GenericResourceHolder {
     @Override
     public Calculation getCalculation() {
         return null;
-    }
-
-    @Override
-    public int hashCode() {
-        return getUniqueName().hashCode();
     }
 
     @Override

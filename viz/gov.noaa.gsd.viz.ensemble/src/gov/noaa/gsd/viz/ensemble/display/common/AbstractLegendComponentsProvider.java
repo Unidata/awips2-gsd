@@ -2,8 +2,6 @@ package gov.noaa.gsd.viz.ensemble.display.common;
 
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
 
-import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
-
 /**
  * Force implementers of derived concrete classes to provide the metadata
  * getters for all the common meteorological components of a resource.
@@ -27,12 +25,20 @@ public abstract class AbstractLegendComponentsProvider {
     public AbstractLegendComponentsProvider() {
     }
 
-    // this will be a root name e.g. for an ensemble group
+    /* this will be a root name e.g. for an ensemble group */
     abstract public String getGroupName();
 
-    // this will be unique between resources within a group
-    // or it will be identical to the getGroupName() method.
-    abstract public String getUniqueName();
+    /*
+     * this will be a less specific name than the unique name though in certain
+     * cases may be identical to the unique name
+     */
+    abstract public String getGeneralName();
+
+    /*
+     * this will be unique between resources within a group or it will be
+     * identical to the getGroupName() method.
+     */
+    abstract public String getSpecificName();
 
     abstract public String getModel();
 
@@ -56,7 +62,7 @@ public abstract class AbstractLegendComponentsProvider {
 
     abstract public Calculation getCalculation();
 
-    abstract public boolean isLoadedAtFrame(FramesInfo info);
+    abstract public boolean isLoadedAtFrame();
 
     /*
      * An abstract place to put the SREF prettifier.

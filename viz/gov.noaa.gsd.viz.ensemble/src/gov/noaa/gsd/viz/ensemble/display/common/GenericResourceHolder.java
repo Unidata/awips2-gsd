@@ -1,32 +1,25 @@
 package gov.noaa.gsd.viz.ensemble.display.common;
 
-import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResource;
-import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
-import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResource;
+import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
 
-import com.raytheon.uf.common.time.DataTime;
-import com.raytheon.uf.viz.core.drawables.IDescriptor;
-import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
-import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
-import com.raytheon.viz.grid.rsc.GridNameGenerator;
 
 /**
- * This class represents the abstract container which encapulates an
- * AbstractVizResource (that happens to be associated with the Ensemble Tool).
- * It provides a poor-man's approach at defining how to parse and extract common
- * resource metadata, an interface that doesn't already exist in the viz
- * resource class. Similar approaches have been attempted in other resource data
- * classes (e.g. getMetaDataMap) but were not necessarily reusable. This class
- * exists to attempt to fill an unusual void in the hierarchy of an
- * AbstractVizResource as there is no convenient way to extract commonly known
- * meteorological metadata information from the resource (needs verification).
+ * This class is used to encapsulate visible resources in order to make it
+ * easier for the developer to get access to the resource meta data such as that
+ * data which is commonly displayed in the editor/map legend for a given
+ * resource.
  * 
- * This abstact class forces derived classes to define the equals() and hashCode
- * methods, among other notable getters.
- * 
- * In order to create a class of this type call the factory method (see
- * createResourceHolder).
+ * Used for encapsulating the more generic <code>AbstractVizResource</code>
+ * instances that are not:
+ * <ul>
+ * <li>GeneratedEnsembleGridResource
+ * <li>GeneratedTimeSeriesResource
+ * <li>GeneratedTimeSeriesResourceHolder
+ * <li>AbstractGridResource
+ * <li>TimeSeriesResource
+ * <li>HistogramResource
+ * </ul>
  * 
  * <pre>
  * 
@@ -34,140 +27,97 @@ import com.raytheon.viz.grid.rsc.GridNameGenerator;
  * 
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
- * Nov 17, 2014    5056     polster     Initial creation
+ * Jan 17, 2016    13211    polster     Renamed class from AbstractResourceHolder
+ *                                      to GenericResourceHolder
  * 
  * </pre>
  * 
  * @author polster
- * @author jing
  * @version 1.0
  */
 
-public abstract class GenericResourceHolder extends
-        AbstractLegendComponentsProvider {
-
-    AbstractVizResource<?, ?> rsc;
-
-    boolean isSelected = false; // either selected or unselected
-
-    boolean isGenerated = false; // either generated or a basic (normally
-                                 // loaded) resource
-
-    public static GenericResourceHolder createResourceHolder(
-            AbstractVizResource<?, ?> rsc, boolean isSelected) {
-
-        GenericResourceHolder genericRsc = null;
-
-        if (GeneratedEnsembleGridResource.class
-                .isAssignableFrom(rsc.getClass())) {
-            genericRsc = new GeneratedGridResourceHolder(rsc, isSelected);
-        } else if (GeneratedTimeSeriesResource.class.isAssignableFrom(rsc
-                .getClass())) {
-            genericRsc = new GeneratedTimeSeriesResourceHolder(rsc, isSelected);
-        } else if ((rsc instanceof AbstractVizResource<?, ?>)
-                && (rsc instanceof GridNameGenerator.IGridNameResource)) {
-            genericRsc = new GridResourceHolder(rsc, isSelected);
-        } else if (TimeSeriesResource.class.isAssignableFrom(rsc.getClass())) {
-            genericRsc = new TimeSeriesResourceHolder(rsc, isSelected);
-        } else if (HistogramResource.class.isAssignableFrom(rsc.getClass())) {
-            genericRsc = new HistogramGridResourceHolder(rsc, isSelected);
-        }
-        return genericRsc;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        boolean equals = false;
-        if (o instanceof GenericResourceHolder) {
-            GenericResourceHolder gr = (GenericResourceHolder) o;
-            equals = this.getUniqueName().equals(gr.getUniqueName());
-        } else {
-            equals = false;
-        }
-        return equals;
-    }
-
-    public abstract int hashCode();
-
-    protected GenericResourceHolder() {
-
-    }
+public class GenericResourceHolder extends AbstractResourceHolder {
 
     protected GenericResourceHolder(AbstractVizResource<?, ?> rsc,
             boolean isSelected) {
 
+        super(rsc, isSelected);
         this.rsc = rsc;
-        this.isSelected = isSelected;
-    }
-
-    public AbstractVizResource<?, ?> getRsc() {
-        return rsc;
-    }
-
-    public void setRsc(AbstractVizResource<?, ?> rsc) {
-        this.rsc = rsc;
-    }
-
-    public boolean isSelected() {
-        return isSelected;
-    }
-
-    public void setSelected(boolean isSelected) {
-        this.isSelected = isSelected;
-    }
-
-    public boolean isGenerated() {
-        return isGenerated;
-    }
-
-    public void setGenerated(boolean isEnsGenerated) {
-        this.isGenerated = isEnsGenerated;
     }
 
     @Override
-    public boolean isLoadedAtFrame(FramesInfo info) {
-
-        if (getRsc() == null) {
-            return false;
-        }
-
-        AbstractVizResource<?, ?> resource = getRsc();
-        String name = resource.getName();
-        if (name == null) {
-            return false;
-        }
-
-        if (!resource.isTimeAgnostic()) {
-            boolean hasTimes = false;
-            DataTime[] times = info.getTimeMap().get(resource);
-            if (times != null) {
-                for (DataTime dt : times) {
-                    if (dt != null) {
-                        hasTimes = true;
-                        break;
-                    }
-                }
-            }
-            if (!hasTimes) {
-                return false;
-            }
-
-            DataTime time = getDataTimeForResource(getRsc(), getRsc()
-                    .getDescriptor(), info);
-
-            if (time == null) {
-                return false;
-            }
-        }
-
-        return true;
+    public boolean requiresLoadCheck() {
+        return false;
     }
 
-    private DataTime getDataTimeForResource(AbstractVizResource<?, ?> rsc,
-            IDescriptor descriptor, FramesInfo info) {
-        return info.getTimeForResource(rsc);
+    @Override
+    public String getGroupName() {
+        return "";
     }
 
-    public abstract boolean requiresLoadCheck();
+    @Override
+    public String getGeneralName() {
+        return getSpecificName();
+    }
+
+    @Override
+    public String getSpecificName() {
+        return rsc.getName();
+    }
+
+    @Override
+    public String getModel() {
+        return "";
+    }
+
+    @Override
+    public String getLocation() {
+        return "";
+    }
+
+    @Override
+    public String getLevel() {
+        return "";
+    }
+
+    @Override
+    public String getParameter() {
+        return "";
+    }
+
+    @Override
+    public String getUnits() {
+        return "";
+    }
+
+    @Override
+    public String getDataTime() {
+        return "";
+    }
+
+    @Override
+    public String getType() {
+        return "";
+    }
+
+    @Override
+    public String getEnsembleId() {
+        return "";
+    }
+
+    @Override
+    public String getEnsembleIdRaw() {
+        return "";
+    }
+
+    @Override
+    public String getStationId() {
+        return "";
+    }
+
+    @Override
+    public Calculation getCalculation() {
+        return null;
+    }
 
 }

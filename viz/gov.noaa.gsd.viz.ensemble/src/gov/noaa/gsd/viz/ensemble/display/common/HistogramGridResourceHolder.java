@@ -18,7 +18,8 @@ import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Nov 17, 2014    5056     jing     Initial creation
- * 
+ * Jan 15, 2016    12301    jing     Added distribution feature
+ *                                   by using GRAPHIC_HISTGRAM display mode.
  * </pre>
  * 
  * @author jing
@@ -83,19 +84,26 @@ public class HistogramGridResourceHolder extends GenericResourceHolder {
 
     @Override
     public Calculation getCalculation() {
-        // return "color histogram";
-        if (((HistogramResource<?>) this.rsc).getMode() == HistogramResource.DisplayMode.POINT_SAMPLING)
+        if (((HistogramResource<?>) this.rsc).getMode() == HistogramResource.DisplayMode.POINT_SAMPLING) {
             return Calculation.HISTOGRAM_SAMPLING;
-        else
+        } else if (((HistogramResource<?>) this.rsc).getMode() == HistogramResource.DisplayMode.GRAPHIC_HISTGRAM) {
+            return Calculation.HISTOGRAM_GRAPHICS;
+        } else {
             return Calculation.VALUE_SAMPLING;
+        }
     }
 
     public String getGroupName() {
 
-        return getUniqueName();
+        return getSpecificName();
     }
 
-    public String getUniqueName() {
+    @Override
+    public String getGeneralName() {
+        return getSpecificName();
+    }
+
+    public String getSpecificName() {
 
         String s = currRsc.getName();
         String nodeLabel = Utilities.removeExtraSpaces(s);
@@ -126,11 +134,6 @@ public class HistogramGridResourceHolder extends GenericResourceHolder {
     @Override
     public String getStationId() {
         return "";
-    }
-
-    @Override
-    public int hashCode() {
-        return getUniqueName().hashCode();
     }
 
     @Override

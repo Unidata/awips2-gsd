@@ -47,7 +47,8 @@ import com.raytheon.viz.grid.rsc.general.GridMemoryManager;
  * 
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
- * Jan 5, 2014     5056      jing     Initial creation
+ * Jan 5 2014     5056      jing     Initial creation
+ * Jan 15 2014    12301     jing     Fixed unit matching
  * 
  * </pre>
  */
@@ -172,6 +173,9 @@ public abstract class EnsembleCalculator {
         Unit rUnit = resultUnit;
         if (rUnit == null) {
             rUnit = dataUnit;
+        }
+        if (rUnit == null) {
+            rUnit = inputData.get(0).get(0).getDataUnit();
         }
         for (int k = 0; k < inputData.get(0).size(); k++) {// List
 

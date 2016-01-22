@@ -24,6 +24,8 @@ import com.raytheon.uf.common.time.DataTime;
 import com.raytheon.uf.viz.core.IGraphicsTarget;
 import com.raytheon.uf.viz.core.drawables.IDescriptor;
 import com.raytheon.uf.viz.core.exception.VizException;
+import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
+import com.raytheon.uf.viz.core.grid.rsc.data.GeneralGridData;
 import com.raytheon.uf.viz.core.map.IMapDescriptor;
 import com.raytheon.uf.viz.core.rsc.AbstractNameGenerator;
 import com.raytheon.uf.viz.core.rsc.AbstractResourceData;
@@ -34,8 +36,6 @@ import com.raytheon.uf.viz.core.rsc.capabilities.DisplayTypeCapability;
 import com.raytheon.viz.grid.rsc.GridNameGenerator;
 import com.raytheon.viz.grid.rsc.GridNameGenerator.IGridNameResource;
 import com.raytheon.viz.grid.rsc.GridNameGenerator.LegendParameters;
-import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
-import com.raytheon.uf.viz.core.grid.rsc.data.GeneralGridData;
 import com.raytheon.viz.grid.rsc.general.GridResource;
 import com.raytheon.viz.grid.xml.FieldDisplayTypesFactory;
 
@@ -201,6 +201,7 @@ public class GeneratedEnsembleGridResource extends
                 rscName = calculation.getTitle() + " "
                         + generator.getName(this);
             }
+            rscName = rscName.concat(" (" + this.getDisplayUnit() + ")");
         }
         return rscName;
     }

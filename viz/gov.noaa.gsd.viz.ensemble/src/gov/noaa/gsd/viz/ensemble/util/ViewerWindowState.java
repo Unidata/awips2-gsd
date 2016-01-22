@@ -1,4 +1,4 @@
-package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer;
+package gov.noaa.gsd.viz.ensemble.util;
 
 /**
  * Convenience enumeration for ViewPart states.

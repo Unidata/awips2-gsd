@@ -1,7 +1,7 @@
 package gov.noaa.gsd.viz.ensemble.display.rsc.histogram;
 
-import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
-import gov.noaa.gsd.viz.ensemble.display.control.EnsembleResourceManager;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleResourceManager;
+import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
 import java.util.ArrayList;
@@ -57,7 +57,7 @@ public class HistogramResourceData extends AbstractResourceData implements
      * more interfaces
      * 
      */
-    private Map<String, List<GenericResourceHolder>> dataHolders = new ConcurrentHashMap<String, List<GenericResourceHolder>>();
+    private Map<String, List<AbstractResourceHolder>> dataHolders = new ConcurrentHashMap<String, List<AbstractResourceHolder>>();
 
     /**
      * Currently consider one resource case only. The multiple generated
@@ -115,7 +115,7 @@ public class HistogramResourceData extends AbstractResourceData implements
         return rsc;
     }
 
-    public Map<String, List<GenericResourceHolder>> getDataHolders() {
+    public Map<String, List<AbstractResourceHolder>> getDataHolders() {
         return dataHolders;
     }
 
@@ -129,7 +129,7 @@ public class HistogramResourceData extends AbstractResourceData implements
         Set<String> keys = dataHolders.keySet();
         List<D2DGridResource> members = new ArrayList<D2DGridResource>();
         for (String key : keys) {
-            List<GenericResourceHolder> rcsList = dataHolders.get(key);
+            List<AbstractResourceHolder> rcsList = dataHolders.get(key);
             if (rcsList == null || rcsList.size() == 0) {
                 continue;
             }

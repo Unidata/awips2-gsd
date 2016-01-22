@@ -12,8 +12,8 @@ package gov.noaa.gsd.viz.ensemble.display.calculate;
  * 
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
- * July 1, 2014  5056          polster     Initial creation
- * 
+ * Jul 1  2014  5056          polster     Initial creation
+ * Jan 12 2016  12301         jing        Added The distribution view
  * </pre>
  * 
  */
@@ -25,6 +25,7 @@ public enum Calculation {
     DIFFERENCE("Diff"), //
     ENSEMBLE_RELATIVE_FREQUENCY("Ens Rel Freq"), //
     HISTOGRAM_SAMPLING("Histogram Sampling"), //
+    HISTOGRAM_GRAPHICS("Distribution Viewer"), //
     MAX("Max"), //
     MEAN("Mean"), //
     MIN("Min"), //

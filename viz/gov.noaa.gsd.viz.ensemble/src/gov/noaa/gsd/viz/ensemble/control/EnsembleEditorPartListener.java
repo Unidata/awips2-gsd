@@ -1,4 +1,4 @@
-package gov.noaa.gsd.viz.ensemble.navigator.ui.layer;
+package gov.noaa.gsd.viz.ensemble.control;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +52,7 @@ public class EnsembleEditorPartListener implements IPartListener2 {
 
         if (containsPart(partRef)) {
             IEditorPart editorPart = (EditorPart) partRef.getPart(false);
+
             if (editorPart instanceof IDisplayPaneContainer) {
                 IDisplayPaneContainer editor = (IDisplayPaneContainer) editorPart;
                 EnsembleTool.getInstance().setEditor(editor);
@@ -82,10 +83,12 @@ public class EnsembleEditorPartListener implements IPartListener2 {
             if (editorPart instanceof AbstractEditor) {
                 VizApp.runSync(new Runnable() {
                     public void run() {
+
                         if (!PlatformUI.getWorkbench().isClosing()) {
                             EnsembleTool.getInstance()
                                     .verifyCloseActiveToolLayer();
                         }
+
                     }
                 });
             }

@@ -1,11 +1,13 @@
-package gov.noaa.gsd.viz.ensemble.display.control;
+package gov.noaa.gsd.viz.ensemble.control;
 
-import gov.noaa.gsd.viz.ensemble.display.common.GenericResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.GridResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.HistogramGridResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.NavigatorResourceList;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
@@ -14,18 +16,29 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.eclipse.core.commands.Command;
+import org.eclipse.core.commands.ExecutionEvent;
+import org.eclipse.core.commands.ExecutionException;
+import org.eclipse.core.commands.NotEnabledException;
+import org.eclipse.core.commands.NotHandledException;
+import org.eclipse.core.commands.common.NotDefinedException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.swt.graphics.RGB;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.commands.ICommandService;
+import org.eclipse.ui.services.IServiceLocator;
 
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
+import com.raytheon.uf.common.status.UFStatus.Priority;
 import com.raytheon.uf.viz.core.IDisplayPaneContainer;
 import com.raytheon.uf.viz.core.drawables.IDescriptor;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
+import com.raytheon.uf.viz.core.map.MapDescriptor;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.core.rsc.IDisposeListener;
 import com.raytheon.uf.viz.core.rsc.IRefreshListener;
@@ -35,14 +48,38 @@ import com.raytheon.uf.viz.core.rsc.capabilities.DensityCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.DisplayTypeCapability;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.ui.editor.AbstractEditor;
+import com.raytheon.viz.volumebrowser.vbui.VolumeBrowserAction;
 
 /**
- * Handle all ensemble products member resources, reference to any loaded grid
- * product may be treated as ensemble member, and ensemble calculation result
- * resources. This is the key architectural support class connecting the
- * ensemble display, GUI and D2D core. It tracks and the status of the handled
- * resources, controls them, keeps the ensemble tool works with D2D core display
- * synchronously. All registered resources are in the ensembleToolResourcesMap.
+ * (This class only interacts with CAVE if the Ensemble Tool is editable.)
+ * 
+ * 
+ * This is the key architectural support class connecting the ensemble core
+ * controller (<code>EnsembleTool</code>, ensemble tool viewer and D2D core,
+ * though the design attempts to minimize any coupling; this class is mainly
+ * coupled at the "refresh resources" event notification, notifying the core
+ * controller that the gui needs to be refreshed (see method
+ * <code>notifyClientListChanged</code>.
+ * 
+ * 
+ * >>> Use Case <<<
+ * 
+ * When the ensemble tool is "editable" and the user loads product resources,
+ * this class maintains, and allows access, to those resources.
+ * 
+ * Also, when the ensemble tool is "editable" there is guaranteed to be a tool
+ * layer (<code>EnsembleToolLayer</code>) that offers a proxy/delegator
+ * interface to those resources.
+ * 
+ * This class is fed these resources through the renderable display customizer
+ * <code>EnsembleToolDisplayCustomizer</code> but only if they are deemed
+ * "compatible" resources. It is the ensemble tool layer, of course, which
+ * contains the <code>EnsembleToolLayer.isResourceCompatible </code> method.
+ * 
+ * It is also the tool layer which allows this class to pull relevant resources
+ * for the active (and tool layer enabled) display. Storage and retrieval of
+ * these resources are obtained via the navigator resource list (see
+ * <code>Map<EnsembleToolLayer, NavigatorResourceList></code> ).
  * 
  * 
  * @author jing
@@ -56,13 +93,13 @@ import com.raytheon.viz.ui.editor.AbstractEditor;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Feb, 2014      5056       jing     Initial creation
- * Oct 30, 2015  12863    polster     clear all data members at close
+ * Nov, 2015      12977     polster  Make ingest poll asynchronously
  * 
  * </pre>
  */
 
-public class EnsembleResourceManager implements IDisposeListener {
-    private final static double DEFAULT_DENSITY = 0.15;
+public class EnsembleResourceManager implements IDisposeListener,
+        IResourceRegisteredProvider {
 
     private static final transient IUFStatusHandler statusHandler = UFStatus
             .getHandler(EnsembleResourceManager.class);
@@ -85,6 +122,17 @@ public class EnsembleResourceManager implements IDisposeListener {
     }
 
     /**
+     * Get the resource manager singleton.
+     * 
+     * @return
+     */
+    public static IResourceRegisteredProvider getResourceProvider() {
+        return (IResourceRegisteredProvider) SINGLETON;
+    }
+
+    private final double DEFAULT_DENSITY = 0.15;
+
+    /**
      * The ensemble marked resource list holds the loaded and generated
      * resources and flags, is used by ensemble display, GUI and calculation.
      */
@@ -96,6 +144,8 @@ public class EnsembleResourceManager implements IDisposeListener {
 
     private List<VisibilityAndColorChangedListener> visibilityAndColorChangedListeners = null;
 
+    private List<IResourceRegisteredListener> resourceRegisteredListeners = null;
+
     /**
      * The listeners to any resource, GUI... change event Register to any bus or
      * event list for to catch interesting events
@@ -105,7 +155,58 @@ public class EnsembleResourceManager implements IDisposeListener {
         visibilityAndColorChangedListeners = new CopyOnWriteArrayList<>();
 
         incomingSpooler = new ArrayBlockingQueue<>(500);
+        resourceRegisteredListeners = new ArrayList<>();
 
+        checkIsVBAvailable();
+    }
+
+    /**
+     * Create the VB dialog if it has not yet been created. Then force it to be
+     * hidden.
+     * 
+     * TODO: This is needed as of the 16.2.2 release as the Matrix navigation
+     * mode will not work without it. For a future release (e.g. 16.4.1) we
+     * would like to have the volume browser plugin allow us to call the correct
+     * metadata initializers (i.e. for accessing metadata such as fields,
+     * planes, and sources) so we don't have to open the entire VB user
+     * interface.
+     */
+    private void checkIsVBAvailable() {
+
+        if (!PlatformUI.getWorkbench().isClosing()) {
+            if (VolumeBrowserAction.getVolumeBrowserDlg() == null) {
+
+                /*
+                 * Obtain IServiceLocator implementer, e.g. from
+                 * PlatformUI.getWorkbench()
+                 */
+                IServiceLocator serviceLocator = PlatformUI.getWorkbench();
+
+                ICommandService commandService = (ICommandService) serviceLocator
+                        .getService(ICommandService.class);
+
+                Command command = commandService
+                        .getCommand("com.raytheon.viz.volumebrowser.volumeBrowserRef");
+
+                /*
+                 * Optionally pass a ExecutionEvent instance, default no-param
+                 * arg creates blank event
+                 */
+
+                try {
+
+                    command.executeWithChecks(new ExecutionEvent());
+                } catch (ExecutionException | NotDefinedException
+                        | NotEnabledException | NotHandledException e) {
+                    statusHandler.handle(Priority.PROBLEM,
+                            e.getLocalizedMessage(), e);
+                }
+
+            }
+
+            VolumeBrowserAction.getVolumeBrowserDlg().hide();
+
+        }
     }
 
     public void startSpooler() {
@@ -121,7 +222,6 @@ public class EnsembleResourceManager implements IDisposeListener {
      * queue.
      */
     protected void addResourceForRegistration(AbstractVizResource<?, ?> rsc) {
-
         incomingSpooler.add(rsc);
         startSpooler();
     }
@@ -129,8 +229,9 @@ public class EnsembleResourceManager implements IDisposeListener {
     /**
      * Get the resources in an editor.
      * 
-     * @param editor
-     *            - The product is loaded into which editor/window.
+     * @param toolLayer
+     *            - The tool layer associated with the editor/window into which
+     *            the resources are loaded .
      * @return - list of resources.
      */
     public NavigatorResourceList getResourceList(EnsembleToolLayer toolLayer) {
@@ -143,14 +244,17 @@ public class EnsembleResourceManager implements IDisposeListener {
         return list;
     }
 
-    /**
-     * Clean the resources in an editor.
-     * 
-     * @param editor
-     *            - The product is loaded into which editor/window.
-     */
-    public void clearResourceList(AbstractEditor editor) {
-        ensembleToolResourcesMap.get(editor).clear();
+    public boolean isEmpty(EnsembleToolLayer toolLayer) {
+        NavigatorResourceList list = ensembleToolResourcesMap.get(toolLayer);
+        if (list == null || list.isEmpty()) {
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean isTimeEmpty(String timeBasisLegend) {
+        return ((timeBasisLegend == null) || (timeBasisLegend.length() == 0) || (timeBasisLegend
+                .compareTo(NavigatorResourceList.TIME_BASIS_EMPTY_STR) == 0));
     }
 
     /**
@@ -180,13 +284,10 @@ public class EnsembleResourceManager implements IDisposeListener {
         ResourceList r = rsc.getDescriptor().getResourceList();
         List<AbstractVizResource<?, ?>> resources = r
                 .getResourcesByType(EnsembleToolLayer.class);
-
-        AbstractVizResource<?, ?> innerResource = null;
-        try {
-            innerResource = resources.get(0);
-        } catch (IndexOutOfBoundsException e) {
-            innerResource = null;
+        if (resources == null || resources.isEmpty()) {
+            return null;
         }
+        AbstractVizResource<?, ?> innerResource = resources.get(0);
         if (innerResource == null) {
             return null;
         }
@@ -222,49 +323,83 @@ public class EnsembleResourceManager implements IDisposeListener {
                     toolLayer));
         }
 
-        // no duplicates
+        // no nulls or duplicates
         if (rsc == null
                 || ensembleToolResourcesMap.get(toolLayer)
                         .containsResource(rsc)) {
             return;
         }
 
-        // TODO: Must refactor so we don't use setSystemResource(boolean)
-        // method.
+        /*
+         * TODO: Must refactor so we don't use setSystemResource(boolean)
+         * method.
+         */
         rsc.getProperties().setSystemResource(true);
 
         rsc.registerListener((IDisposeListener) this);
 
+        /*
+         * For now, we suppress the 'Load as Image' menu item from the context
+         * sensitive pop-up, for *both the Legends and Matrix modes.
+         * 
+         * TODO: This will probably want to eventually be put back in for Matrix
+         * mode.
+         */
         if (rsc.hasCapability(DisplayTypeCapability.class)) {
             rsc.getCapability(DisplayTypeCapability.class)
                     .setSuppressingMenuItems(true);
         }
 
-        // Set to default density for all loaded resources if can
-        // But it may be unmatched with current display. Fix it later
-        if (rsc.getCapability(DensityCapability.class) != null) {
-            DensityCapability densityCapability = (DensityCapability) rsc
-                    .getCapability(DensityCapability.class);
-            densityCapability.setDensity(DEFAULT_DENSITY);
+        /*
+         * TODO: We may need to eventually refactor the Legend browser and
+         * Matrix navigator into two separate views/plug-ins. This type of
+         * constant checking for which mode is a bit painful.
+         */
+        if (toolLayer.getToolMode() == EnsembleTool.EnsembleToolMode.LEGENDS_PLAN_VIEW) {
+
+            // Set to default density for all loaded resources if can
+            // But it may be unmatched with current display. Fix it later
+            if (rsc.getCapability(DensityCapability.class) != null) {
+                DensityCapability densityCapability = (DensityCapability) rsc
+                        .getCapability(DensityCapability.class);
+                densityCapability.setDensity(DEFAULT_DENSITY);
+            }
         }
 
-        GenericResourceHolder ensToolResource = GenericResourceHolder
+        AbstractResourceHolder ensToolResource = AbstractResourceHolder
                 .createResourceHolder(rsc, true);
         ensToolResource.setGenerated(false);
-        ensembleToolResourcesMap.get(toolLayer).add(ensToolResource);
 
+        ensembleToolResourcesMap.get(toolLayer).add(ensToolResource);
         checkExistingRegisteredResources(toolLayer);
+
+        /*
+         * TODO: This resource manager should not have to worry or even know
+         * about which mode the tool is in.
+         * 
+         * Currently, the only listeners are the field/plane controls in the
+         * matrix navigator. This unusual addition is so that the UI controls
+         * are updated with the resource color immediately at load time.
+         */
+        if (toolLayer.getToolMode() == EnsembleTool.EnsembleToolMode.MATRIX) {
+            for (IResourceRegisteredListener listener : resourceRegisteredListeners) {
+                listener.resourceRegistered(rsc);
+            }
+        }
 
         notifyClientListChanged();
 
         visibilityAndColorChangedListeners
                 .add(new VisibilityAndColorChangedListener(rsc));
 
-        // now update the calculation ensemble resource, if not already
-        // set ... there can only be one, and it will be the first
-        // ensemble resource loaded into this editor ...
-        ensembleToolResourcesMap.get(toolLayer)
-                .updateEnsembleCalculationResource();
+        /*
+         * now update the calculation ensemble resource, if not already set ...
+         * there can only be one, and it will be the first ensemble resource
+         * loaded into this editor ...
+         * ensembleToolResourcesMap.get(toolLayer).updateEnsembleCalculationResource
+         * ();
+         */
+
     }
 
     /**
@@ -272,12 +407,15 @@ public class EnsembleResourceManager implements IDisposeListener {
      * 
      * @param gr
      *            - the tracked resource.
-     * @param editor
-     *            - loaded editor.
+     * 
+     * @param toolLayer
+     *            - The tool layer associated with the editor/window into which
+     *            the resource is loaded.
+     * 
      * @param notifyGUI
      *            - if update the GUI.
      */
-    public synchronized void unregisterResource(GenericResourceHolder gr,
+    public synchronized void unregisterResource(AbstractResourceHolder gr,
             EnsembleToolLayer toolLayer, boolean notifyGUI) {
         if (toolLayer == null
                 || gr == null
@@ -321,19 +459,23 @@ public class EnsembleResourceManager implements IDisposeListener {
             return;
         }
 
-        // This may be the first resource ever registered using this editor. If
-        // so, then create the resource list and associate it with the editor
-        // using the map ...
+        /*
+         * This may be the first resource ever registered using this editor. If
+         * so, then create the resource list and associate it with the editor
+         * using the map ...
+         */
 
         if (ensembleToolResourcesMap.get(toolLayer) == null) {
             ensembleToolResourcesMap.put(toolLayer, new NavigatorResourceList(
                     toolLayer));
         }
 
-        // Only one instance of a generated resource is saved. If a duplicate is
-        // created then have it overwrite the existing one.
-        for (GenericResourceHolder gr : ensembleToolResourcesMap.get(toolLayer)
-                .getUserGeneratedRscs()) {
+        /*
+         * Only one instance of a generated resource is saved. If a duplicate is
+         * created then have it overwrite the existing one.
+         */
+        for (AbstractResourceHolder gr : ensembleToolResourcesMap
+                .get(toolLayer).getUserGeneratedRscs()) {
 
             // Remove any resource in this list, since it was unloaded/ isn't
             // existing.
@@ -350,15 +492,13 @@ public class EnsembleResourceManager implements IDisposeListener {
             }
         }
 
-        // Set to default density for all loaded resources if can
-        // But it may be unmatched with current display. Fix it later
-
-        // Set resource as a system resource so we don't show the legend
-        // in the main map, because we will display it in the ensemble
-        // navigator view.
-
-        // TODO: Must refactor so we don't use setSystemResource(boolean)
-        // method.
+        /*
+         * Set resource as a system resource so we don't show the legend in the
+         * main map, because we will display it in the ensemble navigator view.
+         * 
+         * TODO: Must refactor so we don't use setSystemResource(boolean)
+         * method.
+         */
         rsc.getProperties().setSystemResource(true);
         rsc.registerListener((IDisposeListener) this);
 
@@ -367,7 +507,7 @@ public class EnsembleResourceManager implements IDisposeListener {
                     .setSuppressingMenuItems(true);
         }
 
-        GenericResourceHolder ensToolResource = GenericResourceHolder
+        AbstractResourceHolder ensToolResource = AbstractResourceHolder
                 .createResourceHolder(rsc, true);
         ensToolResource.setGenerated(true);
         ensembleToolResourcesMap.get(toolLayer).add(ensToolResource);
@@ -378,6 +518,18 @@ public class EnsembleResourceManager implements IDisposeListener {
                 .add(new VisibilityAndColorChangedListener(rsc));
 
         notifyClientListChanged();
+
+        /*
+         * Turns off other same mode histogram tools.
+         * 
+         * Keeps only one tool working at same time.
+         */
+        if (ensToolResource instanceof HistogramGridResourceHolder) {
+            EnsembleResourceManager.getInstance().turnOffOtherHistograms(
+                    (HistogramGridResourceHolder) ensToolResource);
+
+        }
+
     }
 
     /**
@@ -385,12 +537,13 @@ public class EnsembleResourceManager implements IDisposeListener {
      * 
      * @param gr
      *            - the tracked resource.
-     * @param editor
-     *            - loaded editor.
+     * @param toolLayer
+     *            - The tool layer associated with the editor/window into which
+     *            the resource is loaded .
      * @param notifyGUI
      *            - if update the GUI.
      */
-    public synchronized void unregisterGenerated(GenericResourceHolder gr,
+    public synchronized void unregisterGenerated(AbstractResourceHolder gr,
             EnsembleToolLayer toolLayer, boolean notifyGUI) {
         if (gr == null
                 || ensembleToolResourcesMap.get(toolLayer).getResourceHolders()
@@ -472,7 +625,9 @@ public class EnsembleResourceManager implements IDisposeListener {
     /**
      * Handle ENS GUI change
      * 
-     * @param editor
+     * @param toolLayer
+     *            - The tool layer associated with the editor/window into which
+     *            the resources are loaded.
      */
     public void updateFrameChanges(EnsembleToolLayer toolLayer) {
         checkExistingRegisteredResources(toolLayer);
@@ -499,17 +654,19 @@ public class EnsembleResourceManager implements IDisposeListener {
                         .isEmpty())
             return;
 
-        for (GenericResourceHolder gr : ensembleToolResourcesMap.get(toolLayer)
-                .getAllRscsAsList()) {
+        for (AbstractResourceHolder gr : ensembleToolResourcesMap
+                .get(toolLayer).getAllRscsAsList()) {
             // verify if the resources in the list are existing.
             if (!gr.getRsc().getDescriptor().getResourceList()
                     .containsRsc(gr.getRsc())) {
 
-                // Remove any resource in this list, since it was unloaded/
-                // isn't existing.
+                /*
+                 * Remove any resource in this list, since it was unloaded it
+                 * won't exist.
+                 */
                 ensembleToolResourcesMap.get(toolLayer).remove(gr);
 
-                // TODO: notify GUI if there is any change.
+                /* TODO: notify GUI if there is any change. */
                 // notifyClientListChanged();
             } else {
                 /*
@@ -518,8 +675,10 @@ public class EnsembleResourceManager implements IDisposeListener {
                  */
                 gr.getRsc().getProperties().setSystemResource(true);
 
-                // Marks to unselected if the resource is not visible
-                // set resource selection to true.
+                /*
+                 * Marks to unselected if the resource is not visible set
+                 * resource selection to true.
+                 */
                 if (gr.getRsc().getProperties().isVisible()) {
                     gr.setSelected(true);
                 } else {
@@ -545,7 +704,7 @@ public class EnsembleResourceManager implements IDisposeListener {
         ResourceList unRegisteredResources = new ResourceList();
 
         // The registered resources for this editor in the manager
-        List<GenericResourceHolder> resourceList = ensembleToolResourcesMap
+        List<AbstractResourceHolder> resourceList = ensembleToolResourcesMap
                 .get(editor).getAllRscsAsList();
 
         IDescriptor desc = (editor.getActiveDisplayPane().getDescriptor());
@@ -558,7 +717,7 @@ public class EnsembleResourceManager implements IDisposeListener {
                     || (rsc instanceof HistogramResource)) {
 
                 boolean isRegistered = false;
-                for (GenericResourceHolder rcsHolder : resourceList) {
+                for (AbstractResourceHolder rcsHolder : resourceList) {
                     if (rcsHolder.getRsc() == rsc) {
                         isRegistered = true;
                     }
@@ -574,7 +733,9 @@ public class EnsembleResourceManager implements IDisposeListener {
     /**
      * Check generated resources update data and display if need
      * 
-     * @param editor
+     * @param toolLayer
+     *            - The tool layer associated with the editor/window into which
+     *            the resource is loaded .
      */
     public void updateGenerated(EnsembleToolLayer toolLayer) {
         if (toolLayer == null
@@ -586,8 +747,8 @@ public class EnsembleResourceManager implements IDisposeListener {
                         .getUserGeneratedRscs().isEmpty())
             return;
         // Check each resource if need update
-        for (GenericResourceHolder rsc : ensembleToolResourcesMap
-                .get(toolLayer).getUserGeneratedRscs()) {
+        for (AbstractResourceHolder rsc : ensembleToolResourcesMap.get(
+                toolLayer).getUserGeneratedRscs()) {
             /**
              * TODO : Generated resources will not get auto-updated by the
              * server, so leave this for future use.
@@ -622,6 +783,9 @@ public class EnsembleResourceManager implements IDisposeListener {
         incomingSpooler.clear();
         incomingSpooler = null;
 
+        resourceRegisteredListeners.clear();
+        resourceRegisteredListeners = null;
+
         visibilityAndColorChangedListeners.clear();
         visibilityAndColorChangedListeners = null;
 
@@ -647,6 +811,7 @@ public class EnsembleResourceManager implements IDisposeListener {
     public void disposed(AbstractVizResource<?, ?> rsc) {
 
         notifyClientListChanged();
+
     }
 
     /**
@@ -761,6 +926,141 @@ public class EnsembleResourceManager implements IDisposeListener {
 
     public void removeMapping(EnsembleToolLayer toolLayer) {
         ensembleToolResourcesMap.remove(toolLayer);
+    }
+
+    /**
+     * Turn off all other same mode histogram tools, when a histogram tool is
+     * turn on or loading.
+     * 
+     * TODO: Need do more post processes histograms. Should do similar process
+     * other loaded tools too.
+     * 
+     * @param hgr
+     *            -the histogram tool is turn on or loading
+     */
+    public void turnOffOtherHistograms(HistogramGridResourceHolder hgr) {
+        // Get current Layer
+        EnsembleToolLayer toolLayer = EnsembleTool.getInstance().getToolLayer();
+
+        // Search for same mode histogram tools
+        NavigatorResourceList rList = EnsembleResourceManager.getInstance()
+                .getResourceList(toolLayer);
+        if (rList == null || rList.isEmpty()) {
+            return;
+        }
+
+        // Turn off same mode histogram tools
+        boolean isAnyTurnedOff = false;
+        for (AbstractResourceHolder gr : rList.getUserGeneratedRscs()) {
+            if (!(gr instanceof HistogramGridResourceHolder)) {
+                continue;
+            }
+
+            if (hgr != gr
+                    && ((HistogramResource<?>) (hgr.getRsc())).getMode() == ((HistogramResource<?>) (gr
+                            .getRsc())).getMode() && gr.isSelected()) {
+                gr.getRsc().getProperties().setVisible(false);
+                gr.getRsc().issueRefresh();
+                gr.setSelected(false);
+                isAnyTurnedOff = true;
+            }
+        }
+
+        if (isAnyTurnedOff) {
+            // TODO Update histogram tools, Implement later
+        }
+    }
+
+    /**
+     * Update related generated resource(s) display when a resource changed.
+     * Only process the Distribution Viewer in this release.
+     * 
+     * @param rh
+     *            -The changed resource holder which can be a loaded or
+     *            generated resource holder
+     */
+    public void updateGenerated(AbstractResourceHolder rh) {
+        if (rh == null) {
+            return;
+        }
+
+        // Get current Layer
+        EnsembleToolLayer toolLayer = EnsembleTool.getInstance().getToolLayer();
+
+        // Search for same mode histogram tools
+        NavigatorResourceList rList = EnsembleResourceManager.getInstance()
+                .getResourceList(toolLayer);
+        if (rList == null || rList.isEmpty()) {
+            return;
+        }
+
+        List<AbstractResourceHolder> generatedResources = rList
+                .getUserGeneratedRscs();
+
+        if (rh.isGenerated()) {
+            /*
+             * Update Generated products. Currently just clear the distribution
+             * viewer display area.
+             * 
+             * TODO: This needs further evaluation in the next delivery.
+             */
+            if (rh instanceof HistogramGridResourceHolder
+                    && ((HistogramResource<?>) (rh.getRsc())).getMode() == HistogramResource.DisplayMode.GRAPHIC_HISTGRAM
+                    && EnsembleTool.getInstance().getEnsembleToolViewer() != null) {
+                clearDistributionViewer();
+            }
+
+            return;
+            // Loaded resource in Map may impact to the related loaded tool(s)
+        } else if (rh instanceof GridResourceHolder && !rh.isGenerated()
+                && rh.getRsc().getDescriptor() instanceof MapDescriptor
+                && generatedResources != null && !generatedResources.isEmpty()) {
+            for (AbstractResourceHolder gr : generatedResources) {
+                /*
+                 * A related generated resource is with same level and unit as
+                 * the changed resource.
+                 */
+                if (!gr.getUnits().contentEquals(rh.getUnits())
+                        || !gr.getLevel().contentEquals(rh.getLevel())) {
+                    continue;
+                }
+                // Impact to a related Distribution Viewer, clear display.
+                if (gr instanceof HistogramGridResourceHolder
+                        && ((HistogramResource<?>) (gr.getRsc())).getMode() == HistogramResource.DisplayMode.GRAPHIC_HISTGRAM
+                        && EnsembleTool.getInstance().getEnsembleToolViewer() != null
+                        && gr.isSelected()) {
+                    clearDistributionViewer();
+                }
+
+                /*
+                 * TODO: Need to make sure a calculation is updated if it was
+                 * created with this updated generated product.
+                 */
+
+                /*
+                 * TODO: Need to make sure any related tool products are updated
+                 * if they are impacted by this updated generated product.
+                 */
+
+            }
+
+        }
+        // TODO:Add loaded process for others like time series.
+    }
+
+    /**
+     * Clear the distribution viewer.
+     */
+    public void clearDistributionViewer() {
+        EnsembleTool.getInstance().getEnsembleToolViewer()
+                .getDistributionViewer().getGhGUI().getDisp()
+                .clearDistributionViewer();
+    }
+
+    @Override
+    public void addResourceRegisteredListener(
+            IResourceRegisteredListener listener) {
+        resourceRegisteredListeners.add(listener);
     }
 
 }

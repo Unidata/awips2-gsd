@@ -29,7 +29,7 @@ import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
  * @version 1.0
  */
 
-public class GeneratedGridResourceHolder extends GenericResourceHolder {
+public class GeneratedGridResourceHolder extends AbstractResourceHolder {
 
     GeneratedEnsembleGridResource currRsc = null;
 
@@ -87,12 +87,19 @@ public class GeneratedGridResourceHolder extends GenericResourceHolder {
         return currRsc.getCalculation();
     }
 
+    @Override
     public String getGroupName() {
 
-        return getUniqueName();
+        return getSpecificName();
     }
 
-    public String getUniqueName() {
+    @Override
+    public String getGeneralName() {
+        return getSpecificName();
+    }
+
+    @Override
+    public String getSpecificName() {
 
         String s = currRsc.getName();
         String nodeLabel = Utilities.removeExtraSpaces(s);
@@ -123,11 +130,6 @@ public class GeneratedGridResourceHolder extends GenericResourceHolder {
     @Override
     public String getStationId() {
         return "";
-    }
-
-    @Override
-    public int hashCode() {
-        return getUniqueName().hashCode();
     }
 
     public Range getRange() {

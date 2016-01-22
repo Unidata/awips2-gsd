@@ -37,20 +37,26 @@ public enum GlobalColor {
     GRAY(new RGB(190, 190, 190)), //
     GREEN(new RGB(0, 204, 0)), //
     HOT_MAGENTA(new RGB(252, 29, 206)), //
-    LIGHTER_GRAY(new RGB(234, 232, 227)), //
-    LIGHTER_YELLOW(new RGB(255, 255, 102)), //
+    LIGHT_CARIBBEAN_GREEN(new RGB(0, 224, 173)), //
+    LIGHTER_GRAY(new RGB(234, 234, 234)), //
+    LIGHTER_YELLOW(new RGB(255, 255, 240)), //
+    LIGHTISH_GRAY(new RGB(220, 220, 220)), //
     LIGHT_GRAY(new RGB(210, 210, 210)), //
     LIGHT_OLIVE(new RGB(153, 204, 0)), //
+    LIGHT_RED(new RGB(255, 134, 134)), //
     LIGHT_YELLOW(new RGB(255, 255, 220)), //
+    MEDIUM_LIGHT_GRAY(new RGB(175, 175, 175)), //
     MEDIUM_GRAY(new RGB(160, 160, 160)), //
     NEAR_WHITE(new RGB(240, 240, 240)), //
     NEON_CARROT(new RGB(255, 163, 67)), //
     NEON_PURPLE(new RGB(217, 0, 255)), //
-    PALE_DULL_AZURE(new RGB(168, 215, 255)), //
     PALE_DULL_ORANGE(new RGB(255, 204, 153)), //
     PALE_DULL_VIOLET(new RGB(204, 204, 255)), //
     PALE_DULL_YELLOW(new RGB(255, 255, 150)), //
-    PALE_LIGHT_AZURE(new RGB(215, 239, 255)), //
+    PALE_DULL_AZURE(new RGB(141, 182, 221)), //
+    PALE_DARK_AZURE(new RGB(174, 196, 228)), //
+    PALE_LIGHT_AZURE(new RGB(196, 220, 249)), //
+    PALE_EXTRA_LIGHT_AZURE(new RGB(214, 233, 253)), //
     PALE_WEAK_BLUE(new RGB(203, 229, 255)), //
     PALE_WEAK_GREEN(new RGB(204, 255, 204)), //
     PALE_WEAK_MAGENTA(new RGB(255, 204, 255)), //

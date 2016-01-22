@@ -1,6 +1,6 @@
 package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer;
 
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
 
 import org.eclipse.ui.IPartListener2;
 import org.eclipse.ui.IWorkbenchPart;
@@ -26,18 +26,18 @@ import org.eclipse.ui.IWorkbenchPartReference;
  * @author polster
  * @version 1.0
  */
-public class EnsembleViewPartListener implements IPartListener2 {
+public class EnsembleToolViewerPartListener implements IPartListener2 {
 
     private EnsembleToolViewer ensembleToolViewer = null;
 
-    public EnsembleViewPartListener(EnsembleToolViewer fsv) {
+    public EnsembleToolViewerPartListener(EnsembleToolViewer fsv) {
         ensembleToolViewer = fsv;
     }
 
     @Override
     public void partActivated(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            /* TODO */
+            // ensembleToolViewer.setFocus();`
         }
     }
 
@@ -76,7 +76,7 @@ public class EnsembleViewPartListener implements IPartListener2 {
     @Override
     public void partVisible(IWorkbenchPartReference partRef) {
         if (isThisPart(partRef)) {
-            if (EnsembleTool.getInstance().isToolAvailable()
+            if (EnsembleTool.getInstance().isToolEditable()
                     && EnsembleTool.getInstance()
                             .isMakeEditableOnRestorePreference()) {
                 EnsembleTool.getInstance().setEditable(true);
