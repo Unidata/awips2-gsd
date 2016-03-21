@@ -87,7 +87,7 @@ public class ContextMenuManager {
     private static Map<Class<?>, Set<AbstractRightClickAction>> contextualItems;
 
     static {
-        contextualItems = new HashMap<Class<?>, Set<AbstractRightClickAction>>();
+        contextualItems = new HashMap<>();
         // Construct the resource mapping from Eclipse plugins
         IExtensionRegistry registry = Platform.getExtensionRegistry();
         IExtensionPoint point = registry
@@ -172,7 +172,7 @@ public class ContextMenuManager {
             return;
         }
 
-        TreeSet<AbstractRightClickAction> actionSet = new TreeSet<AbstractRightClickAction>(
+        TreeSet<AbstractRightClickAction> actionSet = new TreeSet<>(
                 new MyComparator());
 
         Iterator<Class<?>> classIterator = contextualItems.keySet().iterator();
@@ -204,9 +204,8 @@ public class ContextMenuManager {
                         continue;
                     }
                     /**
-                     * TODO: (For the 16.2.2 release) Ignore the 'Display
-                     * Product' and 'Move' actions for both Legends and Matrix
-                     * mode.
+                     * Ignore the 'Display Product' and 'Move' actions for both
+                     * Legends and Matrix mode.
                      */
                     if (action instanceof EnableDisableAction
                             || action instanceof MoveUpAction

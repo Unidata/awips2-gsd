@@ -1,9 +1,7 @@
 package gov.noaa.gsd.viz.ensemble.display.chart;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -79,7 +77,6 @@ public abstract class StatisticsUtilities {
         return result;
     }
 
-   
     /**
      * Calculates the mean.
      * 
@@ -139,15 +136,15 @@ public abstract class StatisticsUtilities {
             if (count > 0) {
                 if (count % 2 == 1) {
                     if (count > 1) {
-                        Number value =  values.get((count - 1) / 2);
+                        Number value = values.get((count - 1) / 2);
                         result = value.doubleValue();
                     } else {
-                        Number value =  values.get(0);
+                        Number value = values.get(0);
                         result = value.doubleValue();
                     }
                 } else {
-                    Number value1 =  values.get(count / 2 - 1);
-                    Number value2 =  values.get(count / 2);
+                    Number value1 = values.get(count / 2 - 1);
+                    Number value2 = values.get(count / 2);
                     result = (double) ((value1.doubleValue() + value2
                             .doubleValue()) / 2.0);
                 }
@@ -155,8 +152,7 @@ public abstract class StatisticsUtilities {
         }
         return result;
     }
-    
-    
+
     /**
      * Calculates the median for a sublist within a list of values.
      * 
@@ -205,16 +201,15 @@ public abstract class StatisticsUtilities {
             if (count > 0) {
                 if (count % 2 == 1) {
                     if (count > 1) {
-                        Number value =  values.get(start + (count - 1)
-                                / 2);
+                        Number value = values.get(start + (count - 1) / 2);
                         result = value.doubleValue();
                     } else {
                         Number value = (Number) values.get(start);
                         result = value.doubleValue();
                     }
                 } else {
-                    Number value1 =  values.get(start + count / 2 - 1);
-                    Number value2 =  values.get(start + count / 2);
+                    Number value1 = values.get(start + count / 2 - 1);
+                    Number value2 = values.get(start + count / 2);
                     result = (double) ((value1.doubleValue() + value2
                             .doubleValue()) / 2.0);
                 }
@@ -535,7 +530,7 @@ public abstract class StatisticsUtilities {
      *            - A float data list
      * @return the float array
      */
-    public static float[] FloatListToFloatArray(List<Float> data) {
+    public static float[] floatListToFloatArray(List<Float> data) {
 
         float[] values = new float[data.size()];
         int i = 0;

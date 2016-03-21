@@ -703,7 +703,7 @@ public class EnsembleTool extends AbstractTool implements
                 IDescriptor desc = pane.getDescriptor();
                 List<EnsembleToolLayer> layers = desc.getResourceList()
                         .getResourcesByTypeAsType(EnsembleToolLayer.class);
-                if (layers != null && layers.size() > 0) {
+                if (layers != null && !layers.isEmpty()) {
                     foundToolLayer = layers.get(0);
                 }
             }
@@ -893,7 +893,7 @@ public class EnsembleTool extends AbstractTool implements
     }
 
     public Map<String, List<AbstractResourceHolder>> getEmptyResourceMap() {
-        return new HashMap<String, List<AbstractResourceHolder>>();
+        return new HashMap<>();
     }
 
     /*

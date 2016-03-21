@@ -151,7 +151,7 @@ public class EnsembleResourceManager implements IDisposeListener,
      * event list for to catch interesting events
      */
     private EnsembleResourceManager() {
-        ensembleToolResourcesMap = new ConcurrentHashMap<EnsembleToolLayer, NavigatorResourceList>();
+        ensembleToolResourcesMap = new ConcurrentHashMap<>();
         visibilityAndColorChangedListeners = new CopyOnWriteArrayList<>();
 
         incomingSpooler = new ArrayBlockingQueue<>(500);
@@ -315,8 +315,8 @@ public class EnsembleResourceManager implements IDisposeListener,
         }
 
         /*
-         * is this a previously unknow tool layer? then create the resource list
-         * and map it to the tool layer ...
+         * is this a previously unknown tool layer? then create the resource
+         * list and map it to the tool layer ...
          */
         if (ensembleToolResourcesMap.get(toolLayer) == null) {
             ensembleToolResourcesMap.put(toolLayer, new NavigatorResourceList(

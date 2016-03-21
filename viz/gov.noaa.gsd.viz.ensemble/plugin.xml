@@ -45,29 +45,6 @@
          point="org.eclipse.ui.menus">
 
       <menuContribution
-            locationURI="toolbar:org.eclipse.ui.main.toolbar?after=additions">
-         <toolbar id="ensemblesToolbar">
-            <visibleWhen>
-                <reference
-                    definitionId="com.raytheon.uf.viz.d2d.ui.inD2DActionSet">
-                </reference>
-            </visibleWhen>
-            <command
-                  commandId="gov.noaa.gsd.viz.ensemble.start.tool"
-                  icon="icons/calvin-1.gif"
-                  id="gov.noaa.gsd.viz.ensemble.tool.viewer"
-                  label="Ensembles"
-                  style="push"
-                  tooltip="Ensemble Tool">                  
-            </command>
-             <separator
-                   name="gov.noaa.gsd.viz.ensemble.separator_post"
-                   visible="true">
-             </separator>
-          </toolbar>
-      </menuContribution>
-
-      <menuContribution
             allPopups="false"
             locationURI="menu:tools?after=distanceScaleTool">
          <command
