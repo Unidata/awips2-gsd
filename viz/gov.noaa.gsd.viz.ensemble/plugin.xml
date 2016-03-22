@@ -46,6 +46,12 @@
           </toolbar>
       </menuContribution>
 -->
+	  <menuContribution locationURI="menu:models?after=afterVB">
+         <command
+               commandId="gov.noaa.gsd.viz.ensemble.activate.layer"
+               label="Ensemble Display">
+         </command>
+      </menuContribution>
       <menuContribution
             allPopups="false"
             locationURI="menu:tools">
