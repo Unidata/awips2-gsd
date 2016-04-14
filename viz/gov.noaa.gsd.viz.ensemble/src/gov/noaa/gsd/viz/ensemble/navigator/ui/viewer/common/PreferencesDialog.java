@@ -39,7 +39,7 @@ public class PreferencesDialog extends CaveJFACEDialog {
     public PreferencesDialog(Shell parentShell) {
         super(parentShell);
         setBlockOnOpen(false);
-        setCloseCallback(new ICloseCallback() {
+        addCloseCallback(new ICloseCallback() {
 
             @Override
             public void dialogClosed(Object returnValue) {
