@@ -34,8 +34,11 @@ Require-Bundle: org.eclipse.ui;bundle-version="3.8.2",
  com.raytheon.uf.viz.core.maps;bundle-version="1.14.1"
 Bundle-RequiredExecutionEnvironment: JavaSE-1.7
 Bundle-ActivationPolicy: lazy
-Export-Package: gov.noaa.gsd.viz.ensemble.display.control.load,
- gov.noaa.gsd.viz.ensemble.navigator.ui.layer
+Export-Package: gov.noaa.gsd.viz.ensemble.display.calculate,
+ gov.noaa.gsd.viz.ensemble.display.common,
+ gov.noaa.gsd.viz.ensemble.display.control.load,
+ gov.noaa.gsd.viz.ensemble.navigator.ui.layer,
+ gov.noaa.gsd.viz.ensemble.util
 Import-Package: com.raytheon.uf.viz.core.grid.rsc,
  com.raytheon.uf.viz.core.grid.rsc.data
 Bundle-Activator: gov.noaa.gsd.viz.ensemble.Activator
