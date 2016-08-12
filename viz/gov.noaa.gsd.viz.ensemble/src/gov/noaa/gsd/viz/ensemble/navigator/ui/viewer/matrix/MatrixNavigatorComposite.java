@@ -93,6 +93,8 @@ import com.raytheon.viz.ui.actions.FramesHandler;
  * ------------ ---------- ----------- --------------------------
  * Oct 15, 2015   12565      polster     Initial creation
  * Nov 13, 2015   13211      polster     Matrix editor commonalities
+ * Jun 27, 2016   19975      bsteffen    Eclipse 4: Fix NPE when focus event
+ *                                       arrives before selection event.
  * 
  * </pre>
  * 
@@ -464,8 +466,13 @@ public class MatrixNavigatorComposite extends Composite implements
      */
     @Override
     public void giveEditorFocus() {
-        MatrixNavigatorComposite.matrixEditor.getEditorSite().getPart()
-                .setFocus();
+        /*
+         * The editor will be null on initial selection if SWT sends the focus
+         * event before the selection event.
+         */
+        if (matrixEditor != null) {
+            matrixEditor.getEditorSite().getPart().setFocus();
+        }
     }
 
     /**
