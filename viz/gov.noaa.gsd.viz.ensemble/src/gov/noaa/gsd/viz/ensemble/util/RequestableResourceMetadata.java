@@ -12,8 +12,8 @@ import com.raytheon.uf.common.derivparam.inv.AbstractInventory;
 import com.raytheon.uf.common.derivparam.library.DerivedParameterGenerator;
 import com.raytheon.uf.common.parameter.lookup.ParameterLookup;
 import com.raytheon.uf.viz.core.rsc.AbstractRequestableResourceData;
+import com.raytheon.uf.viz.core.rsc.groups.BestResResourceData;
 import com.raytheon.uf.viz.datacube.DataCubeContainer;
-import com.raytheon.viz.core.rsc.BestResResourceData;
 import com.raytheon.viz.grid.rsc.GridResourceData;
 
 /**
