@@ -46,7 +46,7 @@
 
       <menuContribution
             allPopups="false"
-            locationURI="menu:tools?after=distanceScaleTool">
+            locationURI="menu:models?after=ensemble">
          <command
                commandId="gov.noaa.gsd.viz.ensemble.start.tool"
                style="push">
