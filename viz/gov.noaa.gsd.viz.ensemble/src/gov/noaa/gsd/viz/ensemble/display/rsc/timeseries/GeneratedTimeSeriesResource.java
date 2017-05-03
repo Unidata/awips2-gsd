@@ -34,7 +34,7 @@ import com.raytheon.uf.viz.xy.timeseries.adapter.AbstractTimeSeriesAdapter;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.core.graphing.util.GraphPrefsFactory;
 import com.raytheon.viz.core.graphing.xy.XYData;
-import com.raytheon.viz.core.rsc.ICombinedResourceData.CombineOperation;
+import com.raytheon.uf.viz.core.rsc.groups.ICombinedResourceData.CombineOperation;
 
 /**
  * Uses cached data and parameters of loaded members in the time series display,
