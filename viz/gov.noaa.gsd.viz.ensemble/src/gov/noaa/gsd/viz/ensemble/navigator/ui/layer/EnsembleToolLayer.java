@@ -40,9 +40,9 @@ import com.raytheon.uf.viz.core.rsc.RenderingOrderFactory.ResourceOrder;
 import com.raytheon.uf.viz.core.rsc.ResourceList;
 import com.raytheon.uf.viz.core.rsc.ResourceProperties;
 import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
+import com.raytheon.uf.viz.core.rsc.groups.BestResResource;
 import com.raytheon.uf.viz.core.rsc.tools.GenericToolsResourceData;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
-import com.raytheon.viz.core.rsc.BestResResource;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
 import com.raytheon.viz.grid.rsc.general.GridResource;
 import com.raytheon.viz.ui.input.EditableManager;
@@ -370,6 +370,7 @@ public class EnsembleToolLayer
         /**
          * TODO: Need to make the context menu work for BestResResource.
          */
+
         if (rsc instanceof BestResResource) {
             BestResResource brr = (BestResResource) rsc;
             rscList = brr.getResourceList();
