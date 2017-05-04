@@ -1,5 +1,53 @@
 package gov.noaa.gsd.viz.ensemble.navigator.ui.layer;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.jobs.Job;
+import org.eclipse.jface.viewers.TreePath;
+import org.eclipse.ui.IEditorPart;
+import org.eclipse.ui.IWorkbenchWindow;
+import org.eclipse.ui.PlatformUI;
+
+import com.raytheon.uf.common.status.IUFStatusHandler;
+import com.raytheon.uf.common.status.UFStatus;
+import com.raytheon.uf.common.time.DataTime;
+import com.raytheon.uf.viz.core.IExtent;
+import com.raytheon.uf.viz.core.IGraphicsTarget;
+import com.raytheon.uf.viz.core.drawables.AbstractDescriptor;
+import com.raytheon.uf.viz.core.drawables.IDescriptor;
+import com.raytheon.uf.viz.core.drawables.IDescriptor.IFrameChangedListener;
+import com.raytheon.uf.viz.core.drawables.PaintProperties;
+import com.raytheon.uf.viz.core.drawables.ResourcePair;
+import com.raytheon.uf.viz.core.exception.VizException;
+import com.raytheon.uf.viz.core.rsc.AbstractNameGenerator;
+import com.raytheon.uf.viz.core.rsc.AbstractRequestableResourceData;
+import com.raytheon.uf.viz.core.rsc.AbstractResourceData;
+import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+import com.raytheon.uf.viz.core.rsc.DisplayType;
+import com.raytheon.uf.viz.core.rsc.IInitListener;
+import com.raytheon.uf.viz.core.rsc.IRefreshListener;
+import com.raytheon.uf.viz.core.rsc.IResourceDataChanged;
+import com.raytheon.uf.viz.core.rsc.LoadProperties;
+import com.raytheon.uf.viz.core.rsc.RenderingOrderFactory.ResourceOrder;
+import com.raytheon.uf.viz.core.rsc.ResourceList;
+import com.raytheon.uf.viz.core.rsc.ResourceProperties;
+import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
+import com.raytheon.uf.viz.core.rsc.tools.GenericToolsResourceData;
+import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
+import com.raytheon.viz.core.rsc.BestResResource;
+import com.raytheon.viz.grid.rsc.general.D2DGridResource;
+import com.raytheon.viz.grid.rsc.general.GridResource;
+import com.raytheon.viz.ui.input.EditableManager;
+import com.vividsolutions.jts.geom.Coordinate;
+
 import gov.noaa.gsd.viz.ensemble.control.EnsembleResourceManager;
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.display.calculate.AvgM1StddevCalculator;
@@ -22,63 +70,7 @@ import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResource;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.FieldPlanePair;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.ModelSources;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.VizMatrixEditor;
 import gov.noaa.gsd.viz.ensemble.util.RequestableResourceMetadata;
-import gov.noaa.gsd.viz.ensemble.util.ViewerWindowState;
-
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.core.runtime.IStatus;
-import org.eclipse.core.runtime.Status;
-import org.eclipse.core.runtime.jobs.Job;
-import org.eclipse.jface.viewers.TreePath;
-import org.eclipse.swt.widgets.Event;
-import org.eclipse.ui.IEditorPart;
-import org.eclipse.ui.IEditorReference;
-import org.eclipse.ui.IWorkbenchWindow;
-import org.eclipse.ui.PlatformUI;
-
-import com.raytheon.uf.common.status.IUFStatusHandler;
-import com.raytheon.uf.common.status.UFStatus;
-import com.raytheon.uf.common.time.DataTime;
-import com.raytheon.uf.viz.core.IDisplayPaneContainer;
-import com.raytheon.uf.viz.core.IExtent;
-import com.raytheon.uf.viz.core.IGraphicsTarget;
-import com.raytheon.uf.viz.core.VizApp;
-import com.raytheon.uf.viz.core.drawables.AbstractDescriptor;
-import com.raytheon.uf.viz.core.drawables.IDescriptor;
-import com.raytheon.uf.viz.core.drawables.IDescriptor.IFrameChangedListener;
-import com.raytheon.uf.viz.core.drawables.PaintProperties;
-import com.raytheon.uf.viz.core.drawables.ResourcePair;
-import com.raytheon.uf.viz.core.exception.VizException;
-import com.raytheon.uf.viz.core.rsc.AbstractNameGenerator;
-import com.raytheon.uf.viz.core.rsc.AbstractRequestableResourceData;
-import com.raytheon.uf.viz.core.rsc.AbstractResourceData;
-import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
-import com.raytheon.uf.viz.core.rsc.DisplayType;
-import com.raytheon.uf.viz.core.rsc.IInitListener;
-import com.raytheon.uf.viz.core.rsc.IInputHandler;
-import com.raytheon.uf.viz.core.rsc.IRefreshListener;
-import com.raytheon.uf.viz.core.rsc.IResourceDataChanged;
-import com.raytheon.uf.viz.core.rsc.LoadProperties;
-import com.raytheon.uf.viz.core.rsc.RenderingOrderFactory.ResourceOrder;
-import com.raytheon.uf.viz.core.rsc.ResourceList;
-import com.raytheon.uf.viz.core.rsc.ResourceProperties;
-import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
-import com.raytheon.uf.viz.core.rsc.tools.GenericToolsResourceData;
-import com.raytheon.uf.viz.xy.timeseries.TimeSeriesEditor;
-import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
-import com.raytheon.viz.core.rsc.BestResResource;
-import com.raytheon.viz.grid.rsc.general.D2DGridResource;
-import com.raytheon.viz.grid.rsc.general.GridResource;
-import com.raytheon.viz.ui.input.EditableManager;
-import com.vividsolutions.jts.geom.Coordinate;
 
 /**
  * The EnsembleToolLayer is an AbstractVizResource that the user can turn on or
@@ -114,15 +106,19 @@ import com.vividsolutions.jts.geom.Coordinate;
  * Nov 16, 2014    5056      polster    Initial creation
  * Nov 13, 2015   13211      polster    Changes in support of Matrix vs Legend
  * Jan 15, 2016   12301      jing       Added distribution feature
+ * Nov 12, 2016   19443      polster    Clean up dispose process
+ * Dec 29, 2016   19325      jing       Process image items in calculation menu
+ * Feb 17, 2017   19325      jing       Added ERF image capability
+ * Mar 01, 2017   19443    polster      Fix clear and close behavior
  * 
  * </pre>
  * 
  * @author polster
  * @version 1.0
  */
-public class EnsembleToolLayer extends
-        AbstractVizResource<AbstractResourceData, AbstractDescriptor> implements
-        IInputHandler, IRefreshListener, IResourceDataChanged,
+public class EnsembleToolLayer
+        extends AbstractVizResource<AbstractResourceData, AbstractDescriptor>
+        implements IRefreshListener, IResourceDataChanged,
         IFrameChangedListener, IInitListener {
 
     private static final transient IUFStatusHandler statusHandler = UFStatus
@@ -154,6 +150,8 @@ public class EnsembleToolLayer extends
 
     private EnsembleTool.EnsembleToolMode toolMode = EnsembleTool.EnsembleToolMode.LEGENDS_PLAN_VIEW;
 
+    // private IDisplayPaneContainer thisToolLayersContainer = null;
+
     public EnsembleToolLayer(
             GenericToolsResourceData<EnsembleToolLayer> resourceData,
             LoadProperties loadProperties) {
@@ -161,7 +159,7 @@ public class EnsembleToolLayer extends
         ensemblesTree = new ConcurrentHashMap<>();
         registerListener((IInitListener) this);
 
-        changeListeners = new ArrayList<IToolLayerChanged>();
+        changeListeners = new ArrayList<>();
 
     }
 
@@ -183,12 +181,13 @@ public class EnsembleToolLayer extends
 
     synchronized public Map<String, List<AbstractResourceHolder>> getEnsembleResources() {
 
-        if (EnsembleResourceManager.getInstance().getResourceList(this) != null) {
+        if (EnsembleResourceManager.getInstance()
+                .getResourceList(this) != null) {
             ensemblesTree = EnsembleResourceManager.getInstance()
                     .getResourceList(this).getAllRscsAsMap(ensemblesTree);
         } else {
             if (ensemblesTree == null) {
-                ensemblesTree = new ConcurrentHashMap<String, List<AbstractResourceHolder>>();
+                ensemblesTree = new ConcurrentHashMap<>();
             }
         }
 
@@ -237,7 +236,8 @@ public class EnsembleToolLayer extends
                      * then the resource is compatible.
                      */
                     if (!isGeneratedResource(rp)
-                            && ((resource instanceof GridResource) || (resource instanceof TimeSeriesResource))) {
+                            && ((resource instanceof GridResource)
+                                    || (resource instanceof TimeSeriesResource))) {
                         isCompatible = true;
                     }
 
@@ -285,11 +285,11 @@ public class EnsembleToolLayer extends
 
     public void unloadAllResources() {
 
-        if (EnsembleResourceManager.getInstance().getResourceList(this) == null) {
+        if (EnsembleResourceManager.getInstance()
+                .getResourceList(this) == null) {
             return;
         }
-        Map<String, List<AbstractResourceHolder>> allRscs = EnsembleResourceManager
-                .getInstance().getResourceList(this).getAllRscsAsMap();
+        Map<String, List<AbstractResourceHolder>> allRscs = getEnsembleResources();
 
         List<AbstractResourceHolder> currEnsembleMembers = null;
         Set<String> keySet = allRscs.keySet();
@@ -298,17 +298,16 @@ public class EnsembleToolLayer extends
             String currRscListName = iter.next();
             currEnsembleMembers = allRscs.get(currRscListName);
             for (AbstractResourceHolder gr : currEnsembleMembers) {
+                AbstractVizResource<?, ?> rsc = gr.getRsc();
+                if (rsc instanceof TimeSeriesResource) {
+                    rsc.unload(getDescriptor().getResourceList());
+                    rsc.dispose();
+                } else {
+                    rsc.unload();
+                    rsc.dispose();
+                }
                 EnsembleResourceManager.getInstance().unregisterResource(gr,
                         this, false);
-                if (gr.getRsc() instanceof TimeSeriesResource) {
-                    gr.getRsc().unload(
-                            getEditor().getActiveDisplayPane().getDescriptor()
-                                    .getResourceList());
-                    gr.getRsc().dispose();
-                } else {
-                    gr.getRsc().unload();
-                    gr.getRsc().dispose();
-                }
             }
         }
 
@@ -320,7 +319,8 @@ public class EnsembleToolLayer extends
 
     }
 
-    public ResourcePair getResourcePair(FieldPlanePair e, ModelSources modelSrc) {
+    public ResourcePair getResourcePair(FieldPlanePair e,
+            ModelSources modelSrc) {
 
         ResourcePair foundRp = null;
         ResourceList rscList = getResourceContainer().getActiveDisplayPane()
@@ -381,10 +381,8 @@ public class EnsembleToolLayer extends
             }
         } else {
             if (TimeSeriesResource.class.isAssignableFrom(rsc.getClass())) {
-                IDisplayPaneContainer editor = EnsembleTool.getInstance()
-                        .findEditor(this);
-                rscList = editor.getActiveDisplayPane().getDescriptor()
-                        .getResourceList();
+                rscList = getResourceContainer().getActiveDisplayPane()
+                        .getDescriptor().getResourceList();
             } else {
                 rscList = getResourceContainer().getActiveDisplayPane()
                         .getDescriptor().getResourceList();
@@ -432,63 +430,27 @@ public class EnsembleToolLayer extends
         return isDisposed;
     }
 
-    public IDisplayPaneContainer getEditor() {
-        IDisplayPaneContainer editor = EnsembleTool.getInstance().findEditor(
-                this);
-        return editor;
-    }
-
     /**
-     * If the tool layer is associated with a Time Series or Matrix editor then
-     * close (i.e. hide) those editors when
+     * When the tool layer is disposed, clean up any listeners, unload all
+     * resources associated with the layer, and call the tool manager to let it
+     * handle its necessary cleanup.
      */
     @Override
     protected void disposeInternal() {
 
-        IDisplayPaneContainer editor = EnsembleTool.getInstance().getEditor(
-                this);
-
-        if (!PlatformUI.getWorkbench().isClosing()) {
-            if (editor instanceof TimeSeriesEditor) {
-                TimeSeriesEditor tsEditor = (TimeSeriesEditor) editor;
-                if (tsEditor != null) {
-                    for (IEditorReference ref : PlatformUI.getWorkbench()
-                            .getActiveWorkbenchWindow().getActivePage()
-                            .getEditorReferences()) {
-                        IEditorPart partEditor = ref.getEditor(false);
-                        if (editor == partEditor) {
-                            PlatformUI.getWorkbench()
-                                    .getActiveWorkbenchWindow().getActivePage()
-                                    .hideEditor(ref);
-                        }
-                    }
-                }
-            } else if (editor instanceof VizMatrixEditor) {
-                VizMatrixEditor vmEditor = (VizMatrixEditor) editor;
-                if (vmEditor != null) {
-                    for (IEditorReference ref : PlatformUI.getWorkbench()
-                            .getActiveWorkbenchWindow().getActivePage()
-                            .getEditorReferences()) {
-                        IEditorPart partEditor = ref.getEditor(false);
-                        if (editor == partEditor) {
-                            PlatformUI.getWorkbench()
-                                    .getActiveWorkbenchWindow().getActivePage()
-                                    .hideEditor(ref);
-                        }
-                    }
-                }
-            }
-        }
+        unregisterListener((IToolLayerChanged) EnsembleTool.getInstance());
 
         descriptor.removeFrameChangedListener(this);
+
         resourceData.removeChangeListener((IResourceDataChanged) this);
 
         unloadAllResources();
 
-        IDisplayPaneContainer container = getResourceContainer();
-        if (container != null) {
-            container.unregisterMouseHandler(this);
-        }
+        /* AWIPS2_GSD VLab Issue #29204 */
+        EnsembleResourceManager.getInstance().remove(this);
+
+        EnsembleTool.getInstance().checkForLastToolLayerClosed();
+
         isDisposed = true;
 
     }
@@ -499,11 +461,6 @@ public class EnsembleToolLayer extends
         descriptor.getResourceList().getProperties(this)
                 .setRenderingOrderId("HIGHEST");
 
-        IDisplayPaneContainer container = getResourceContainer();
-        if (container != null) {
-            container.registerMouseHandler(this);
-        }
-
     }
 
     @Override
@@ -512,9 +469,10 @@ public class EnsembleToolLayer extends
         descriptor.addFrameChangedListener(this);
         registerListener((IRefreshListener) this);
         resourceData.addChangeListener((IResourceDataChanged) this);
-        resourceData
-                .setNameGenerator(new EnsembleToolLayerNameGeneratorWithTimeStampBasis(
-                        this));
+        resourceData.setNameGenerator(
+                new EnsembleToolLayerNameGeneratorWithTimeStampBasis(this));
+        descriptor.getResourceList()
+                .addPostRemoveListener(EnsembleTool.getInstance());
 
     }
 
@@ -543,82 +501,24 @@ public class EnsembleToolLayer extends
         // TODO
     }
 
-    @Override
-    public boolean handleMouseMove(int x, int y) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean handleMouseDownMove(int x, int y, int mouseButton) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean handleMouseUp(int x, int y, int mouseButton) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean handleKeyUp(int keyCode) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean handleMouseDown(int x, int y, int mouseButton) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean handleMouseHover(int x, int y) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean handleDoubleClick(int x, int y, int button) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean handleMouseWheel(Event event, int x, int y) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean handleMouseExit(Event event) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean handleMouseEnter(Event event) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean handleKeyDown(int keyCode) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
     public void calculate(Calculation algorithm, final Range range) {
 
         final EnsembleToolLayer thisToolLayer = this;
 
-        if (algorithm == Calculation.ENSEMBLE_RELATIVE_FREQUENCY) {
+        if (algorithm == Calculation.ENSEMBLE_RELATIVE_FREQUENCY
+                || algorithm == Calculation.ENSEMBLE_RELATIVE_FREQUENCY_IMAGE) {
+
             Thread t = null;
             t = new Thread() {
                 public void run() {
 
                     ERFCalculator erfCalculation = new ERFCalculator(range);
+                    if (algorithm == Calculation.ENSEMBLE_RELATIVE_FREQUENCY_IMAGE) {
+                        erfCalculation.setImage(true);
+                    } else {
+                        erfCalculation.setImage(false);
+                    }
+
                     GeneratedDataLoader loader = new GeneratedDataLoader(
                             thisToolLayer,
                             GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
@@ -634,208 +534,333 @@ public class EnsembleToolLayer extends
     public void calculate(Calculation algorithm) {
 
         final EnsembleToolLayer thisToolLayer = this;
-        if (algorithm == Calculation.MEAN) {
+        Job calculateJob = null;
 
-            Thread t = null;
+        GeneratedDataLoader loader = new GeneratedDataLoader(thisToolLayer,
+                GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
 
-            t = new Thread() {
-                public void run() {
+        switch (algorithm) {
 
+        case MEAN:
+
+            calculateJob = new Job("Calculate Mean") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
                     // Load the mean overlay
                     MeanCalculator meanRsc = new MeanCalculator();
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(meanRsc);
 
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.MIN) {
 
-            Thread t = null;
+            break;
+        case MEAN_IMAGE:
 
-            t = new Thread() {
-                public void run() {
+            calculateJob = new Job("Calculate Mean Image") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+                    // Load the mean image overlay
+                    MeanCalculator meanRsc = new MeanCalculator();
+                    meanRsc.setImage(true);
+                    loader.load(meanRsc);
 
+                    return Status.OK_STATUS;
+                }
+            };
+
+            break;
+        case MIN:
+
+            calculateJob = new Job("Calculate Minimum") {
+
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
                     // Load the min overlay
                     MinCalculator minRsc = new MinCalculator();
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(minRsc);
+                    return Status.OK_STATUS;
 
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.MAX) {
+            break;
+        case MIN_IMAGE:
 
-            Thread t = null;
+            calculateJob = new Job("Calculate Minimum Image") {
 
-            t = new Thread() {
-                public void run() {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+                    // Load the min image overlay
+                    MinCalculator minRsc = new MinCalculator();
+                    minRsc.setImage(true);
+                    loader.load(minRsc);
+                    return Status.OK_STATUS;
 
+                }
+            };
+            break;
+        case MAX:
+
+            calculateJob = new Job("Calculate Maximum") {
+
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
                     // Load the max overlay
                     MaxCalculator maxRsc = new MaxCalculator();
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(maxRsc);
-
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.MEDIAN) {
+            break;
+        case MAX_IMAGE:
 
-            Thread t = null;
-            t = new Thread() {
-                public void run() {
+            calculateJob = new Job("Calculate Maximum Image") {
+
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+                    // Load the max image overlay
+                    MaxCalculator maxRsc = new MaxCalculator();
+                    maxRsc.setImage(true);
+                    loader.load(maxRsc);
+                    return Status.OK_STATUS;
+                }
+            };
+            break;
+        case MEDIAN:
+
+            calculateJob = new Job("Calculate Median") {
+
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
 
                     // Load the median overlay
                     MedianCalculator medianRsc = new MedianCalculator();
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(medianRsc);
-
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.MODE) {
+            break;
+        case MEDIAN_IMAGE:
 
-            Thread t = null;
-            t = new Thread() {
-                public void run() {
+            calculateJob = new Job("Calculate Median Image") {
+
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+
+                    // Load the median image overlay
+                    MedianCalculator medianRsc = new MedianCalculator();
+                    medianRsc.setImage(true);
+                    loader.load(medianRsc);
+                    return Status.OK_STATUS;
+                }
+            };
+            break;
+        case MODE:
+
+            calculateJob = new Job("Calculate Mode") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
 
                     // Load the median overlay
                     ModeCalculator modeRsc = new ModeCalculator();
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(modeRsc);
-
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.RANGE) {
+            break;
+        case MODE_IMAGE:
 
-            Thread t = null;
-            t = new Thread() {
-                public void run() {
+            calculateJob = new Job("Calculate Mode Image") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+
+                    // Load the median image overlay
+                    ModeCalculator modeRsc = new ModeCalculator();
+                    modeRsc.setImage(true);
+                    loader.load(modeRsc);
+                    return Status.OK_STATUS;
+                }
+            };
+            break;
+        case RANGE:
+
+            calculateJob = new Job("Calculate Range") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
 
                     // Load the range overlay
                     RangeCalculator rangeRsc = new RangeCalculator();
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(rangeRsc);
-
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.SUMMATION) {
+            break;
+        case RANGE_IMAGE:
 
-            Thread t = null;
-            t = new Thread() {
-                public void run() {
+            calculateJob = new Job("Calculate Range Image") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+
+                    // Load the range image overlay
+                    RangeCalculator rangeRsc = new RangeCalculator();
+                    rangeRsc.setImage(true);
+                    loader.load(rangeRsc);
+                    return Status.OK_STATUS;
+                }
+            };
+            break;
+        case SUMMATION:
+
+            calculateJob = new Job("Calculate Summation") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
 
                     // Load the sum overlay
                     SumCalculator sumRsc = new SumCalculator();
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(sumRsc);
-
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.STANDARD_DEVIATION) {
+            break;
+        case SUMMATION_IMAGE:
 
-            Thread t = null;
-            t = new Thread() {
-                public void run() {
+            calculateJob = new Job("Calculate Summation Image") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+
+                    // Load the sum image overlay
+                    SumCalculator sumRsc = new SumCalculator();
+                    sumRsc.setImage(true);
+                    loader.load(sumRsc);
+                    return Status.OK_STATUS;
+                }
+            };
+            break;
+        case STANDARD_DEVIATION:
+
+            calculateJob = new Job("Calculate Std Deviation") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
 
                     // Load the sum overlay
                     StddevCalculator stddevRsc = new StddevCalculator();
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(stddevRsc);
-
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.AVG_MINUS_STD_DEV) {
+            break;
+        case STANDARD_DEVIATION_IMAGE:
 
-            Thread t = null;
-            t = new Thread() {
-                public void run() {
+            calculateJob = new Job("Calculate Std Deviation Image") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+
+                    // Load the sum image overlay
+                    StddevCalculator stddevRsc = new StddevCalculator();
+                    stddevRsc.setImage(true);
+                    loader.load(stddevRsc);
+                    return Status.OK_STATUS;
+                }
+            };
+            break;
+        case AVG_MINUS_STD_DEV:
+
+            calculateJob = new Job("Calculate Avg Minus Std Deviation") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
 
                     // Load the sum overlay
                     AvgM1StddevCalculator m1StddevRsc = new AvgM1StddevCalculator();
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(m1StddevRsc);
-
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.AVG_PLUS_STD_DEV) {
+            break;
+        case AVG_MINUS_STD_DEV_IMAGE:
 
-            Thread t = null;
-            t = new Thread() {
-                public void run() {
+            calculateJob = new Job("Calculate Avg Minus Std Deviation Image") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+
+                    // Load the avg minus std deviation image overlay
+                    AvgM1StddevCalculator m1StddevRsc = new AvgM1StddevCalculator();
+                    m1StddevRsc.setImage(true);
+                    loader.load(m1StddevRsc);
+                    return Status.OK_STATUS;
+                }
+            };
+            break;
+        case AVG_PLUS_STD_DEV:
+
+            calculateJob = new Job("Calculate Avg Plus Std Deviation") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
 
                     // Load the sum overlay
                     AvgP1StddevCalculator p1StddevRsc = new AvgP1StddevCalculator();
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
                     loader.load(p1StddevRsc);
-
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.VALUE_SAMPLING) {
-            Thread t = null;
-            t = new Thread() {
-                public void run() {
+            break;
+        case AVG_PLUS_STD_DEV_IMAGE:
 
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
+            calculateJob = new Job("Calculate Avg Plus Std Deviation Image") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+
+                    // Load the avg plus std deviation image overlay
+                    AvgP1StddevCalculator p1StddevRsc = new AvgP1StddevCalculator();
+                    p1StddevRsc.setImage(true);
+                    loader.load(p1StddevRsc);
+                    return Status.OK_STATUS;
+                }
+            };
+            break;
+        case VALUE_SAMPLING:
+
+            calculateJob = new Job("Do Value Sampling") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+
                     loader.loadOverlay(Calculation.VALUE_SAMPLING);
-
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.HISTOGRAM_SAMPLING) {
+            break;
 
-            Thread t = null;
-            t = new Thread() {
-                public void run() {
+        case HISTOGRAM_SAMPLING:
 
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
+            calculateJob = new Job("Do Histogram Sampling") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+
                     loader.loadOverlay(Calculation.HISTOGRAM_SAMPLING);
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
-        } else if (algorithm == Calculation.HISTOGRAM_GRAPHICS) {
+            break;
 
-            Thread t = null;
-            t = new Thread() {
-                public void run() {
+        case HISTOGRAM_GRAPHICS:
 
-                    GeneratedDataLoader loader = new GeneratedDataLoader(
-                            thisToolLayer,
-                            GeneratedDataLoader.GeneratedloadMode.SAME_UNIT_AND_LEVEL);
+            calculateJob = new Job("Do Histogram Graphics") {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+
                     loader.loadOverlay(Calculation.HISTOGRAM_GRAPHICS);
+                    return Status.OK_STATUS;
                 }
             };
-            t.start();
+            break;
+
+        default:
+            break;
+        }
+
+        if (calculateJob != null) {
+            calculateJob.setSystem(false);
+            calculateJob.setPriority(Job.INTERACTIVE);
+            calculateJob.schedule();
         }
     }
 
@@ -852,8 +877,8 @@ public class EnsembleToolLayer extends
 
     }
 
-    class EnsembleToolLayerNameGeneratorWithTimeStampBasis extends
-            AbstractNameGenerator {
+    class EnsembleToolLayerNameGeneratorWithTimeStampBasis
+            extends AbstractNameGenerator {
 
         EnsembleToolLayer toolLayer = null;
 
@@ -884,45 +909,7 @@ public class EnsembleToolLayer extends
     }
 
     /*
-     * This Job allows the caller to set the viewer state (minimized, restored,
-     * etc) asynchronously.
-     */
-    private class SetViewerStateJob extends Job {
-
-        public SetViewerStateJob(String name) {
-            super(name);
-        }
-
-        private ViewerWindowState state = ViewerWindowState.UNDEFINED;
-
-        private void setViewerWindowState(ViewerWindowState s) {
-            state = s;
-        }
-
-        @Override
-        protected IStatus run(IProgressMonitor monitor) {
-            IStatus status = null;
-
-            if (state == ViewerWindowState.UNDEFINED) {
-                status = Status.CANCEL_STATUS;
-            } else {
-                status = Status.OK_STATUS;
-                VizApp.runAsync(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        EnsembleTool.getInstance().setViewerWindowState(state);
-                        EnsembleTool.getInstance().clearEditableToggleFlags();
-                    }
-                });
-            }
-
-            return status;
-        }
-    }
-
-    /*
-     * All ensemble tool classes shold make certain they check to see whether
+     * All ensemble tool classes should make certain they check to see whether
      * the tool layer is editable before interacting with the user.
      */
     public boolean isEditable() {
@@ -955,6 +942,7 @@ public class EnsembleToolLayer extends
         return changeListeners.contains(listener);
     }
 
+    /* In association with VLab AWIPS2_GSD Issue #29762 */
     @Override
     public void resourceChanged(ChangeType type, Object object) {
 
@@ -962,10 +950,9 @@ public class EnsembleToolLayer extends
                 && object instanceof EditableCapability) {
             EditableCapability editability = (EditableCapability) object;
             isEditable = editability.isEditable();
-            EnsembleTool.getInstance().setEditable(isEditable);
-        }
-        for (IToolLayerChanged etl : changeListeners) {
-            etl.resourceChanged(this, type, object);
+            for (IToolLayerChanged etl : changeListeners) {
+                etl.resourceChanged(this, type, object);
+            }
         }
     }
 

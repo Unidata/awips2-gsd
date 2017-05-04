@@ -1,29 +1,5 @@
 package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.legend;
 
-import gov.noaa.gsd.viz.ensemble.control.EnsembleResourceManager;
-import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
-import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;
-import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
-import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
-import gov.noaa.gsd.viz.ensemble.display.common.GeneratedGridResourceHolder;
-import gov.noaa.gsd.viz.ensemble.display.common.GeneratedTimeSeriesResourceHolder;
-import gov.noaa.gsd.viz.ensemble.display.common.GridResourceHolder;
-import gov.noaa.gsd.viz.ensemble.display.common.HistogramGridResourceHolder;
-import gov.noaa.gsd.viz.ensemble.display.common.TimeSeriesResourceHolder;
-import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.EnsembleToolViewer;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.ContextMenuManager;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.DistributionViewerComposite;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.GlobalPreferencesComposite;
-import gov.noaa.gsd.viz.ensemble.util.ChosenGEFSColors;
-import gov.noaa.gsd.viz.ensemble.util.ChosenSREFColors;
-import gov.noaa.gsd.viz.ensemble.util.EnsembleGEFSColorChooser;
-import gov.noaa.gsd.viz.ensemble.util.EnsembleSREFColorChooser;
-import gov.noaa.gsd.viz.ensemble.util.GlobalColor;
-import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
-import gov.noaa.gsd.viz.ensemble.util.Utilities;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -77,14 +53,48 @@ import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swt.widgets.TreeItem;
 
+import com.raytheon.uf.common.status.IUFStatusHandler;
+import com.raytheon.uf.common.status.UFStatus;
+import com.raytheon.uf.common.status.UFStatus.Priority;
+import com.raytheon.uf.common.style.AbstractStylePreferences;
+import com.raytheon.uf.common.style.LabelingPreferences;
+import com.raytheon.uf.common.style.StyleException;
+import com.raytheon.uf.common.style.contour.ContourPreferences;
 import com.raytheon.uf.viz.core.VizApp;
 import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
+import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
 import com.raytheon.uf.viz.core.map.MapDescriptor;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.uf.viz.core.rsc.capabilities.ColorableCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.OutlineCapability;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
+
+import gov.noaa.gsd.viz.ensemble.control.EnsembleResourceManager;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;
+import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
+import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.GeneratedGridResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.GeneratedTimeSeriesResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.GridResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.HistogramGridResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.TimeSeriesResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.control.contour.ContourControlDialog;
+import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.EnsembleToolViewer;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.ContextMenuManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.DistributionViewerComposite;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.GlobalPreferencesComposite;
+import gov.noaa.gsd.viz.ensemble.util.ChosenGEFSColors;
+import gov.noaa.gsd.viz.ensemble.util.ChosenSREFColors;
+import gov.noaa.gsd.viz.ensemble.util.EnsembleGEFSColorChooser;
+import gov.noaa.gsd.viz.ensemble.util.EnsembleSREFColorChooser;
+import gov.noaa.gsd.viz.ensemble.util.GlobalColor;
+import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
+import gov.noaa.gsd.viz.ensemble.util.Utilities;
 
 /***
  * 
@@ -99,6 +109,11 @@ import com.raytheon.viz.grid.rsc.general.D2DGridResource;
  * Date          Ticket#    Engineer      Description
  * ------------ ---------- ----------- --------------------------
  * Oct 15, 2015   12565      polster     Initial creation
+ * Dec 14, 2016   19443      polster     added isWidgetReady method
+ * Dec 29, 2016   19325      jing        Legend for an image member
+ * Feb 17, 2017   19325      jing        Added ERF image capability
+ * Mar 01, 2017   19443      polster     Clear all method force clears to empty map
+ * Mar 31, 2017   19598      jing        Contour control feature
  * 
  * </pre>
  * 
@@ -106,8 +121,8 @@ import com.raytheon.viz.grid.rsc.general.D2DGridResource;
  * @version 1.0
  */
 public class LegendBrowserComposite extends Composite {
-
-    private EnsembleToolViewer mainToolView = null;
+    private static final transient IUFStatusHandler statusHandler = UFStatus
+            .getHandler(LegendBrowserComposite.class);
 
     private DistributionViewerComposite distributionViewerComposite = null;
 
@@ -129,6 +144,8 @@ public class LegendBrowserComposite extends Composite {
 
     private ERFProductDialog erfDialog = null;
 
+    private ContourControlDialog contourDialog = null;
+
     protected TreeItem foundTreeItem = null;
 
     protected TreeItem[] directDescendants = null;
@@ -136,6 +153,10 @@ public class LegendBrowserComposite extends Composite {
     private ArrayList<ColumnLabelProvider> columnLabelProviders = new ArrayList<ColumnLabelProvider>();
 
     private MenuItem addERFLayerMenuItem = null;
+
+    private MenuItem addERFImageLayerMenuItem = null;
+
+    private MenuItem contourMenuItem = null;
 
     private TreeViewerColumn column0 = null;
 
@@ -145,21 +166,35 @@ public class LegendBrowserComposite extends Composite {
 
     private AbstractVizResource<?, ?> currentEnsembleRsc = null;
 
-    private boolean CTRL_KEY_DEPRESSED = false;
-
     private List<Image> imageCache = null;
 
-    // private FramesInfo currentFramesInfo;
+    private final Font legendTimeFont = SWTResourceManager
+            .getFont("courier new", 8, SWT.BOLD);
 
-    // If an item in the tree is toggled, need not clear the distribution viewer
-    // when refreshing the tree.
+    private final Font legendNameFont = SWTResourceManager
+            .getFont("courier new", 8, SWT.BOLD);
+
+    /*
+     * Padding used as tree viewer column headers are not very cosmetically
+     * controllable.
+     */
+    private static final String HEADER_GRID_PRODUCTS = "Products";
+
+    private static final String HEADER_VALID_TIME = "Time";
+
+    private static final String HEADER_CYCLE_TIME = "Cycle Time";
+
+    /*
+     * If an item in the tree is toggled, need not clear the distribution viewer
+     * when refreshing the tree.
+     */
     boolean isItemToggled = false;
 
     public LegendBrowserComposite(Composite parentTabFolder, int style,
             EnsembleToolViewer ownerView, CTabItem itemLegendsTabItem) {
         super(parentTabFolder, style);
+
         ensembleToolTabFolder = (CTabFolder) parentTabFolder;
-        mainToolView = ownerView;
         legendsTabItem = itemLegendsTabItem;
         imageCache = new ArrayList<>();
         createBody();
@@ -175,8 +210,8 @@ public class LegendBrowserComposite extends Composite {
          * contain a tab folder displaying a distribution viewer tool.
          */
         rootComposite = new Composite(ensembleToolTabFolder, SWT.NONE);
-        GridData rootComposite_gd = new GridData(SWT.FILL, SWT.FILL, true,
-                true, 1, 1);
+        GridData rootComposite_gd = new GridData(SWT.FILL, SWT.FILL, true, true,
+                1, 1);
         rootComposite.setLayoutData(rootComposite_gd);
         GridLayout rootComposite_gl = new GridLayout(1, true);
         rootComposite_gl.marginWidth = 0;
@@ -230,8 +265,9 @@ public class LegendBrowserComposite extends Composite {
         legendRootContainerScrolledComposite.setExpandVertical(true);
 
         /* Legend tab contains a tree of legends */
-        legendsTree = new Tree(legendRootContainerScrolledComposite, SWT.BORDER
-                | SWT.H_SCROLL | SWT.V_SCROLL | SWT.SINGLE | SWT.FULL_SELECTION);
+        legendsTree = new Tree(legendRootContainerScrolledComposite,
+                SWT.BORDER | SWT.H_SCROLL | SWT.V_SCROLL | SWT.SINGLE
+                        | SWT.FULL_SELECTION);
         legendsTree.setLinesVisible(true);
         legendsTree.setHeaderVisible(true);
         legendsTreeViewer = new TreeViewer(legendsTree);
@@ -261,7 +297,7 @@ public class LegendBrowserComposite extends Composite {
         column0 = new TreeViewerColumn(legendsTableViewer, SWT.LEFT);
         column0.getColumn().setWidth(220);
         column0.getColumn().setMoveable(false);
-        column0.getColumn().setText("   Grid Products");
+        column0.getColumn().setText(HEADER_GRID_PRODUCTS);
         column0.getColumn().setAlignment(SWT.LEFT);
 
         LegendNameTreeColumnLabelProvider cnlp = new LegendNameTreeColumnLabelProvider();
@@ -271,7 +307,7 @@ public class LegendBrowserComposite extends Composite {
         column1 = new TreeViewerColumn(legendsTableViewer, SWT.LEFT);
         column1.getColumn().setWidth(220);
         column1.getColumn().setMoveable(false);
-        column1.getColumn().setText("   Time");
+        column1.getColumn().setText(HEADER_VALID_TIME);
         column1.getColumn().setAlignment(SWT.LEFT);
 
         LegendTimeTreeColumnLabelProvider ctlp = new LegendTimeTreeColumnLabelProvider();
@@ -317,7 +353,7 @@ public class LegendBrowserComposite extends Composite {
             erfDialog.close();
         }
 
-        if (isViewerTreeReady()) {
+        if (isWidgetReady()) {
 
             legendsTree.removeAll();
             legendsTree.dispose();
@@ -386,7 +422,7 @@ public class LegendBrowserComposite extends Composite {
             @Override
             public void run() {
 
-                if (!isViewerTreeReady()) {
+                if (!isWidgetReady()) {
                     return;
                 }
                 if (childItem == null) {
@@ -425,11 +461,13 @@ public class LegendBrowserComposite extends Composite {
 
                     final boolean allInvisible = ai;
 
-                    /* if all invisible then make sure the parent is grayed-out. */
+                    /*
+                     * if all invisible then make sure the parent is grayed-out.
+                     */
                     if (allInvisible) {
                         parentItem.setForeground(EnsembleToolViewer
                                 .getDisabledForegroundColor());
-                        if (isViewerTreeReady()) {
+                        if (isWidgetReady()) {
                             legendsTreeViewer.getTree().deselectAll();
                         }
                     }
@@ -439,9 +477,9 @@ public class LegendBrowserComposite extends Composite {
                      */
 
                     else {
-                        parentItem.setForeground(EnsembleToolViewer
-                                .getEnabledForegroundColor());
-                        if (isViewerTreeReady()) {
+                        parentItem.setForeground(
+                                EnsembleToolViewer.getEnabledForegroundColor());
+                        if (isWidgetReady()) {
                             legendsTreeViewer.getTree().deselectAll();
                         }
                     }
@@ -516,31 +554,30 @@ public class LegendBrowserComposite extends Composite {
     public void prepareForNewToolInput() {
         VizApp.runAsync(new Runnable() {
             public void run() {
-                if (isViewerTreeReady()) {
-                    legendsTreeViewer.setInput(EnsembleTool.getInstance()
-                            .getEmptyResourceMap());
+                if (isWidgetReady()) {
+                    legendsTreeViewer.setInput(
+                            EnsembleTool.getInstance().getEmptyResourceMap());
                 }
             }
         });
     }
 
-    synchronized public void setViewEditable(final boolean enabled) {
+    synchronized public void setEditable(final boolean enabled) {
 
-        if (isViewerTreeReady()) {
-            VizApp.runSync(new Runnable() {
+        VizApp.runSync(new Runnable() {
 
-                @Override
-                public void run() {
+            @Override
+            public void run() {
+                if (isWidgetReady()) {
                     if (!enabled) {
                         legendsTreeViewer.getTree().deselectAll();
                     }
 
                     legendsTree.setEnabled(enabled);
-                    distributionViewerComposite.setViewEditable(enabled);
-
+                    distributionViewerComposite.setEditable(enabled);
                 }
-            });
-        }
+            }
+        });
 
     }
 
@@ -558,7 +595,7 @@ public class LegendBrowserComposite extends Composite {
 
         List<String> expandedItems = new ArrayList<String>();
 
-        if (isViewerTreeReady()) {
+        if (isWidgetReady()) {
             TreeItem[] children = legendsTreeViewer.getTree().getItems();
             List<TreeItem> immediateChildren = Arrays.asList(children);
             for (TreeItem ti : immediateChildren) {
@@ -582,19 +619,77 @@ public class LegendBrowserComposite extends Composite {
         EnsembleTool.getInstance().setExpandedElements(getTreeExpansion());
     }
 
-    private void startAddERFLayer(String mousedEnsembleName) {
+    private void startAddERFLayer(String mousedEnsembleName, boolean isImage) {
 
         erfDialog = new ERFProductDialog(rootComposite.getShell(),
-                mousedEnsembleName);
+                mousedEnsembleName, isImage);
         if (erfDialog.open() == Window.OK) {
             erfDialog.close();
             erfDialog = null;
         }
     }
 
+    private void startContourControl(String mousedEnsembleName)
+            throws StyleException {
+        List<AbstractResourceHolder> rhs = getEnsembleMemberGenericResources(
+                mousedEnsembleName);
+        if (rhs == null || rhs.isEmpty()
+                || !(rhs.get(0).getRsc() instanceof AbstractGridResource)) {
+            return;
+        }
+        List<AbstractGridResource<?>> rscList = new ArrayList<AbstractGridResource<?>>();
+        for (AbstractResourceHolder rh : rhs) {
+            rscList.add((AbstractGridResource<?>) rh.getRsc());
+        }
+        contourDialog = new ContourControlDialog(rootComposite.getShell(),
+                mousedEnsembleName, rscList);
+
+        /*
+         * TODO:
+         * This code tests the stylePreferences and label preferences objs. All
+         * member resources share one stylePreferences and one label preference
+         * object in the baseline code, which is not right. It maybe a fundamental 
+         * problem for D2D data display.
+         * For dealing with the sharing problem, we clone the original StylePreferences 
+         * object and assign a new object to the grid resources related to the
+         * "Contour Control".
+         * See the code in the EnsembleResourceManager::registerResource() and
+         * registerGenerated(). 
+         * It requires adding two methods in ufcore:AbstractGridResource.java, 
+         * public AbstractStylePreferences getStylePreferences() { 
+         *      return stylePreferences; 
+         * } 
+         * public void setStylePreferences(AbstractStylePreferences stylePreferences) {
+         *      this.stylePreferences = stylePreferences; 
+         *      } 
+         * 
+         * For long term, AWIPS2
+         * team should fix the baseline bug which may impact the contour and
+         * other display. 
+         * Need to keep this code at this location for ET until
+         * the bug in base line is fixed. 
+         * 
+         * for (AbstractResourceHolder rh : rhs){ 
+         *      AbstractGridResource rsc = (AbstractGridResource) (rh.getRsc());
+         *      LabelingPreferences labelingPreferences = null;
+         *      AbstractStylePreferences stylePreferences = rsc
+         *           .getStylePreferences(); if (stylePreferences instanceof
+         *      ContourPreferences) { labelingPreferences = ((ContourPreferences)
+         *           stylePreferences) .getContourLabeling(); float incrementOrig =
+         *      labelingPreferences.getIncrement(); 
+         *      // valuesOrig =labelingPreferences.getValues(); 
+         * }
+         */
+
+        if (contourDialog.open() == Window.OK) {
+            contourDialog.close();
+            contourDialog = null;
+        }
+    }
+
     public void refreshInput(EnsembleToolLayer tl) {
 
-        if (!isViewerTreeReady()) {
+        if (!isWidgetReady()) {
             return;
         }
 
@@ -608,7 +703,7 @@ public class LegendBrowserComposite extends Composite {
         VizApp.runAsync(new Runnable() {
             public void run() {
 
-                if (!isViewerTreeReady()) {
+                if (!isWidgetReady()) {
                     return;
                 }
 
@@ -639,10 +734,10 @@ public class LegendBrowserComposite extends Composite {
                                 .clearDistributionViewer();
                     }
                     isItemToggled = false;
-                    
+
                     AbstractResourceHolder grh = null;
                     String ensembleRscName = null;
-                    if (isViewerTreeReady()) {
+                    if (isWidgetReady()) {
                         TreeItem[] selectedItems = legendsTree.getSelection();
                         if ((selectedItems != null)
                                 && (selectedItems.length > 0)
@@ -666,7 +761,8 @@ public class LegendBrowserComposite extends Composite {
                                 if (ti != null)
                                     legendsTree.select(ti);
                             } else if (ensembleRscName != null) {
-                                TreeItem ti = findTreeItemByLabelName(ensembleRscName);
+                                TreeItem ti = findTreeItemByLabelName(
+                                        ensembleRscName);
                                 if (ti != null)
                                     legendsTree.select(ti);
                             }
@@ -681,8 +777,8 @@ public class LegendBrowserComposite extends Composite {
     /*
      * Keep track of the expansion state of the tree.
      */
-    private class LegendTreeExpandCollapseListener implements
-            ITreeViewerListener {
+    private class LegendTreeExpandCollapseListener
+            implements ITreeViewerListener {
 
         @Override
         public void treeCollapsed(TreeExpansionEvent event) {
@@ -707,7 +803,7 @@ public class LegendBrowserComposite extends Composite {
     }
 
     public void setTabDefaultState() {
-        updateCursor(EnsembleToolViewer.normalCursor);
+        updateCursor(EnsembleToolViewer.getNormalCursor());
     }
 
     protected void updateCursor(final Cursor c) {
@@ -715,7 +811,7 @@ public class LegendBrowserComposite extends Composite {
 
             @Override
             public void run() {
-                if (isViewerTreeReady()) {
+                if (isWidgetReady()) {
                     legendsTree.setCursor(c);
                 }
             }
@@ -723,7 +819,7 @@ public class LegendBrowserComposite extends Composite {
         });
     }
 
-    public boolean isViewerTreeReady() {
+    public boolean isWidgetReady() {
         boolean isReady = false;
 
         if (legendsTreeViewer != null && legendsTree != null
@@ -768,9 +864,8 @@ public class LegendBrowserComposite extends Composite {
                      * grayed-out. This needs to be further evaluated for a
                      * better solution.
                      */
-                    if (fg.getRGB().equals(
-                            EnsembleToolViewer.getEnabledForegroundColor()
-                                    .getRGB())) {
+                    if (fg.getRGB().equals(EnsembleToolViewer
+                            .getEnabledForegroundColor().getRGB())) {
                         isVisible = false;
                     } else {
                         isVisible = true;
@@ -780,15 +875,15 @@ public class LegendBrowserComposite extends Composite {
                     if (isVisible) {
                         finalItem.setForeground(EnsembleToolViewer
                                 .getDisabledForegroundColor());
-                        if (isViewerTreeReady()) {
+                        if (isWidgetReady()) {
                             legendsTreeViewer.getTree().deselectAll();
                         }
                     }
                     /* if it was off turn it on */
                     else {
-                        finalItem.setForeground(EnsembleToolViewer
-                                .getEnabledForegroundColor());
-                        if (isViewerTreeReady()) {
+                        finalItem.setForeground(
+                                EnsembleToolViewer.getEnabledForegroundColor());
+                        if (isWidgetReady()) {
                             legendsTreeViewer.getTree().deselectAll();
                         }
                     }
@@ -803,13 +898,13 @@ public class LegendBrowserComposite extends Composite {
                     gr.getRsc().issueRefresh();
                     /* update tree item to reflect new state */
                     if (isVisible) {
-                        finalItem.setForeground(EnsembleToolViewer
-                                .getEnabledForegroundColor());
+                        finalItem.setForeground(
+                                EnsembleToolViewer.getEnabledForegroundColor());
                     } else {
                         finalItem.setForeground(EnsembleToolViewer
                                 .getDisabledForegroundColor());
                     }
-                    if (isViewerTreeReady()) {
+                    if (isWidgetReady()) {
                         legendsTreeViewer.getTree().deselectAll();
                     }
 
@@ -825,7 +920,8 @@ public class LegendBrowserComposite extends Composite {
                         }
 
                         // Clear the Distribution Viewer
-                        if (((HistogramResource<?>) (gr.getRsc())).getMode() == HistogramResource.DisplayMode.GRAPHIC_HISTGRAM
+                        if (((HistogramResource<?>) (gr.getRsc()))
+                                .getMode() == HistogramResource.DisplayMode.GRAPHIC_HISTGRAM
                                 && getDistributionViewer() != null) {
                             getDistributionViewer().getGhGUI().getDisp()
                                     .clearDistributionViewer();
@@ -834,10 +930,11 @@ public class LegendBrowserComposite extends Composite {
                         // Update related generated resource.
                     } else if (!gr.isGenerated()
                             && gr.getRsc() instanceof D2DGridResource
-                            && gr.getRsc().getDescriptor() instanceof MapDescriptor) {
+                            && gr.getRsc()
+                                    .getDescriptor() instanceof MapDescriptor) {
                         // Update related generated resource(s).
-                        EnsembleResourceManager.getInstance().updateGenerated(
-                                gr);
+                        EnsembleResourceManager.getInstance()
+                                .updateGenerated(gr);
                     }
 
                     // Set flag to prevent clear the distribution viewer when
@@ -930,7 +1027,8 @@ public class LegendBrowserComposite extends Composite {
         VizApp.runSync(new Runnable() {
             @Override
             public void run() {
-                setPerturbationMembers(getEnsembleMemberGenericResources(ensembleName));
+                setPerturbationMembers(
+                        getEnsembleMemberGenericResources(ensembleName));
             }
         });
 
@@ -986,7 +1084,7 @@ public class LegendBrowserComposite extends Composite {
 
         VizApp.runAsync(new Runnable() {
             public void run() {
-                if (isViewerTreeReady()) {
+                if (isWidgetReady()) {
                     legendsTreeViewer.refresh(true);
                 }
 
@@ -1015,7 +1113,7 @@ public class LegendBrowserComposite extends Composite {
              * if the ensemble tool isn't open then ignore user mouse clicks ...
              */
             if (!EnsembleTool.getInstance().isToolEditable()
-                    || !isViewerTreeReady()) {
+                    || !isWidgetReady()) {
                 return;
             }
 
@@ -1023,7 +1121,8 @@ public class LegendBrowserComposite extends Composite {
             Point point = new Point(event.x, event.y);
 
             final TreeItem userClickedTreeItem = legendsTree.getItem(point);
-            if (userClickedTreeItem == null || userClickedTreeItem.isDisposed()) {
+            if (userClickedTreeItem == null
+                    || userClickedTreeItem.isDisposed()) {
                 return;
             }
 
@@ -1058,11 +1157,12 @@ public class LegendBrowserComposite extends Composite {
                     addERFLayerMenuItem = new MenuItem(legendMenu, SWT.PUSH);
                     addERFLayerMenuItem.setText("Relative Frequency");
 
-                    /* only enable the RF menu item if we are in plan view */
-                    if (EnsembleTool.getInstance().getToolMode() == EnsembleToolMode.LEGENDS_TIME_SERIES) {
+                    /* only enable the ERF menu item if we are in plan view */
+                    EnsembleToolMode mode = EnsembleTool.getInstance()
+                            .getToolMode();
+                    if (mode == EnsembleToolMode.LEGENDS_TIME_SERIES) {
                         addERFLayerMenuItem.setEnabled(false);
-                    }
-                    if (EnsembleTool.getInstance().getToolMode() == EnsembleToolMode.LEGENDS_PLAN_VIEW) {
+                    } else if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW) {
                         addERFLayerMenuItem.setEnabled(true);
                     }
 
@@ -1071,19 +1171,71 @@ public class LegendBrowserComposite extends Composite {
 
                                 public void handleEvent(Event event) {
 
-                                    updateCursor(EnsembleToolViewer.waitCursor);
-                                    startAddERFLayer(mousedEnsembleName);
-                                    updateCursor(EnsembleToolViewer.normalCursor);
+                                    startAddERFLayer(mousedEnsembleName, false);
 
                                 }
                             });
 
                     /*
+                     * Relative frequency image menu item allows the user to
+                     * generate a probability image display demonstrating the
+                     * chance a value p(x) lies within a range, outside a range,
+                     * above a threshold, or below a threshold.
+                     */
+                    addERFImageLayerMenuItem = new MenuItem(legendMenu,
+                            SWT.PUSH);
+                    addERFImageLayerMenuItem
+                            .setText("Relative Frequency Image");
+
+                    /* only enable the ERF menu item if we are in plan view */
+                    if (mode == EnsembleToolMode.LEGENDS_TIME_SERIES) {
+                        addERFImageLayerMenuItem.setEnabled(false);
+                    } else if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW) {
+                        addERFImageLayerMenuItem.setEnabled(true);
+                    }
+
+                    addERFImageLayerMenuItem.addListener(SWT.Selection,
+                            new Listener() {
+
+                                public void handleEvent(Event event) {
+
+                                    startAddERFLayer(mousedEnsembleName, true);
+
+                                }
+                            });
+
+                    /*
+                     * Contour control for ensemble product.
+                     */
+                    contourMenuItem = new MenuItem(legendMenu, SWT.PUSH);
+                    contourMenuItem.setText("Contour Control");
+
+                    if (mode == EnsembleToolMode.LEGENDS_TIME_SERIES) {
+                        contourMenuItem.setEnabled(false);
+                    } else if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW) {
+                        contourMenuItem.setEnabled(true);
+                    }
+
+                    contourMenuItem.addListener(SWT.Selection, new Listener() {
+
+                        public void handleEvent(Event event) {
+
+                            try {
+                                startContourControl(mousedEnsembleName);
+                            } catch (StyleException e) {
+                                statusHandler.handle(Priority.WARN,
+                                e.getLocalizedMessage(), e);
+                            }
+
+                        }
+                    });
+
+                    /*
                      * This menu item allows the user to choose a color gradient
                      * for either the SREF or GEFS ensemble products.
                      */
-                    MenuItem ensembleColorizeMenuItem = new MenuItem(
-                            legendMenu, SWT.PUSH);
+                    MenuItem ensembleColorizeMenuItem = new MenuItem(legendMenu,
+                            SWT.PUSH);
                     ensembleColorizeMenuItem.setText("Color Gradient");
 
                     ensembleColorizeMenuItem.addListener(SWT.Selection,
@@ -1102,7 +1254,8 @@ public class LegendBrowserComposite extends Composite {
                                         userClickedTreeItem.setExpanded(true);
                                     }
 
-                                    updateColorsOnEnsembleResource(mousedEnsembleName);
+                                    updateColorsOnEnsembleResource(
+                                            mousedEnsembleName);
 
                                 }
                             });
@@ -1253,7 +1406,7 @@ public class LegendBrowserComposite extends Composite {
             Point point = new Point(event.x, event.y);
 
             if (!EnsembleTool.getInstance().isToolEditable()
-                    || !isViewerTreeReady()) {
+                    || !isWidgetReady()) {
                 return;
             }
 
@@ -1263,7 +1416,8 @@ public class LegendBrowserComposite extends Composite {
              * The mouse up event currently only acts on items in the tree so if
              * the tree item is null then just return ...
              */
-            if (userClickedTreeItem == null || userClickedTreeItem.isDisposed()) {
+            if (userClickedTreeItem == null
+                    || userClickedTreeItem.isDisposed()) {
                 return;
             }
 
@@ -1272,15 +1426,14 @@ public class LegendBrowserComposite extends Composite {
              * still displayed properly ...
              */
             if (EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE != null) {
-                EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE.getCapability(
-                        OutlineCapability.class).setOutlineWidth(
-                        EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE_WIDTH);
-                EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE.getCapability(
-                        ColorableCapability.class).setColor(
-                        EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE_RGB);
                 EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE
-                        .getCapability(OutlineCapability.class)
-                        .setOutlineOn(
+                        .getCapability(OutlineCapability.class).setOutlineWidth(
+                                EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE_WIDTH);
+                EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE
+                        .getCapability(ColorableCapability.class).setColor(
+                                EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE_RGB);
+                EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE
+                        .getCapability(OutlineCapability.class).setOutlineOn(
                                 EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE_OUTLINE_ASSERTED);
             }
 
@@ -1292,7 +1445,9 @@ public class LegendBrowserComposite extends Composite {
 
                 final Object mousedObject = userClickedTreeItem.getData();
 
-                /* Ctrl-click on a item that is already selected deselects it. */
+                /*
+                 * Ctrl-click on a item that is already selected deselects it.
+                 */
                 if (EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE != null) {
 
                     if (mousedObject instanceof AbstractResourceHolder) {
@@ -1303,7 +1458,7 @@ public class LegendBrowserComposite extends Composite {
                             return;
                         }
                     }
-                } else if (isViewerTreeReady()) {
+                } else if (isWidgetReady()) {
 
                     /* Ctrl-click on a item that is not selected selects it. */
                     if (mousedObject instanceof AbstractResourceHolder) {
@@ -1359,21 +1514,21 @@ public class LegendBrowserComposite extends Composite {
                             EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE_OUTLINE_ASSERTED = currentEnsembleRsc
                                     .getCapability(OutlineCapability.class)
                                     .isOutlineOn();
-                            currentEnsembleRsc.getCapability(
-                                    OutlineCapability.class).setOutlineOn(true);
-                            currentEnsembleRsc.getCapability(
-                                    OutlineCapability.class).setOutlineWidth(
-                                    GlobalPreferencesComposite
+                            currentEnsembleRsc
+                                    .getCapability(OutlineCapability.class)
+                                    .setOutlineOn(true);
+                            currentEnsembleRsc
+                                    .getCapability(OutlineCapability.class)
+                                    .setOutlineWidth(GlobalPreferencesComposite
                                             .getThickenWidthPreference());
                             if (!GlobalPreferencesComposite
                                     .isUseResourceColorOnThickenPreference()) {
                                 currentEnsembleRsc
                                         .getCapability(
                                                 ColorableCapability.class)
-                                        .setColor(
-                                                GlobalPreferencesComposite
-                                                        .getThickenOnSelectionColorPreference()
-                                                        .getRGB());
+                                        .setColor(GlobalPreferencesComposite
+                                                .getThickenOnSelectionColorPreference()
+                                                .getRGB());
                             }
                         }
                     }
@@ -1409,21 +1564,21 @@ public class LegendBrowserComposite extends Composite {
                             EnsembleToolViewer.LAST_HIGHLIGHTED_RESOURCE_OUTLINE_ASSERTED = currentEnsembleRsc
                                     .getCapability(OutlineCapability.class)
                                     .isOutlineOn();
-                            currentEnsembleRsc.getCapability(
-                                    OutlineCapability.class).setOutlineOn(true);
-                            currentEnsembleRsc.getCapability(
-                                    OutlineCapability.class).setOutlineWidth(
-                                    GlobalPreferencesComposite
+                            currentEnsembleRsc
+                                    .getCapability(OutlineCapability.class)
+                                    .setOutlineOn(true);
+                            currentEnsembleRsc
+                                    .getCapability(OutlineCapability.class)
+                                    .setOutlineWidth(GlobalPreferencesComposite
                                             .getThickenWidthPreference());
                             if (!GlobalPreferencesComposite
                                     .isUseResourceColorOnThickenPreference()) {
                                 currentEnsembleRsc
                                         .getCapability(
                                                 ColorableCapability.class)
-                                        .setColor(
-                                                GlobalPreferencesComposite
-                                                        .getThickenOnSelectionColorPreference()
-                                                        .getRGB());
+                                        .setColor(GlobalPreferencesComposite
+                                                .getThickenOnSelectionColorPreference()
+                                                .getRGB());
                             }
                         }
                     }
@@ -1454,8 +1609,9 @@ public class LegendBrowserComposite extends Composite {
             if (ensembleName == null) {
                 status = Status.CANCEL_STATUS;
             } else {
-                updateCursor(EnsembleToolViewer.waitCursor);
-                TreeItem ensembleRootItem = findTreeItemByLabelName(ensembleName);
+                updateCursor(EnsembleToolViewer.getWaitCursor());
+                TreeItem ensembleRootItem = findTreeItemByLabelName(
+                        ensembleName);
 
                 TreeItem[] descendants = getDirectDescendants(ensembleRootItem);
                 TreeItem ti = null;
@@ -1474,7 +1630,7 @@ public class LegendBrowserComposite extends Composite {
                     }
 
                 }
-                updateCursor(EnsembleToolViewer.normalCursor);
+                updateCursor(EnsembleToolViewer.getNormalCursor());
                 status = Status.OK_STATUS;
             }
             return status;
@@ -1488,7 +1644,8 @@ public class LegendBrowserComposite extends Composite {
     private class LegendTreeContentProvider implements ITreeContentProvider {
 
         @Override
-        public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
+        public void inputChanged(Viewer viewer, Object oldInput,
+                Object newInput) {
             // do nothing
         }
 
@@ -1502,7 +1659,8 @@ public class LegendBrowserComposite extends Composite {
             // those names.
 
             Map<String, List<AbstractResourceHolder>> allLoadedProducts = (Map<String, List<AbstractResourceHolder>>) inputElement;
-            if ((allLoadedProducts == null) || (allLoadedProducts.size() == 0)) {
+            if ((allLoadedProducts == null)
+                    || (allLoadedProducts.size() == 0)) {
                 return new Object[0];
             }
 
@@ -1584,8 +1742,8 @@ public class LegendBrowserComposite extends Composite {
             // an FYI.
             String parentEnsembleName = null;
             boolean parentFound = false;
-            if (AbstractResourceHolder.class.isAssignableFrom(element
-                    .getClass())) {
+            if (AbstractResourceHolder.class
+                    .isAssignableFrom(element.getClass())) {
                 AbstractResourceHolder targetRsc = (AbstractResourceHolder) element;
                 Map<String, List<AbstractResourceHolder>> ensembles = EnsembleTool
                         .getInstance().getCurrentToolLayerResources();
@@ -1659,8 +1817,7 @@ public class LegendBrowserComposite extends Composite {
         public void keyPressed(KeyEvent e) {
 
             if ((e.keyCode & SWT.CTRL) == SWT.CTRL) {
-                CTRL_KEY_DEPRESSED = true;
-                updateCursor(EnsembleToolViewer.selectionModeCursor);
+                updateCursor(EnsembleToolViewer.getSelectionCursor());
             }
         }
 
@@ -1668,8 +1825,7 @@ public class LegendBrowserComposite extends Composite {
         public void keyReleased(KeyEvent e) {
 
             if ((e.keyCode & SWT.CTRL) == SWT.CTRL) {
-                CTRL_KEY_DEPRESSED = false;
-                updateCursor(EnsembleToolViewer.normalCursor);
+                updateCursor(EnsembleToolViewer.getNormalCursor());
             }
         }
 
@@ -1718,7 +1874,8 @@ public class LegendBrowserComposite extends Composite {
                         String ts_fullName_1 = vr1.getName();
                         String ts_fullName_2 = vr2.getName();
 
-                        if ((ts_fullName_1 != null) && (ts_fullName_2 != null)) {
+                        if ((ts_fullName_1 != null)
+                                && (ts_fullName_2 != null)) {
 
                             compareResult = ts_fullName_1
                                     .compareTo(ts_fullName_2);
@@ -1728,8 +1885,8 @@ public class LegendBrowserComposite extends Composite {
                 }
                 if (!compareResultFound) {
 
-                    if (TimeSeriesResourceHolder.class.isAssignableFrom(av1
-                            .getClass())
+                    if (TimeSeriesResourceHolder.class
+                            .isAssignableFrom(av1.getClass())
                             && (TimeSeriesResourceHolder.class
                                     .isAssignableFrom(av2.getClass()))) {
 
@@ -1765,8 +1922,8 @@ public class LegendBrowserComposite extends Composite {
                         if ((vr1 != null) && (vr1.getName() != null)
                                 && (vr2 != null) && (vr2.getName() != null)) {
 
-                            compareResult = vr1.getName().compareTo(
-                                    vr2.getName());
+                            compareResult = vr1.getName()
+                                    .compareTo(vr2.getName());
                         }
                     }
                 }
@@ -1786,24 +1943,19 @@ public class LegendBrowserComposite extends Composite {
         }
     }
 
-    private Font setLegendLabelFont(Object element) {
-
-        return SWTResourceManager.getFont("courier new", 10, SWT.BOLD);
-
-    }
-
     public void setToolMode(EnsembleTool.EnsembleToolMode mode) {
         if (mode == EnsembleTool.EnsembleToolMode.LEGENDS_PLAN_VIEW) {
-            column1.getColumn().setText("   Valid Time");
+            column1.getColumn().setText(HEADER_VALID_TIME);
         } else if (mode == EnsembleTool.EnsembleToolMode.LEGENDS_TIME_SERIES) {
-            column1.getColumn().setText("   Cycle Time");
+            column1.getColumn().setText(HEADER_CYCLE_TIME);
         }
     }
 
-    private class LegendTimeTreeColumnLabelProvider extends ColumnLabelProvider {
+    private class LegendTimeTreeColumnLabelProvider
+            extends ColumnLabelProvider {
 
         public Font getFont(Object element) {
-            return setLegendLabelFont(element);
+            return legendTimeFont;
         }
 
         public Image getImage(Object element) {
@@ -1824,8 +1976,8 @@ public class LegendBrowserComposite extends Composite {
 
                 GridResourceHolder gr = (GridResourceHolder) element;
                 nodeLabel = gr.getDataTime();
-            } else if (TimeSeriesResourceHolder.class.isAssignableFrom(element
-                    .getClass())) {
+            } else if (TimeSeriesResourceHolder.class
+                    .isAssignableFrom(element.getClass())) {
                 TimeSeriesResourceHolder tsr = (TimeSeriesResourceHolder) element;
                 nodeLabel = tsr.getDataTime();
             }
@@ -1837,8 +1989,8 @@ public class LegendBrowserComposite extends Composite {
                 TreeItem treeItem = findTreeItemByResource(gr);
                 if (treeItem != null) {
                     if (gr.getRsc().getProperties().isVisible()) {
-                        treeItem.setForeground(EnsembleToolViewer
-                                .getEnabledForegroundColor());
+                        treeItem.setForeground(
+                                EnsembleToolViewer.getEnabledForegroundColor());
                     } else {
                         treeItem.setForeground(EnsembleToolViewer
                                 .getDisabledForegroundColor());
@@ -1854,10 +2006,11 @@ public class LegendBrowserComposite extends Composite {
     /*
      * Here's how we control the items displayed in the tree.
      */
-    private class LegendNameTreeColumnLabelProvider extends ColumnLabelProvider {
+    private class LegendNameTreeColumnLabelProvider
+            extends ColumnLabelProvider {
 
         public Font getFont(Object element) {
-            return setLegendLabelFont(element);
+            return legendNameFont;
         }
 
         public Image getImage(Object element) {
@@ -1867,8 +2020,8 @@ public class LegendBrowserComposite extends Composite {
                 int imageWidth = 46;
                 int imageHeight = 18;
 
-                ImageData imageData = new ImageData(imageWidth, imageHeight,
-                        24, new PaletteData(255, 255, 255));
+                ImageData imageData = new ImageData(imageWidth, imageHeight, 24,
+                        new PaletteData(255, 255, 255));
                 imageData.transparentPixel = imageData.palette
                         .getPixel(new RGB(255, 255, 255));
                 image = new Image(rootComposite.getDisplay(), imageData);
@@ -1918,8 +2071,8 @@ public class LegendBrowserComposite extends Composite {
             } else if (element instanceof AbstractResourceHolder) {
 
                 AbstractResourceHolder gr = (AbstractResourceHolder) element;
-                RGB color = gr.getRsc()
-                        .getCapability(ColorableCapability.class).getColor();
+                RGB color = gr.getRsc().getCapability(ColorableCapability.class)
+                        .getColor();
 
                 int imageWidth = 46;
                 int imageHeight = 18;
@@ -1931,8 +2084,8 @@ public class LegendBrowserComposite extends Composite {
                 int bulletUpperLeftMargin_x = 13;
                 int bulletUpperLeft_y = 9;
 
-                ImageData imageData = new ImageData(imageWidth, imageHeight,
-                        24, new PaletteData(255, 255, 255));
+                ImageData imageData = new ImageData(imageWidth, imageHeight, 24,
+                        new PaletteData(255, 255, 255));
                 imageData.transparentPixel = imageData.palette
                         .getPixel(new RGB(255, 255, 255));
                 image = new Image(rootComposite.getDisplay(), imageData);
@@ -1957,7 +2110,8 @@ public class LegendBrowserComposite extends Composite {
                     gc.fillRectangle(4 + ((colorWidth - innerColorWidth) / 2),
                             (imageHeight - colorHeight)
                                     + ((colorHeight - innerColorHeight) / 2)
-                                    - 2, innerColorWidth, innerColorHeight);
+                                    - 2,
+                            innerColorWidth, innerColorHeight);
 
                     // then put a nice hyphen
                     gc.setBackground(GlobalColor.get(GlobalColor.BLACK));
@@ -1973,12 +2127,13 @@ public class LegendBrowserComposite extends Composite {
                     // color of the resource inside a greyed bordered rectangle.
                     gc.fillRectangle(4, imageHeight - colorHeight - 2,
                             colorWidth, colorHeight);
-                    gc.setBackground(SWTResourceManager.getColor(Utilities
-                            .desaturate(color)));
+                    gc.setBackground(SWTResourceManager
+                            .getColor(Utilities.desaturate(color)));
                     gc.fillRectangle(4 + ((colorWidth - innerColorWidth) / 2),
                             (imageHeight - colorHeight)
                                     + ((colorHeight - innerColorHeight) / 2)
-                                    - 2, innerColorWidth, innerColorHeight);
+                                    - 2,
+                            innerColorWidth, innerColorHeight);
 
                     gc.setBackground(GlobalColor.get(GlobalColor.GRAY));
                     gc.fillRectangle(colorWidth + bulletUpperLeftMargin_x,
@@ -2006,13 +2161,15 @@ public class LegendBrowserComposite extends Composite {
 
                 GridResourceHolder gr = (GridResourceHolder) element;
                 if ((gr.getEnsembleId() != null)
-                        && (gr.getEnsembleId().length() > 0)) {
+                        && (gr.getEnsembleId().length() > 0)
+                        && ((AbstractGridResource<?>) (gr.getRsc()))
+                                .getDisplayType() != DisplayType.IMAGE) {
                     nodeLabel = gr.getEnsembleId();
                 } else {
                     nodeLabel = gr.getSpecificName();
                 }
-            } else if (TimeSeriesResourceHolder.class.isAssignableFrom(element
-                    .getClass())) {
+            } else if (TimeSeriesResourceHolder.class
+                    .isAssignableFrom(element.getClass())) {
 
                 TimeSeriesResourceHolder tsr = (TimeSeriesResourceHolder) element;
                 if ((tsr.getEnsembleId() != null)
@@ -2043,8 +2200,8 @@ public class LegendBrowserComposite extends Composite {
                 TreeItem treeItem = findTreeItemByResource(gr);
                 if (treeItem != null) {
                     if (gr.getRsc().getProperties().isVisible()) {
-                        treeItem.setForeground(EnsembleToolViewer
-                                .getEnabledForegroundColor());
+                        treeItem.setForeground(
+                                EnsembleToolViewer.getEnabledForegroundColor());
                     } else {
                         treeItem.setForeground(EnsembleToolViewer
                                 .getDisabledForegroundColor());
@@ -2086,8 +2243,8 @@ public class LegendBrowserComposite extends Composite {
                     if ((ensId != null) && (ensId.length() > 1)) {
                         currColor = ChosenSREFColors.getInstance()
                                 .getGradientByEnsembleId(ensId);
-                        rsc.getCapability(ColorableCapability.class).setColor(
-                                currColor.getRGB());
+                        rsc.getCapability(ColorableCapability.class)
+                                .setColor(currColor.getRGB());
                     }
                 }
             }
@@ -2127,8 +2284,8 @@ public class LegendBrowserComposite extends Composite {
                     if ((ensId != null) && (ensId.length() > 1)) {
                         currColor = ChosenGEFSColors.getInstance()
                                 .getGradientByEnsembleId(ensId);
-                        rsc.getCapability(ColorableCapability.class).setColor(
-                                currColor.getRGB());
+                        rsc.getCapability(ColorableCapability.class)
+                                .setColor(currColor.getRGB());
                         rsc.getCapability(OutlineCapability.class);
                     }
                 }
@@ -2185,8 +2342,14 @@ public class LegendBrowserComposite extends Composite {
 
     public void clearAll() {
 
-        if (isViewerTreeReady()) {
-            legendsTreeViewer.getTree().clearAll(true);
+        if (isWidgetReady()) {
+            /*
+             * In association with VLab AWIPS2_GSD Issue #29204
+             * 
+             * Cosmetic clear for performance perception.
+             */
+            legendsTreeViewer
+                    .setInput(EnsembleTool.getInstance().getEmptyResourceMap());
             legendsTreeViewer.refresh();
         }
 

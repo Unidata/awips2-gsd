@@ -1,19 +1,15 @@
 package gov.noaa.gsd.viz.ensemble.control;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.eclipse.ui.IEditorPart;
+import org.eclipse.ui.IEditorReference;
 import org.eclipse.ui.IPartListener2;
-import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.IWorkbenchPartReference;
-import org.eclipse.ui.PlatformUI;
-import org.eclipse.ui.internal.EditorReference;
-import org.eclipse.ui.part.EditorPart;
 
 import com.raytheon.uf.viz.core.IDisplayPaneContainer;
-import com.raytheon.uf.viz.core.VizApp;
-import com.raytheon.viz.ui.editor.AbstractEditor;
+import com.raytheon.uf.viz.xy.timeseries.TimeSeriesEditor;
+
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolCompatibility;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;
 
 /**
  * This is the part listener for the editors associated with Ensemble Tool.
@@ -25,6 +21,7 @@ import com.raytheon.viz.ui.editor.AbstractEditor;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Nov 17, 2014    5056      polster     Initial creation
+ * Mar 01, 2017    19443      polster     handle part opened for time series
  * 
  * </pre>
  * 
@@ -33,125 +30,107 @@ import com.raytheon.viz.ui.editor.AbstractEditor;
  */
 public class EnsembleEditorPartListener implements IPartListener2 {
 
-    private List<IDisplayPaneContainer> editors = null;
+    private boolean ignorePartActivatedEvent = false;
 
     public EnsembleEditorPartListener() {
-        editors = new ArrayList<>();
-    }
-
-    public void addEditor(IDisplayPaneContainer e) {
-        editors.add(e);
-    }
-
-    public void removeEditor(IDisplayPaneContainer e) {
-        editors.remove(e);
     }
 
     @Override
     public void partActivated(IWorkbenchPartReference partRef) {
 
-        if (containsPart(partRef)) {
-            IEditorPart editorPart = (EditorPart) partRef.getPart(false);
-
-            if (editorPart instanceof IDisplayPaneContainer) {
-                IDisplayPaneContainer editor = (IDisplayPaneContainer) editorPart;
-                EnsembleTool.getInstance().setEditor(editor);
-                EnsembleTool.getInstance().refreshTool(true);
+        /*
+         * Ignore the part activated event when ignore flag is set
+         */
+        if (!ignorePartActivatedEvent) {
+            EnsembleToolCompatibility compatibility = EnsembleTool
+                    .getEditorCompatibility(partRef);
+            if (compatibility == EnsembleToolCompatibility.COMPATIBLE_CONTAINS_ENSEMBLE_TOOL_LAYER
+                    || compatibility == EnsembleToolCompatibility.COMPATIBLE_NO_ENSEMBLE_TOOL_LAYER) {
+                EnsembleTool.getInstance().refreshToolByActiveEditor();
             }
         }
+    }
+
+    @Override
+    public void partClosed(final IWorkbenchPartReference partRef) {
+        // Needed only because the interface requires it
     }
 
     @Override
     public void partDeactivated(IWorkbenchPartReference partRef) {
-        if (containsPart(partRef)) {
-            // TODO
-        }
+        // Needed only because the interface requires it
     }
 
     @Override
     public void partBroughtToTop(IWorkbenchPartReference partRef) {
-        if (containsPart(partRef)) {
-            // TODO
-        }
+        // Needed only because the interface requires it
     }
 
-    @Override
-    public void partClosed(IWorkbenchPartReference partRef) {
-        if (containsPart(partRef)) {
-
-            EditorPart editorPart = (EditorPart) partRef.getPart(false);
-            if (editorPart instanceof AbstractEditor) {
-                VizApp.runSync(new Runnable() {
-                    public void run() {
-
-                        if (!PlatformUI.getWorkbench().isClosing()) {
-                            EnsembleTool.getInstance()
-                                    .verifyCloseActiveToolLayer();
-                        }
-
-                    }
-                });
-            }
-        }
-    }
-
-    @SuppressWarnings("restriction")
     @Override
     public void partOpened(IWorkbenchPartReference partRef) {
-        if (containsPart(partRef)) {
-            /* ignore */
-        }
         /*
          * Did another editor open? If so, if there is not already a tool layer
          * associated with it the tell the manager about the new editor.
          */
-        else if (partRef instanceof EditorReference) {
-            EditorPart openedEditor = (EditorPart) ((EditorReference) partRef)
-                    .getPart(false);
-            if (openedEditor instanceof IDisplayPaneContainer) {
+        if (partRef instanceof IEditorReference) {
+            IEditorPart openedEditor = ((IEditorReference) partRef)
+                    .getEditor(false);
+            if (openedEditor instanceof TimeSeriesEditor
+                    && EnsembleTool.isExtant()) {
                 IDisplayPaneContainer editor = (IDisplayPaneContainer) openedEditor;
-                EnsembleTool.getInstance().setEditor(editor);
-                if (!EnsembleTool.getInstance().hasToolLayer(editor)) {
-                    EnsembleTool.getInstance().createToolLayer(editor);
+                /*
+                 * The time series editor opens automatically when a time series
+                 * product is requested from the Volume Browser. If the ensemble
+                 * tool is editable when the time series editor is opened then
+                 * read the products into the ensemble tool.
+                 */
+                if (EnsembleTool.getInstance().isToolEditable()) {
+                    EnsembleTool.getInstance().setEditor(editor);
+                    /*
+                     * Ensemble Tool only allows one time series editor at one
+                     * time to be associated.
+                     */
+                    if (!EnsembleTool.hasToolLayer(editor)) {
+                        EnsembleTool.getInstance().createToolLayer(editor,
+                                EnsembleToolMode.LEGENDS_TIME_SERIES);
+                    }
+                    EnsembleTool.getInstance().refreshTool(true);
                 }
-                EnsembleTool.getInstance().refreshTool(true);
+                /*
+                 * If the ensemble tool was not editable then make sure it gets
+                 * or stays minimized.
+                 */
+                else {
+                    EnsembleTool.getInstance().setEditor(null);
+                    EnsembleTool.getInstance().refreshToolByActiveEditor();
+                }
             }
         }
     }
 
     @Override
     public void partHidden(IWorkbenchPartReference partRef) {
-        if (containsPart(partRef)) {
-            // TODO
-        }
+        // Needed only because the interface requires it
     }
 
     @Override
     public void partVisible(IWorkbenchPartReference partRef) {
-        if (containsPart(partRef)) {
-            // TODO
-        }
+        // Needed only because the interface requires it
     }
 
     @Override
     public void partInputChanged(IWorkbenchPartReference partRef) {
-        if (containsPart(partRef)) {
-            // TODO
-        }
+        // Needed only because the interface requires it
     }
 
-    private boolean containsPart(IWorkbenchPartReference ref) {
-        boolean containsPart = false;
-        IWorkbenchPart part = ref.getPart(false);
-        if (part != null) {
-
-        }
-        for (IDisplayPaneContainer ep : editors) {
-            if (part.equals(ep)) {
-                containsPart = true;
-                break;
-            }
-        }
-        return containsPart;
+    /**
+     * Allow this listener to ignore incoming part activated events.
+     * 
+     * @param ignore
+     *            boolean to turn on/off the "ignore" state
+     */
+    public void ignorePartActivatedEvent(boolean ignore) {
+        ignorePartActivatedEvent = ignore;
     }
+
 }

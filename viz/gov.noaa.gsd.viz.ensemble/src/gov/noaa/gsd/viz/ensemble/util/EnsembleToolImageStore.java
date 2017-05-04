@@ -74,36 +74,6 @@ public class EnsembleToolImageStore {
 
     public static Image NEW_IMG = null;
 
-    public static Image TAB_LEGENDS_ENABLED_SELECTED_IMG = null;
-
-    public static Image TAB_LEGENDS_DISABLED_SELECTED_IMG = null;
-
-    public static Image TAB_LEGENDS_ENABLED_UNSELECTED_IMG = null;
-
-    public static Image TAB_LEGENDS_DISABLED_IMG = null;
-
-    public static Image TAB_MATRIX_ENABLED_SELECTED_IMG = null;
-
-    public static Image TAB_MATRIX_DISABLED_SELECTED_IMG = null;
-
-    public static Image TAB_MATRIX_ENABLED_UNSELECTED_IMG = null;
-
-    public static Image TAB_MATRIX_DISABLED_IMG = null;
-
-    public static Image TAB_INFO_ENABLED_IMG = null;
-
-    public static Image TAB_INFO_DISABLED_IMG = null;
-
-    public static Image TAB_OPTIONS_ENABLED_IMG = null;
-
-    public static Image TAB_OPTIONS_DISABLED_IMG = null;
-
-    public static Image TAB_DISTR_VIEWER_ENABLED_IMG = null;
-
-    public static Image TAB_DISTR_VIEWER_ENABLED_SELECTED_IMG = null;
-
-    public static Image TAB_DISTR_VIEWER_DISABLED_IMG = null;
-
     public static Image VISIBILITY_IMG = null;
 
     public static void constructImages() {
@@ -240,10 +210,6 @@ public class EnsembleToolImageStore {
                     "icons/matrix-browser-dialog-icon-29x24.gif");
         }
 
-        if (TAB_INFO_ENABLED_IMG == null) {
-            TAB_INFO_ENABLED_IMG = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble", "icons/tab-info-enabled.gif");
-        }
         if (POWER_ON_IMG == null) {
             POWER_ON_IMG = ImageResourceManager.getPluginImage(
                     "gov.noaa.gsd.viz.ensemble", "icons/power-on-29x24.gif");
@@ -254,92 +220,6 @@ public class EnsembleToolImageStore {
                     "gov.noaa.gsd.viz.ensemble", "icons/power-off-29x24.gif");
         }
 
-        if (TAB_LEGENDS_ENABLED_UNSELECTED_IMG == null) {
-            TAB_LEGENDS_ENABLED_UNSELECTED_IMG = ImageResourceManager
-                    .getPluginImage("gov.noaa.gsd.viz.ensemble",
-                            "icons/tab-legends-enabled-unselected.gif");
-        }
-
-        if (TAB_LEGENDS_ENABLED_SELECTED_IMG == null) {
-            TAB_LEGENDS_ENABLED_SELECTED_IMG = ImageResourceManager
-                    .getPluginImage("gov.noaa.gsd.viz.ensemble",
-                            "icons/tab-legends-enabled-selected.gif");
-        }
-
-        if (TAB_LEGENDS_DISABLED_SELECTED_IMG == null) {
-            TAB_LEGENDS_DISABLED_SELECTED_IMG = ImageResourceManager
-                    .getPluginImage("gov.noaa.gsd.viz.ensemble",
-                            "icons/tab-legends-disabled-selected.gif");
-        }
-
-        if (TAB_LEGENDS_DISABLED_IMG == null) {
-            TAB_LEGENDS_DISABLED_IMG = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble",
-                    "icons/tab-legends-disabled.gif");
-        }
-
-        if (TAB_MATRIX_ENABLED_UNSELECTED_IMG == null) {
-            TAB_MATRIX_ENABLED_UNSELECTED_IMG = ImageResourceManager
-                    .getPluginImage("gov.noaa.gsd.viz.ensemble",
-                            "icons/tab-matrix-enabled-unselected.gif");
-        }
-
-        if (TAB_MATRIX_ENABLED_SELECTED_IMG == null) {
-            TAB_MATRIX_ENABLED_SELECTED_IMG = ImageResourceManager
-                    .getPluginImage("gov.noaa.gsd.viz.ensemble",
-                            "icons/tab-matrix-enabled-selected.gif");
-        }
-
-        if (TAB_MATRIX_DISABLED_SELECTED_IMG == null) {
-            TAB_MATRIX_DISABLED_SELECTED_IMG = ImageResourceManager
-                    .getPluginImage("gov.noaa.gsd.viz.ensemble",
-                            "icons/tab-matrix-disabled-selected.gif");
-        }
-
-        if (TAB_MATRIX_DISABLED_IMG == null) {
-            TAB_MATRIX_DISABLED_IMG = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble",
-                    "icons/tab-matrix-disabled.gif");
-        }
-
-        if (TAB_INFO_ENABLED_IMG == null) {
-            TAB_INFO_ENABLED_IMG = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble", "icons/tab-info-enabled.gif");
-        }
-
-        if (TAB_INFO_DISABLED_IMG == null) {
-            TAB_INFO_DISABLED_IMG = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble", "icons/tab-info-disabled.gif");
-        }
-
-        if (TAB_OPTIONS_ENABLED_IMG == null) {
-            TAB_OPTIONS_ENABLED_IMG = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble", "icons/tab-prefs-enabled.gif");
-        }
-
-        if (TAB_OPTIONS_DISABLED_IMG == null) {
-            TAB_OPTIONS_DISABLED_IMG = ImageResourceManager
-                    .getPluginImage("gov.noaa.gsd.viz.ensemble",
-                            "icons/tab-prefs-disabled.gif");
-        }
-
-        if (TAB_DISTR_VIEWER_ENABLED_IMG == null) {
-            TAB_DISTR_VIEWER_ENABLED_IMG = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble",
-                    "icons/tab-distr-viewer-enabled.gif");
-        }
-
-        if (TAB_DISTR_VIEWER_ENABLED_SELECTED_IMG == null) {
-            TAB_DISTR_VIEWER_ENABLED_SELECTED_IMG = ImageResourceManager
-                    .getPluginImage("gov.noaa.gsd.viz.ensemble",
-                            "icons/tab-distr-viewer-enabled-selected.gif");
-        }
-
-        if (TAB_DISTR_VIEWER_DISABLED_IMG == null) {
-            TAB_DISTR_VIEWER_DISABLED_IMG = ImageResourceManager
-                    .getPluginImage("gov.noaa.gsd.viz.ensemble",
-                            "icons/tab-distr-viewer-disabled.gif");
-        }
         if (VISIBILITY_IMG == null) {
             VISIBILITY_IMG = ImageResourceManager.getPluginImage(
                     "gov.noaa.gsd.viz.ensemble", "icons/visibility.gif");

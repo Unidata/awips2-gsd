@@ -12,6 +12,7 @@ import com.raytheon.uf.viz.core.rsc.DisplayType;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Oct 10, 2015  12372      polster     Initial creation
+ * Nov 20, 2016  19443      polster     Rename method to include resource type
  * 
  * </pre>
  * 
@@ -40,17 +41,17 @@ public class FieldPlanePair {
         sourceParent = "";
         plane = p;
         displayType = dt;
-        setVisible(v);
+        setResourceVisible(v);
     }
 
-    public FieldPlanePair(String fieldAbbreviation, String fieldLongName, String p,
-            boolean v, DisplayType dt) {
+    public FieldPlanePair(String fieldAbbreviation, String fieldLongName,
+            String p, boolean v, DisplayType dt) {
         fieldAbbrev = fieldAbbreviation;
         fieldFullName = fieldLongName;
         sourceParent = "";
         plane = p;
         displayType = dt;
-        setVisible(v);
+        setResourceVisible(v);
     }
 
     public String getFieldAbbrev() {
@@ -77,11 +78,11 @@ public class FieldPlanePair {
         return plane + " " + fieldAbbrev;
     }
 
-    public boolean isVisible() {
+    public boolean isResourceVisible() {
         return isVisible;
     }
 
-    public void setVisible(boolean isVisible) {
+    public void setResourceVisible(boolean isVisible) {
         this.isVisible = isVisible;
     }
 

@@ -37,6 +37,7 @@ import com.raytheon.viz.grid.rsc.GridNameGenerator;
  * Nov 17, 2014    5056     polster     Initial creation
  * Jan 17, 2016    13211    polster     Renamed class from GenericResourceHolder
  *                                      to AbstractResourceHolder
+ * Dec 29, 2016    19325    jing        Deal with Image display type in equals()
  * 
  * </pre>
  * 
@@ -45,8 +46,8 @@ import com.raytheon.viz.grid.rsc.GridNameGenerator;
  * @version 1.0
  */
 
-public abstract class AbstractResourceHolder extends
-        AbstractLegendComponentsProvider {
+public abstract class AbstractResourceHolder
+        extends AbstractLegendComponentsProvider {
 
     protected AbstractVizResource<?, ?> rsc;
 
@@ -63,8 +64,8 @@ public abstract class AbstractResourceHolder extends
         if (GeneratedEnsembleGridResource.class
                 .isAssignableFrom(rsc.getClass())) {
             genericRsc = new GeneratedGridResourceHolder(rsc, isSelected);
-        } else if (GeneratedTimeSeriesResource.class.isAssignableFrom(rsc
-                .getClass())) {
+        } else if (GeneratedTimeSeriesResource.class
+                .isAssignableFrom(rsc.getClass())) {
             genericRsc = new GeneratedTimeSeriesResourceHolder(rsc, isSelected);
         } else if ((rsc instanceof AbstractVizResource<?, ?>)
                 && (rsc instanceof GridNameGenerator.IGridNameResource)) {
@@ -85,6 +86,11 @@ public abstract class AbstractResourceHolder extends
         if (o instanceof AbstractResourceHolder) {
             AbstractResourceHolder gr = (AbstractResourceHolder) o;
             equals = this.getSpecificName().equals(gr.getSpecificName());
+            // Catch image case that the two names are different.
+            if (!this.getRsc().getName().equals(gr.getRsc().getName())) {
+                equals = false;
+            }
+
         } else {
             equals = false;
         }
@@ -217,8 +223,8 @@ public abstract class AbstractResourceHolder extends
                 return false;
             }
 
-            DataTime time = getDataTimeForResource(getRsc(), getRsc()
-                    .getDescriptor(), info);
+            DataTime time = getDataTimeForResource(getRsc(),
+                    getRsc().getDescriptor(), info);
 
             if (time == null) {
                 return false;

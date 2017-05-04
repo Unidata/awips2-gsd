@@ -1,6 +1,13 @@
 package gov.noaa.gsd.viz.ensemble.util;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
@@ -8,6 +15,9 @@ import java.util.Set;
 
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.RGB;
+
+import com.raytheon.uf.viz.core.exception.VizException;
+import com.raytheon.uf.viz.core.procedures.Bundle;
 
 /**
  * Generic Utilities class to contain a hodge-podge of utility capabilties.
@@ -18,7 +28,8 @@ import org.eclipse.swt.graphics.RGB;
  * 
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
- * Oct 8, 2014     5056     polster     Initial creation
+ * Oct 08, 2014  5056       polster     Initial creation
+ * Nov 19, 2016  19443      polster     Add a dump bundle method
  * 
  * </pre>
  * 
@@ -190,7 +201,6 @@ public class Utilities {
         return es;
     }
 
-    /* TODO: diagnostic only: uses standard-out file descriptor */
     public static void dumpMap(PrintStream out, Map<String, String> map,
             String keyDescr, String valueDescr) {
 
@@ -198,7 +208,8 @@ public class Utilities {
         String value = null;
 
         out.println("");
-        out.println("----------------------------------------------------------");
+        out.println(
+                "----------------------------------------------------------");
         Set<String> keySet = map.keySet();
         Iterator<String> variablesIter = keySet.iterator();
         while (variablesIter.hasNext()) {
@@ -207,7 +218,20 @@ public class Utilities {
             out.println(">>>>>>>>> " + keyDescr + " " + variable + " "
                     + valueDescr + ": " + value);
         }
-        out.println("----------------------------------------------------------");
+        out.println(
+                "----------------------------------------------------------");
+        out.println("");
+
+    }
+
+    public static void echo(PrintStream out, String str) {
+
+        out.println("");
+        out.println(
+                "----------------------------------------------------------");
+        out.println(">>>>>>>>>>>>>>>>>  " + str);
+        out.println(
+                "----------------------------------------------------------");
         out.println("");
 
     }
@@ -242,4 +266,48 @@ public class Utilities {
         return result;
     }
 
+    public static void dumpStackTrace(int traceCount) {
+
+        Exception e = new Exception();
+        StackTraceElement[] traces = e.getStackTrace();
+        System.out.println("________________");
+        int count = 0;
+        for (StackTraceElement ste : traces) {
+            if (ste.toString().indexOf("dumpStackTrace") >= 0) {
+                continue;
+            }
+            System.out.println(">>>>> " + ste.toString());
+            count++;
+            if (count == traceCount)
+                break;
+        }
+        System.out.println(
+                "__________________________________________________________________");
+
+    }
+
+    public static void dumpBundleToFile(Bundle b, String fileLocation,
+            String prefix) {
+        String bundleAsXML = null;
+        try {
+            bundleAsXML = b.toXML();
+        } catch (VizException e) {
+            return;
+        }
+
+        if (!fileLocation.endsWith(File.separator)) {
+            fileLocation.concat(File.separator);
+        }
+
+        if (bundleAsXML != null && bundleAsXML.length() > 0) {
+            Path outFile = Paths.get(fileLocation + prefix + "-bundle.xml");
+            Charset charset = Charset.forName("UTF-8");
+            try (BufferedWriter writer = Files.newBufferedWriter(outFile,
+                    charset)) {
+                writer.write(bundleAsXML, 0, bundleAsXML.length());
+            } catch (IOException x) {
+                /* ignore */
+            }
+        }
+    }
 }

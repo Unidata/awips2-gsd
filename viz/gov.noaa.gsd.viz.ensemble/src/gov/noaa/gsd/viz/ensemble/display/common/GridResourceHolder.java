@@ -6,7 +6,9 @@ import gov.noaa.gsd.viz.ensemble.util.Utilities;
 import com.raytheon.uf.common.dataplugin.level.Level;
 import com.raytheon.uf.common.dataplugin.level.mapping.LevelMapping;
 import com.raytheon.uf.common.dataplugin.level.mapping.LevelMappingFactory;
+import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.viz.grid.rsc.GridNameGenerator;
 import com.raytheon.viz.grid.rsc.GridNameGenerator.IGridNameResource;
 import com.raytheon.viz.grid.rsc.GridNameGenerator.LegendParameters;
@@ -21,6 +23,7 @@ import com.raytheon.viz.grid.rsc.GridNameGenerator.LegendParameters;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Nov 17, 2014   5056       polster     Initial creation
+ * Dec 15, 2016   19325      jing        Deal with image
  * 
  * </pre>
  * 
@@ -69,6 +72,13 @@ public class GridResourceHolder extends AbstractResourceHolder {
             parameter = "<param missing>";
         } else {
             parameter = currRsc.getLegendParameters().parameter;
+            /*
+             * Identify if the member is displayed as image.
+             */
+            if (((AbstractGridResource<?>) (this.getRsc()))
+                    .getDisplayType() == DisplayType.IMAGE) {
+                parameter += " Img";
+            }
         }
         return parameter;
     }
@@ -132,8 +142,9 @@ public class GridResourceHolder extends AbstractResourceHolder {
     }
 
     private String lookupPlane(Level level) {
-        LevelMapping mapping = LevelMappingFactory.getInstance(
-                LevelMappingFactory.VOLUMEBROWSER_LEVEL_MAPPING_FILE)
+        LevelMapping mapping = LevelMappingFactory
+                .getInstance(
+                        LevelMappingFactory.VOLUMEBROWSER_LEVEL_MAPPING_FILE)
                 .getLevelMappingForLevel(level);
         if (mapping == null) {
             return level.getMasterLevel().getName();
@@ -142,27 +153,23 @@ public class GridResourceHolder extends AbstractResourceHolder {
     }
 
     public String getGroupName() {
-
+        String units = getUnits();
         String sb = String.format("%s %s %s %s", getModel(), getLevel(),
-                getParameter(), getUnits() != null
-                        && getUnits().equals("") == false ? "(" + getUnits()
-                        + ")" : "");
+                getParameter(),
+                units != null && units.equals("") == false
+                        ? "(" + units + ")" : "");
         return sb;
     }
 
     public String getSpecificName() {
 
-        String sb = String
-                .format("%s %s %s %s %s",
-                        getModel(),
-                        getLevel(),
-                        getParameter(),
-                        getUnits() != null && getUnits().equals("") == false ? "("
-                                + getUnits() + ")"
-                                : "",
-                        getEnsembleId() != null
-                                && getEnsembleId().equals("") == false ? getEnsembleId()
-                                : "");
+        String units = getUnits();
+        String sb = String.format("%s %s %s %s %s", getModel(), getLevel(),
+                getParameter(),
+                units != null && units.equals("") == false
+                        ? "(" + units + ")" : "",
+                getEnsembleId() != null && getEnsembleId().equals("") == false
+                        ? getEnsembleId() : "");
 
         String nodeLabel = Utilities.removeExtraSpaces(sb.toString());
         return nodeLabel;

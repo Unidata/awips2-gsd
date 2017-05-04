@@ -25,9 +25,12 @@ import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.grid.rsc.data.GeneralGridData;
 import com.raytheon.uf.viz.core.map.MapDescriptor;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.uf.viz.core.rsc.IInitListener;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
+import com.raytheon.uf.viz.core.rsc.RenderingOrderFactory.ResourceOrder;
 import com.raytheon.uf.viz.core.rsc.ResourceProperties;
+import com.raytheon.uf.viz.core.rsc.capabilities.DisplayTypeCapability;
 import com.raytheon.viz.grid.rsc.GridResourceData;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
 import com.raytheon.viz.grid.rsc.general.GridResource;
@@ -46,8 +49,9 @@ import com.raytheon.viz.grid.rsc.general.GridResource;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Jan 2014       5056       jing        Initial creation
+ * Dec 2016       19325      jing        Dispaly calculated grid as image
  * 
- * </pre>
+ *          </pre>
  */
 
 public class GeneratedEnsembleGridResourceData extends GridResourceData
@@ -141,7 +145,8 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
         this.level = resourceData.level;
         this.unit = resourceData.unit;
         this.setRetrieveData(resourceData.retrieveData);
-        this.setRequeryNecessaryOnTimeMatch(resourceData.isRequeryNecessaryOnTimeMatch);
+        this.setRequeryNecessaryOnTimeMatch(
+                resourceData.isRequeryNecessaryOnTimeMatch);
         this.setMetadataMap(resourceData.metadataMap);
         this.toolLayer = resourceData.toolLayer;
 
@@ -163,9 +168,19 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
         resource.setCalculation(calculator.getCalculation());
         resource.registerListener(this);
 
+        if (this.getCalculator().isImage()) {
+            rsc.getLoadProperties().getCapabilities()
+                    .getCapability(rsc.getResourceData(),
+                            DisplayTypeCapability.class)
+                    .setDisplayType(DisplayType.IMAGE);
+        }
+
         update();
         ResourceProperties rp = new ResourceProperties();
 
+        if (this.getCalculator().isImage()) {
+            rp.setRenderingOrder(ResourceOrder.LOWEST.value);
+        }
         ResourcePair pair = new ResourcePair();
         pair.setResource(rsc);
         pair.setProperties(rp);
@@ -291,7 +306,8 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
         DataTime[] dataTimes = this.mapDescriptor.getFramesInfo()
                 .getFrameTimes();
 
-        List<DataTime> times = new ArrayList<DataTime>(Arrays.asList(dataTimes));
+        List<DataTime> times = new ArrayList<DataTime>(
+                Arrays.asList(dataTimes));
 
         return times;
     }
@@ -316,7 +332,7 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
             return allData;
         }
         int i;
-        for (i = 0; i < frameTimes.length; i++){
+        for (i = 0; i < frameTimes.length; i++) {
             if (time.equals(frameTimes[i])) {
                 break;
             }
@@ -386,18 +402,15 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
         if (level != null && !level.equals("") && unit != null
                 && !unit.equals("")) {
             // Same level and unit case
-            dataHolders = EnsembleResourceManager
-                    .getInstance()
+            dataHolders = EnsembleResourceManager.getInstance()
                     .getResourceList(toolLayer)
                     .getUserLoadedRscs((IDescriptor) new MapDescriptor(), true,
                             level, unit);
         } else if (unit != null && !unit.equals("")) {
             // same unit whatever level case
-            dataHolders = EnsembleResourceManager
-                    .getInstance()
-                    .getResourceList(toolLayer)
-                    .getUserLoadedRscs((IDescriptor) new MapDescriptor(), true,
-                            unit);
+            dataHolders = EnsembleResourceManager.getInstance()
+                    .getResourceList(toolLayer).getUserLoadedRscs(
+                            (IDescriptor) new MapDescriptor(), true, unit);
         } else {
             // whatever level or unit,for test only
             dataHolders = EnsembleResourceManager.getInstance()
@@ -407,8 +420,8 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
 
         if (!dataHolders.isEmpty() && !dataHolders.keySet().isEmpty()) {
             disableMembersRetrieveData();
-            resource.setParameter((GridResource<?>) (dataHolders.get(
-                    (dataHolders.keySet().toArray())[0]).get(0).getRsc()));
+            resource.setParameter((GridResource<?>) (dataHolders
+                    .get((dataHolders.keySet().toArray())[0]).get(0).getRsc()));
             resource.updateData(calculate());
             enableMembersRetrieveData();
         }
@@ -452,8 +465,8 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
     @Override
     public void inited(AbstractVizResource<?, ?> rsc) {
 
-        EnsembleResourceManager.getInstance().registerGenerated(
-                (AbstractVizResource<?, ?>) resource);
+        EnsembleResourceManager.getInstance()
+                .registerGenerated((AbstractVizResource<?, ?>) resource);
 
     }
 

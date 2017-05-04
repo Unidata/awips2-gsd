@@ -1,14 +1,5 @@
 package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer;
 
-import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
-import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;
-import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.GlobalPreferencesComposite;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.PreferencesDialog;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.ModelFamilyDialog;
-import gov.noaa.gsd.viz.ensemble.util.EnsembleToolImageStore;
-import gov.noaa.gsd.viz.ensemble.util.GlobalColor;
-
 import org.eclipse.core.commands.Command;
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
@@ -35,8 +26,17 @@ import org.eclipse.ui.services.IServiceLocator;
 
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
+import com.raytheon.uf.viz.core.IDisplayPaneContainer;
 import com.raytheon.uf.viz.core.VizApp;
 import com.raytheon.viz.ui.EditorUtil;
+
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;
+import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.GlobalPreferencesComposite;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.PreferencesDialog;
+import gov.noaa.gsd.viz.ensemble.util.EnsembleToolImageStore;
 
 /***
  * 
@@ -55,6 +55,9 @@ import com.raytheon.viz.ui.EditorUtil;
  * ------------ ---------- ----------- --------------------------
  * Oct 15, 2015   12565      polster     Initial creation
  * Jan 15, 2016   12301      jing        Added distribution feature
+ * Oct 12, 2016   19443      polster     Moved model family dialog access
+ * Dec 29, 2016   19325      jing        Added image items in the calculation menu
+ * Mar 01, 2017   19443      polster     Fixed toggle editability problem
  * 
  * </pre>
  * 
@@ -78,7 +81,7 @@ public class EnsembleToolBar extends Composite {
 
     private ToolItem powerToggleToolItem = null;
 
-    private ToolItem clearAllToolItem = null;
+    private ToolItem clearAllEntriesToolItem = null;
 
     private Menu dropdownMenu = null;
 
@@ -90,7 +93,8 @@ public class EnsembleToolBar extends Composite {
 
     private final LegendsBrowserCalculationSelectionAdapter legendsCalculationListener = new LegendsBrowserCalculationSelectionAdapter();
 
-    public EnsembleToolBar(Composite parent, int style, EnsembleToolViewer etv) {
+    public EnsembleToolBar(Composite parent, int style,
+            EnsembleToolViewer etv) {
         super(parent, style);
         rootTabFolder = (CTabFolder) parent;
         ensembleToolViewer = etv;
@@ -98,8 +102,7 @@ public class EnsembleToolBar extends Composite {
     }
 
     private void createToolBar() {
-        Composite toolbarComposite = new Composite(rootTabFolder, SWT.NONE);
-        toolbarComposite.setBackground(GlobalColor.get(GlobalColor.WHITE));
+        Composite toolbarComposite = new Composite(rootTabFolder, SWT.BORDER);
 
         FillLayout toolbarContainer_fl = new FillLayout(SWT.HORIZONTAL);
         toolbarContainer_fl.marginWidth = 1;
@@ -108,9 +111,6 @@ public class EnsembleToolBar extends Composite {
 
         /* Fill the tool bar and add it to the main tab folder */
         toolBar = makeToolBar(toolbarComposite);
-        Rectangle r = toolbarComposite.getBounds();
-        r.height = r.height + 32;
-        toolbarComposite.setBounds(r);
         rootTabFolder.setTopRight(toolbarComposite);
 
     }
@@ -119,30 +119,32 @@ public class EnsembleToolBar extends Composite {
         powerToggleToolItem.setEnabled(false);
     }
 
-    synchronized public void setViewEditable(final boolean enabled) {
+    synchronized public void setEditable(final boolean enabled) {
 
         VizApp.runSync(new Runnable() {
 
             @Override
             public void run() {
 
-                if (enabled) {
-                    powerToggleToolItem
-                            .setImage(EnsembleToolImageStore.POWER_ON_IMG);
-                    powerToggleToolItem.setToolTipText("Tool Off");
-                } else {
-                    powerToggleToolItem
-                            .setImage(EnsembleToolImageStore.POWER_OFF_IMG);
-                    powerToggleToolItem.setToolTipText("Tool On");
+                if (isWidgetReady()) {
+                    if (enabled) {
+                        powerToggleToolItem
+                                .setImage(EnsembleToolImageStore.POWER_ON_IMG);
+                        powerToggleToolItem.setToolTipText("Tool Off");
+                    } else {
+                        powerToggleToolItem
+                                .setImage(EnsembleToolImageStore.POWER_OFF_IMG);
+                        powerToggleToolItem.setToolTipText("Tool On");
+                    }
+
+                    browserToolItem.setEnabled(enabled);
+                    toolRelevantActions.setEnabled(enabled);
+                    clearAllEntriesToolItem.setEnabled(enabled);
+
+                    /* Always on items */
+                    powerToggleToolItem.setEnabled(true);
+                    toolBar.setEnabled(true);
                 }
-
-                browserToolItem.setEnabled(enabled);
-                toolRelevantActions.setEnabled(enabled);
-
-                /* Always on items */
-                powerToggleToolItem.setEnabled(true);
-                toolBar.setEnabled(true);
-
             }
         });
 
@@ -167,7 +169,7 @@ public class EnsembleToolBar extends Composite {
      */
     private ToolBar makeToolBar(Composite parent) {
 
-        toolBar = new ToolBar(parent, SWT.BORDER_SOLID);
+        toolBar = new ToolBar(parent, SWT.NONE);
 
         browserToolItem = new ToolItem(toolBar, SWT.PUSH);
         browserToolItem.setImage(EnsembleToolImageStore.VOLUME_BROWSER_IMG);
@@ -187,8 +189,8 @@ public class EnsembleToolBar extends Composite {
                     ICommandService commandService = (ICommandService) serviceLocator
                             .getService(ICommandService.class);
 
-                    Command command = commandService
-                            .getCommand("com.raytheon.viz.volumebrowser.volumeBrowserRef");
+                    Command command = commandService.getCommand(
+                            "com.raytheon.viz.volumebrowser.volumeBrowserRef");
 
                     /**
                      * Optionally pass a ExecutionEvent instance, default
@@ -204,48 +206,52 @@ public class EnsembleToolBar extends Composite {
 
                 } else if (mode == EnsembleTool.EnsembleToolMode.MATRIX) {
 
-                    ModelFamilyDialog cd = new ModelFamilyDialog(
-                            EnsembleToolViewer.getShell(), ensembleToolViewer
-                                    .getMatrixNavigator());
-                    cd.setBlockOnOpen(true);
-                    if (cd.open() == Window.OK) {
-                        cd.close();
-                    }
+                    ensembleToolViewer.getMatrixNavigator()
+                            .openFamilyLoaderDialog();
 
                 }
             }
         });
 
-        clearAllToolItem = new ToolItem(toolBar, SWT.PUSH);
-        clearAllToolItem.setImage(EnsembleToolImageStore.CLEAR_ALL_IMG);
-        clearAllToolItem.setToolTipText("Clear All");
-        clearAllToolItem.addSelectionListener(new SelectionAdapter() {
+        clearAllEntriesToolItem = new ToolItem(toolBar, SWT.PUSH);
+        clearAllEntriesToolItem.setImage(EnsembleToolImageStore.CLEAR_ALL_IMG);
+        clearAllEntriesToolItem.setToolTipText("Clear All Entries");
+        clearAllEntriesToolItem.addSelectionListener(new SelectionAdapter() {
 
             @Override
             public void widgetSelected(SelectionEvent e) {
 
-                boolean isFull = (EnsembleTool.getInstance().getToolLayer() == null || EnsembleTool
-                        .getInstance().getToolLayer().isEmpty()) ? false : true;
+                if (EnsembleTool.getInstance() == null) {
+                    return;
+                }
+                boolean isFull = (EnsembleTool.getInstance()
+                        .getToolLayer() == null
+                        || EnsembleTool.getInstance().getToolLayer().isEmpty())
+                                ? false : true;
 
+                IDisplayPaneContainer editor = null;
+                String clearResourcesPrompt = "Are you sure you want to clear all Ensemble Tool resources in the active editor?";
+                if (EnsembleTool.getInstance().getActiveEditor() != null) {
+                    editor = EnsembleTool.getInstance().getActiveEditor();
+                    if (EnsembleTool.isMatrixEditor(editor)) {
+                        clearResourcesPrompt = "Are you sure you want to clear all Matrix resources in the active editor?";
+                    }
+                }
                 if (isFull) {
-                    boolean isOkay = MessageDialog
-                            .open(MessageDialog.QUESTION_WITH_CANCEL,
-                                    getShell(),
-                                    "Confirm Clear All",
-                                    "Are you sure you want to clear all resources? \n \n  \t\t\t ... Cannot be undone!",
-                                    SWT.NONE);
+                    boolean isOkay = MessageDialog.open(MessageDialog.QUESTION,
+                            getShell(), "Confirm Clear All Entries",
+                            clearResourcesPrompt, SWT.NONE);
                     if (isOkay) {
                         EnsembleTool.getInstance().clearToolLayer();
                     }
                 }
-
             }
 
         });
 
         toolRelevantActions = new EnsembleToolItemActionDropdown(toolBar);
-        toolRelevantActions.setToolMode(EnsembleTool.getToolMode(EditorUtil
-                .getActiveVizContainer()));
+        toolRelevantActions.setToolMode(
+                EnsembleTool.getToolMode(EditorUtil.getActiveVizContainer()));
 
         ToolItem separator_3 = new ToolItem(toolBar, SWT.SEPARATOR);
         separator_3.setWidth(0);
@@ -253,47 +259,93 @@ public class EnsembleToolBar extends Composite {
         powerToggleToolItem = new ToolItem(toolBar, SWT.PUSH);
         powerToggleToolItem.setImage(EnsembleToolImageStore.POWER_ON_IMG);
         powerToggleToolItem.setToolTipText("Tool Off");
-        powerToggleToolItem.setSelection(EnsembleToolViewer.isViewEditable());
+        powerToggleToolItem.setSelection(EnsembleToolViewer.isEditable());
         powerToggleToolItem.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
-                ensembleToolViewer.toggleViewEditable();
+
+                /* In association with VLab AWIPS2_GSD Issue #29762 */
+                EnsembleTool.getInstance().setEditable(
+                        !EnsembleTool.getInstance().isToolEditable());
             }
         });
 
-        parent.pack();
+        toolBar.redraw();
 
         return toolBar;
     }
 
+    private boolean isToolEnabled() {
+        boolean isToolEnabled = false;
+        EnsembleTool et = EnsembleTool.getInstance();
+        if (et != null) {
+            IDisplayPaneContainer editor = et.getActiveEditor();
+            if (editor != null) {
+                EnsembleToolLayer toolLayer = EnsembleTool.getToolLayer(editor);
+                if (toolLayer != null) {
+                    if (toolLayer.isEmpty()) {
+                        isToolEnabled = false;
+                    } else {
+                        isToolEnabled = true;
+                    }
+                }
+            }
+        }
+        return isToolEnabled;
+    }
+
     protected void addLegendsPlanViewItems() {
+
+        if (EnsembleTool.getInstance() == null) {
+            return;
+        }
         removeAllMenuItems();
 
         new MenuItem(dropdownMenu, SWT.SEPARATOR);
 
-        boolean isEnabled = (EnsembleTool.getInstance().getToolLayer() == null || EnsembleTool
-                .getInstance().getToolLayer().isEmpty()) ? false : true;
+        boolean isEnabled = isToolEnabled();
 
         add(Calculation.MEAN.getTitle(), "Calculate mean of visible resources",
                 isEnabled, legendsCalculationListener);
+        add(Calculation.MEAN_IMAGE.getTitle(),
+                "Calculate mean image of visible resources", isEnabled,
+                legendsCalculationListener);
         add(Calculation.MIN.getTitle(),
                 "Calculate minimum on visible resources", isEnabled,
+                legendsCalculationListener);
+        add(Calculation.MIN_IMAGE.getTitle(),
+                "Calculate minimum image on visible resources", isEnabled,
                 legendsCalculationListener);
         add(Calculation.MAX.getTitle(),
                 "Calculate maxixum on visible resources", isEnabled,
                 legendsCalculationListener);
+        add(Calculation.MAX_IMAGE.getTitle(),
+                "Calculate maxixum image on visible resources", isEnabled,
+                legendsCalculationListener);
         add(Calculation.MEDIAN.getTitle(),
                 "Calculate median on visible resources", isEnabled,
+                legendsCalculationListener);
+        add(Calculation.MEDIAN_IMAGE.getTitle(),
+                "Calculate median image on visible resources", isEnabled,
                 legendsCalculationListener);
         add(Calculation.RANGE.getTitle(),
                 "Calculate range on visible resources", isEnabled,
                 legendsCalculationListener);
+        add(Calculation.RANGE_IMAGE.getTitle(),
+                "Calculate range image on visible resources", isEnabled,
+                legendsCalculationListener);
         add(Calculation.SUMMATION.getTitle(),
                 "Calculate summation on visible resources", isEnabled,
+                legendsCalculationListener);
+        add(Calculation.SUMMATION_IMAGE.getTitle(),
+                "Calculate summation image on visible resources", isEnabled,
                 legendsCalculationListener);
         add(Calculation.STANDARD_DEVIATION.getTitle(),
                 "Calculate standard deviation on visible resources", isEnabled,
                 legendsCalculationListener);
+        add(Calculation.STANDARD_DEVIATION_IMAGE.getTitle(),
+                "Calculate standard deviation image on visible resources",
+                isEnabled, legendsCalculationListener);
         add(Calculation.VALUE_SAMPLING.getTitle(), "Turn on value sampling",
                 isEnabled, legendsCalculationListener);
         add(Calculation.HISTOGRAM_SAMPLING.getTitle(),
@@ -323,9 +375,11 @@ public class EnsembleToolBar extends Composite {
 
     private void addLegendsTimeSeriesItems() {
         removeAllMenuItems();
+
         new MenuItem(dropdownMenu, SWT.SEPARATOR);
-        boolean isEnabled = (EnsembleTool.getInstance().getToolLayer() == null || EnsembleTool
-                .getInstance().getToolLayer().isEmpty()) ? false : true;
+
+        boolean isEnabled = isToolEnabled();
+
         add(Calculation.MEAN.getTitle(), "Calculate mean of visible resources",
                 true, legendsCalculationListener);
         add(Calculation.MIN.getTitle(),
@@ -359,31 +413,13 @@ public class EnsembleToolBar extends Composite {
         });
     }
 
+    /**
+     * TODO: No tool bar drop down menu items for the Matrix tool. Save for
+     * future use.
+     */
     protected void addMatrixItems() {
         removeAllMenuItems();
         new MenuItem(dropdownMenu, SWT.SEPARATOR);
-        boolean isEnabled = (EnsembleTool.getInstance().getToolLayer() == null || EnsembleTool
-                .getInstance().getToolLayer().isEmpty()) ? false : true;
-
-        SelectionAdapter matchRscAction = new SelectionAdapter() {
-            public void widgetSelected(SelectionEvent event) {
-                if (ensembleToolViewer != null) {
-                    ensembleToolViewer.matchLikeResources();
-                }
-            }
-        };
-        add("Match Resources",
-                "Match colors and density for similar resources", isEnabled,
-                matchRscAction);
-
-        SelectionAdapter refreshRscAction = new SelectionAdapter() {
-            public void widgetSelected(SelectionEvent event) {
-                if (ensembleToolViewer != null) {
-                    ensembleToolViewer.refreshResources();
-                }
-            }
-        };
-        add("Refresh", "Refresh the resource", isEnabled, refreshRscAction);
     }
 
     protected void removeAllMenuItems() {
@@ -403,12 +439,13 @@ public class EnsembleToolBar extends Composite {
     private class EnsembleToolItemActionDropdown extends SelectionAdapter {
 
         public EnsembleToolItemActionDropdown(ToolBar parentToolBar) {
-            actionsDropdownToolItem = new ToolItem(parentToolBar, SWT.DROP_DOWN);
+            actionsDropdownToolItem = new ToolItem(parentToolBar,
+                    SWT.DROP_DOWN);
             actionsDropdownToolItem.setImage(EnsembleToolImageStore.GEAR_IMG);
             actionsDropdownToolItem.addSelectionListener(this);
             actionsDropdownToolItem.setToolTipText("Actions");
-            dropdownMenu = new Menu(actionsDropdownToolItem.getParent()
-                    .getShell());
+            dropdownMenu = new Menu(
+                    actionsDropdownToolItem.getParent().getShell());
         }
 
         public void setToolMode(EnsembleToolMode mode) {
@@ -433,7 +470,8 @@ public class EnsembleToolBar extends Composite {
 
             setToolMode(EnsembleTool.getInstance().getToolMode());
 
-            if ((event.detail == SWT.ARROW) || (event.detail == SWT.MENU_MOUSE)) {
+            if ((event.detail == SWT.ARROW)
+                    || (event.detail == SWT.MENU_MOUSE)) {
                 ToolItem item = (ToolItem) event.widget;
                 Rectangle rect = item.getBounds();
                 Point pt = item.getParent()
@@ -457,4 +495,27 @@ public class EnsembleToolBar extends Composite {
             }
         }
     }
+
+    /**
+     * Convenience method to make certain all tree components are not null and
+     * not disposed.
+     * 
+     * @return
+     */
+    public boolean isWidgetReady() {
+        boolean isReady = false;
+
+        if (toolBar != null && !toolBar.isDisposed() && browserToolItem != null
+                && !browserToolItem.isDisposed() && powerToggleToolItem != null
+                && !powerToggleToolItem.isDisposed()
+                && clearAllEntriesToolItem != null
+                && !clearAllEntriesToolItem.isDisposed() && dropdownMenu != null
+                && !dropdownMenu.isDisposed() && actionsDropdownToolItem != null
+                && !actionsDropdownToolItem.isDisposed()) {
+            isReady = true;
+        }
+
+        return isReady;
+    }
+
 }

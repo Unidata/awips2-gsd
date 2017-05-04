@@ -1,8 +1,5 @@
 package gov.noaa.gsd.viz.ensemble.display.common;
 
-import gov.noaa.gsd.viz.ensemble.control.EnsembleResourceManager;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
-
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -17,7 +14,9 @@ import com.raytheon.uf.viz.core.map.IMapDescriptor;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.xy.timeseries.display.TimeSeriesDescriptor;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
-import com.raytheon.viz.ui.EditorUtil;
+
+import gov.noaa.gsd.viz.ensemble.control.EnsembleResourceManager;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
 /**
  * Access and operate the Ensemble Tool resources. Any resources contained in
@@ -104,7 +103,9 @@ public class NavigatorResourceList {
                     arh.getRsc().unload();
                 }
                 ensembleToolResources.clear();
-                EditorUtil.getActiveVizContainer().refresh();
+                if (theToolLayer.getResourceContainer() != null) {
+                    theToolLayer.getResourceContainer().refresh();
+                }
             }
         });
 
@@ -157,8 +158,8 @@ public class NavigatorResourceList {
 
         Map<String, List<AbstractResourceHolder>> rscMap = new ConcurrentHashMap<>();
 
-        EnsembleResourceManager.getInstance().checkExistingRegisteredResources(
-                theToolLayer);
+        EnsembleResourceManager.getInstance()
+                .checkExistingRegisteredResources(theToolLayer);
 
         List<AbstractResourceHolder> rscs = EnsembleResourceManager
                 .getInstance().getResourceList(theToolLayer)
@@ -180,7 +181,8 @@ public class NavigatorResourceList {
         Iterator<String> iter = rscGroupNames.iterator();
         while (iter.hasNext()) {
             String currRsc = iter.next();
-            List<AbstractResourceHolder> members = findAssociatedMembers(currRsc);
+            List<AbstractResourceHolder> members = findAssociatedMembers(
+                    currRsc);
             if (!members.isEmpty()) {
                 rscMap.put(currRsc, members);
             }
@@ -212,8 +214,8 @@ public class NavigatorResourceList {
 
         rscMap.clear();
 
-        EnsembleResourceManager.getInstance().checkExistingRegisteredResources(
-                theToolLayer);
+        EnsembleResourceManager.getInstance()
+                .checkExistingRegisteredResources(theToolLayer);
 
         List<AbstractResourceHolder> rscs = EnsembleResourceManager
                 .getInstance().getResourceList(theToolLayer)
@@ -235,7 +237,8 @@ public class NavigatorResourceList {
         Iterator<String> iter = rscGroupNames.iterator();
         while (iter.hasNext()) {
             String currRsc = iter.next();
-            List<AbstractResourceHolder> members = findAssociatedMembers(currRsc);
+            List<AbstractResourceHolder> members = findAssociatedMembers(
+                    currRsc);
             if (!members.isEmpty()) {
                 rscMap.put(currRsc, members);
             }
@@ -283,8 +286,8 @@ public class NavigatorResourceList {
      * @return
      */
     public List<AbstractResourceHolder> getUserLoadedRscs() {
-        EnsembleResourceManager.getInstance().checkExistingRegisteredResources(
-                theToolLayer);
+        EnsembleResourceManager.getInstance()
+                .checkExistingRegisteredResources(theToolLayer);
 
         List<AbstractResourceHolder> rscs = new CopyOnWriteArrayList<>();
         for (AbstractResourceHolder emr : ensembleToolResources) {
@@ -307,8 +310,8 @@ public class NavigatorResourceList {
         if (uniqueResourceName == null)
             return null;
 
-        EnsembleResourceManager.getInstance().checkExistingRegisteredResources(
-                theToolLayer);
+        EnsembleResourceManager.getInstance()
+                .checkExistingRegisteredResources(theToolLayer);
 
         List<AbstractResourceHolder> rscs = new CopyOnWriteArrayList<>();
         for (AbstractResourceHolder emr : ensembleToolResources) {
@@ -335,18 +338,18 @@ public class NavigatorResourceList {
     public Map<String, List<AbstractResourceHolder>> getUserLoadedRscs(
             IDescriptor descriptor, boolean selected) {
 
-        EnsembleResourceManager.getInstance().checkExistingRegisteredResources(
-                theToolLayer);
+        EnsembleResourceManager.getInstance()
+                .checkExistingRegisteredResources(theToolLayer);
 
         Map<String, List<AbstractResourceHolder>> rscMap = new ConcurrentHashMap<>();
         for (AbstractResourceHolder emr : ensembleToolResources) {
-            if (!emr.isGenerated
-                    && emr.isSelected == selected
-                    && emr.getRsc().getDescriptor().getClass() == descriptor
-                            .getClass()) { // same type descriptor like Map
+            /* same type descriptor like Map */
+            if (!emr.isGenerated && emr.isSelected == selected && emr.getRsc()
+                    .getDescriptor().getClass() == descriptor.getClass()) {
                 if (emr.getRsc().getName() == null
-                        || emr.getRsc().getName().equals(""))
+                        || emr.getRsc().getName().equals("")) {
                     continue;
+                }
                 String model = emr.getModel();
                 addResource2Map(rscMap, model, emr);
             }
@@ -369,9 +372,10 @@ public class NavigatorResourceList {
      * @return
      */
     public Map<String, List<AbstractResourceHolder>> getUserLoadedRscs(
-            IDescriptor descriptor, boolean selected, String level, String unit) {
-        EnsembleResourceManager.getInstance().checkExistingRegisteredResources(
-                theToolLayer);
+            IDescriptor descriptor, boolean selected, String level,
+            String unit) {
+        EnsembleResourceManager.getInstance()
+                .checkExistingRegisteredResources(theToolLayer);
 
         Map<String, List<AbstractResourceHolder>> rscMap = new ConcurrentHashMap<>();
 
@@ -379,8 +383,7 @@ public class NavigatorResourceList {
             if (descriptor instanceof IMapDescriptor
                     && emr.getRsc().getDescriptor() instanceof IMapDescriptor) {
 
-                if (!emr.isGenerated
-                        && emr.isSelected == selected
+                if (!emr.isGenerated && emr.isSelected == selected
                         && level.equals(emr.getLevel())
                         && unit.equals(emr.getUnits())
                         // same type descriptor like Map
@@ -394,15 +397,13 @@ public class NavigatorResourceList {
                     String model = emr.getModel();
                     addResource2Map(rscMap, model, emr);
                 }
-            } else if (descriptor instanceof TimeSeriesDescriptor
-                    && emr.getRsc().getDescriptor() instanceof TimeSeriesDescriptor) {
+            } else if (descriptor instanceof TimeSeriesDescriptor && emr
+                    .getRsc().getDescriptor() instanceof TimeSeriesDescriptor) {
 
-                if (!emr.isGenerated
-                        && emr.isSelected == selected
-                        /**
-                         * Remember to handle surface level name issue (e.g.
-                         * "0SURFACE")
-                         */
+                if (!emr.isGenerated && emr.isSelected == selected
+                /**
+                 * Remember to handle surface level name issue (e.g. "0SURFACE")
+                 */
                         && level.equals(emr.getLevel())
                         && unit.equals(((TimeSeriesResource) (emr.getRsc()))
                                 .getUnits())
@@ -435,13 +436,12 @@ public class NavigatorResourceList {
      */
     public Map<String, List<AbstractResourceHolder>> getUserLoadedRscs(
             IDescriptor descriptor, boolean selected, String unit) {
-        EnsembleResourceManager.getInstance().checkExistingRegisteredResources(
-                theToolLayer);
+        EnsembleResourceManager.getInstance()
+                .checkExistingRegisteredResources(theToolLayer);
 
         Map<String, List<AbstractResourceHolder>> rscMap = new ConcurrentHashMap<>();
         for (AbstractResourceHolder emr : ensembleToolResources) {
-            if (!emr.isGenerated
-                    && emr.isSelected == selected
+            if (!emr.isGenerated && emr.isSelected == selected
                     && unit.equals(emr.getUnits())
                     // same type descriptor like Map
                     && emr.getRsc().getDescriptor().getClass() == descriptor
@@ -528,8 +528,8 @@ public class NavigatorResourceList {
     // Currently get the first resource loaded to get time from
     public String getTimeBasisLegendTime() {
 
-        EnsembleResourceManager.getInstance().checkExistingRegisteredResources(
-                theToolLayer);
+        EnsembleResourceManager.getInstance()
+                .checkExistingRegisteredResources(theToolLayer);
         // for now this is the first resource name loaded into this editor
         String timeBasisLegendTime = null;
 
@@ -545,8 +545,8 @@ public class NavigatorResourceList {
 
     public String getTimeBasisResourceName() {
 
-        EnsembleResourceManager.getInstance().checkExistingRegisteredResources(
-                theToolLayer);
+        EnsembleResourceManager.getInstance()
+                .checkExistingRegisteredResources(theToolLayer);
         // for now this is the first resource name loaded into this editor
         String timeBasisResourceName = null;
 
@@ -560,7 +560,8 @@ public class NavigatorResourceList {
         return timeBasisResourceName;
     }
 
-    synchronized public void setEnsembleCalculationResource(String rscGroupName) {
+    synchronized public void setEnsembleCalculationResource(
+            String rscGroupName) {
         calculationEnsembleName = rscGroupName;
     }
 
@@ -596,13 +597,12 @@ public class NavigatorResourceList {
     public Map<String, List<AbstractResourceHolder>> getCalculationLoadedRscs(
             IDescriptor descriptor, boolean selected) {
 
-        EnsembleResourceManager.getInstance().checkExistingRegisteredResources(
-                theToolLayer);
+        EnsembleResourceManager.getInstance()
+                .checkExistingRegisteredResources(theToolLayer);
 
         Map<String, List<AbstractResourceHolder>> rscMap = new ConcurrentHashMap<>();
         for (AbstractResourceHolder emr : ensembleToolResources) {
-            if (!emr.isGenerated
-                    && emr.isSelected == selected
+            if (!emr.isGenerated && emr.isSelected == selected
                     && emr.getGroupName().equals(calculationEnsembleName)
                     // same type descriptor like Map
                     && emr.getRsc().getDescriptor().getClass() == descriptor

@@ -57,9 +57,10 @@ public enum GlobalColor {
     PALE_DARK_AZURE(new RGB(174, 196, 228)), //
     PALE_LIGHT_AZURE(new RGB(196, 220, 249)), //
     PALE_EXTRA_LIGHT_AZURE(new RGB(214, 233, 253)), //
-    PALE_WEAK_BLUE(new RGB(203, 229, 255)), //
-    PALE_WEAK_GREEN(new RGB(204, 255, 204)), //
-    PALE_WEAK_MAGENTA(new RGB(255, 204, 255)), //
+    PALE_LIGHT_BLUE(new RGB(203, 229, 255)), //
+    PALE_LIGHT_GREEN(new RGB(204, 255, 204)), //
+    PALE_LIGHT_MAGENTA(new RGB(255, 204, 255)), //
+    PALE_LIGHT_RED(new RGB(255, 204, 204)), //
     PASTEL_LIGHT_BLUE(new RGB(134, 181, 245)), //
     PEACH(new RGB(255, 204, 153)), //
     PINK_FLAMINGO(new RGB(252, 116, 253)), //

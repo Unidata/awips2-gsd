@@ -1,12 +1,12 @@
 package gov.noaa.gsd.viz.ensemble.display.common;
 
-import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
-import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
-import gov.noaa.gsd.viz.ensemble.util.Utilities;
-
 import java.util.StringTokenizer;
 
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+
+import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
+import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
+import gov.noaa.gsd.viz.ensemble.util.Utilities;
 
 /**
  * Concrete resolution of accessors of histogram resource attributes.
@@ -35,6 +35,11 @@ public class HistogramGridResourceHolder extends GenericResourceHolder {
 
         super(rsc, isSelected);
         currRsc = (HistogramResource<?>) rsc;
+    }
+
+    @Override
+    public HistogramResource<?> getRsc() {
+        return (HistogramResource<?>) rsc;
     }
 
     @Override
@@ -84,9 +89,11 @@ public class HistogramGridResourceHolder extends GenericResourceHolder {
 
     @Override
     public Calculation getCalculation() {
-        if (((HistogramResource<?>) this.rsc).getMode() == HistogramResource.DisplayMode.POINT_SAMPLING) {
+        if (((HistogramResource<?>) this.rsc)
+                .getMode() == HistogramResource.DisplayMode.POINT_SAMPLING) {
             return Calculation.HISTOGRAM_SAMPLING;
-        } else if (((HistogramResource<?>) this.rsc).getMode() == HistogramResource.DisplayMode.GRAPHIC_HISTGRAM) {
+        } else if (((HistogramResource<?>) this.rsc)
+                .getMode() == HistogramResource.DisplayMode.GRAPHIC_HISTGRAM) {
             return Calculation.HISTOGRAM_GRAPHICS;
         } else {
             return Calculation.VALUE_SAMPLING;
