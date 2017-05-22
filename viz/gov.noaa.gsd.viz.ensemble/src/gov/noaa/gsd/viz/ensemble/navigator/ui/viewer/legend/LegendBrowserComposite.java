@@ -17,8 +17,12 @@ import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
+import org.eclipse.jface.viewers.DelegatingStyledCellLabelProvider;
+import org.eclipse.jface.viewers.ILabelProviderListener;
 import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.ITreeViewerListener;
+import org.eclipse.jface.viewers.StyledString;
+import org.eclipse.jface.viewers.StyledString.Styler;
 import org.eclipse.jface.viewers.TreeExpansionEvent;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.TreeViewerColumn;
@@ -37,12 +41,10 @@ import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Cursor;
 import org.eclipse.swt.graphics.Font;
-import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
-import org.eclipse.swt.graphics.ImageData;
-import org.eclipse.swt.graphics.PaletteData;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.RGB;
+import org.eclipse.swt.graphics.TextStyle;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
@@ -56,10 +58,7 @@ import org.eclipse.swt.widgets.TreeItem;
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.common.status.UFStatus.Priority;
-import com.raytheon.uf.common.style.AbstractStylePreferences;
-import com.raytheon.uf.common.style.LabelingPreferences;
 import com.raytheon.uf.common.style.StyleException;
-import com.raytheon.uf.common.style.contour.ContourPreferences;
 import com.raytheon.uf.viz.core.VizApp;
 import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
@@ -169,10 +168,15 @@ public class LegendBrowserComposite extends Composite {
     private List<Image> imageCache = null;
 
     private final Font legendTimeFont = SWTResourceManager
-            .getFont("courier new", 8, SWT.BOLD);
+            .getFont("courier new", 10, SWT.BOLD);
 
-    private final Font legendNameFont = SWTResourceManager
-            .getFont("courier new", 8, SWT.BOLD);
+    private final Font enabledLegendNameFont = SWTResourceManager
+            .getFont("courier new", 11, SWT.BOLD);
+
+    private final Font disabledLegendNameFont = SWTResourceManager
+            .getFont("courier new", 11, SWT.NONE);
+
+    private final int LEGEND_NAME_DECENT_CHAR_CELL_WIDTH = 10;
 
     /*
      * Padding used as tree viewer column headers are not very cosmetically
@@ -183,6 +187,8 @@ public class LegendBrowserComposite extends Composite {
     private static final String HEADER_VALID_TIME = "Time";
 
     private static final String HEADER_CYCLE_TIME = "Cycle Time";
+
+    private static ProductResourceStyle prodRscStyler = null;
 
     /*
      * If an item in the tree is toggled, need not clear the distribution viewer
@@ -198,6 +204,7 @@ public class LegendBrowserComposite extends Composite {
         legendsTabItem = itemLegendsTabItem;
         imageCache = new ArrayList<>();
         createBody();
+        prodRscStyler = new ProductResourceStyle();
     }
 
     private void createBody() {
@@ -302,7 +309,7 @@ public class LegendBrowserComposite extends Composite {
 
         LegendNameTreeColumnLabelProvider cnlp = new LegendNameTreeColumnLabelProvider();
         columnLabelProviders.add(cnlp);
-        column0.setLabelProvider(cnlp);
+        column0.setLabelProvider(new DelegatingStyledCellLabelProvider(cnlp));
 
         column1 = new TreeViewerColumn(legendsTableViewer, SWT.LEFT);
         column1.getColumn().setWidth(220);
@@ -645,40 +652,32 @@ public class LegendBrowserComposite extends Composite {
                 mousedEnsembleName, rscList);
 
         /*
-         * TODO:
-         * This code tests the stylePreferences and label preferences objs. All
-         * member resources share one stylePreferences and one label preference
-         * object in the baseline code, which is not right. It maybe a fundamental 
-         * problem for D2D data display.
-         * For dealing with the sharing problem, we clone the original StylePreferences 
-         * object and assign a new object to the grid resources related to the
-         * "Contour Control".
-         * See the code in the EnsembleResourceManager::registerResource() and
-         * registerGenerated(). 
-         * It requires adding two methods in ufcore:AbstractGridResource.java, 
-         * public AbstractStylePreferences getStylePreferences() { 
-         *      return stylePreferences; 
-         * } 
-         * public void setStylePreferences(AbstractStylePreferences stylePreferences) {
-         *      this.stylePreferences = stylePreferences; 
-         *      } 
+         * TODO: This code tests the stylePreferences and label preferences
+         * objs. All member resources share one stylePreferences and one label
+         * preference object in the baseline code, which is not right. It maybe
+         * a fundamental problem for D2D data display. For dealing with the
+         * sharing problem, we clone the original StylePreferences object and
+         * assign a new object to the grid resources related to the
+         * "Contour Control". See the code in the
+         * EnsembleResourceManager::registerResource() and registerGenerated().
+         * It requires adding two methods in ufcore:AbstractGridResource.java,
+         * public AbstractStylePreferences getStylePreferences() { return
+         * stylePreferences; } public void
+         * setStylePreferences(AbstractStylePreferences stylePreferences) {
+         * this.stylePreferences = stylePreferences; }
          * 
-         * For long term, AWIPS2
-         * team should fix the baseline bug which may impact the contour and
-         * other display. 
-         * Need to keep this code at this location for ET until
-         * the bug in base line is fixed. 
+         * For long term, AWIPS2 team should fix the baseline bug which may
+         * impact the contour and other display. Need to keep this code at this
+         * location for ET until the bug in base line is fixed.
          * 
-         * for (AbstractResourceHolder rh : rhs){ 
-         *      AbstractGridResource rsc = (AbstractGridResource) (rh.getRsc());
-         *      LabelingPreferences labelingPreferences = null;
-         *      AbstractStylePreferences stylePreferences = rsc
-         *           .getStylePreferences(); if (stylePreferences instanceof
-         *      ContourPreferences) { labelingPreferences = ((ContourPreferences)
-         *           stylePreferences) .getContourLabeling(); float incrementOrig =
-         *      labelingPreferences.getIncrement(); 
-         *      // valuesOrig =labelingPreferences.getValues(); 
-         * }
+         * for (AbstractResourceHolder rh : rhs){ AbstractGridResource rsc =
+         * (AbstractGridResource) (rh.getRsc()); LabelingPreferences
+         * labelingPreferences = null; AbstractStylePreferences stylePreferences
+         * = rsc .getStylePreferences(); if (stylePreferences instanceof
+         * ContourPreferences) { labelingPreferences = ((ContourPreferences)
+         * stylePreferences) .getContourLabeling(); float incrementOrig =
+         * labelingPreferences.getIncrement(); // valuesOrig
+         * =labelingPreferences.getValues(); }
          */
 
         if (contourDialog.open() == Window.OK) {
@@ -1224,7 +1223,7 @@ public class LegendBrowserComposite extends Composite {
                                 startContourControl(mousedEnsembleName);
                             } catch (StyleException e) {
                                 statusHandler.handle(Priority.WARN,
-                                e.getLocalizedMessage(), e);
+                                        e.getLocalizedMessage(), e);
                             }
 
                         }
@@ -1951,18 +1950,201 @@ public class LegendBrowserComposite extends Composite {
         }
     }
 
+    /*
+     * Here's how we display the names of the product resource items displayed
+     * in the tree.
+     */
+    private class LegendNameTreeColumnLabelProvider extends ColumnLabelProvider
+            implements DelegatingStyledCellLabelProvider.IStyledLabelProvider {
+
+        @Override
+        public Color getBackground(final Object element) {
+            if (element instanceof AbstractResourceHolder) {
+                AbstractResourceHolder arh = (AbstractResourceHolder) element;
+                if (arh.getRsc() != null) {
+                    if (arh.getRsc().getProperties().isVisible()) {
+                        RGB rgb = arh.getRsc()
+                                .getCapability(ColorableCapability.class)
+                                .getColor();
+                        return new Color(getShell().getDisplay(), rgb.red,
+                                rgb.green, rgb.blue);
+                    } else {
+                        RGB rgb = arh.getRsc()
+                                .getCapability(ColorableCapability.class)
+                                .getColor();
+                        rgb = Utilities.desaturate(rgb);
+                        return new Color(getShell().getDisplay(), rgb.red,
+                                rgb.green, rgb.blue);
+                    }
+                }
+            }
+
+            return super.getBackground(element);
+        }
+
+        @Override
+        public Image getImage(Object element) {
+            return null;
+        }
+
+        @Override
+        public StyledString getStyledText(Object element) {
+            StyledString styledNodeLabel = null;
+            String nodeLabel = null;
+            if (element instanceof String) {
+                nodeLabel = (String) element;
+            } else if (GeneratedGridResourceHolder.class
+                    .isAssignableFrom(element.getClass())) {
+                AbstractResourceHolder gr = (AbstractResourceHolder) element;
+                nodeLabel = gr.getSpecificName();
+            } else if (element instanceof GridResourceHolder) {
+
+                GridResourceHolder gr = (GridResourceHolder) element;
+                if ((gr.getEnsembleId() != null)
+                        && (gr.getEnsembleId().length() > 0)
+                        && ((AbstractGridResource<?>) (gr.getRsc()))
+                                .getDisplayType() != DisplayType.IMAGE) {
+                    nodeLabel = gr.getEnsembleId();
+                } else {
+                    nodeLabel = gr.getSpecificName();
+                }
+            } else if (TimeSeriesResourceHolder.class
+                    .isAssignableFrom(element.getClass())) {
+                TimeSeriesResourceHolder tsr = (TimeSeriesResourceHolder) element;
+                if ((tsr.getEnsembleId() != null)
+                        && (tsr.getEnsembleId().length() > 0)) {
+                    nodeLabel = tsr.getEnsembleId();
+                } else {
+                    if (element instanceof GeneratedTimeSeriesResourceHolder) {
+                        nodeLabel = tsr.getSpecificName();
+                    } else {
+                        nodeLabel = tsr.getGeneralName();
+                    }
+                }
+            } else if (element instanceof HistogramGridResourceHolder) {
+
+                HistogramGridResourceHolder gr = (HistogramGridResourceHolder) element;
+                if ((gr.getEnsembleId() != null)
+                        && (gr.getEnsembleId().length() > 0)) {
+                    nodeLabel = gr.getEnsembleId();
+                } else {
+                    nodeLabel = gr.getSpecificName();
+                }
+            }
+            // update the visibility status cosmetically (i.e. normal text
+            // versus graying-out)
+            if (element instanceof AbstractResourceHolder) {
+                AbstractResourceHolder gr = (AbstractResourceHolder) element;
+
+                TreeItem treeItem = findTreeItemByResource(gr);
+                if (treeItem != null) {
+                    if (gr.getRsc().getProperties().isVisible()) {
+                        treeItem.setForeground(
+                                EnsembleToolViewer.getEnabledForegroundColor());
+                    } else {
+                        treeItem.setForeground(EnsembleToolViewer
+                                .getDisabledForegroundColor());
+                    }
+                    matchParentToChildrenVisibility(treeItem);
+                }
+                if (nodeLabel != null) {
+                    nodeLabel = nodeLabel.trim();
+                    if (gr != null && gr.requiresLoadCheck()
+                            && !gr.isLoadedAtFrame()) {
+                        nodeLabel = nodeLabel.concat(" (Not Loaded)");
+                    }
+                }
+            }
+
+            /* resize so most text widths are equally highlighted using style */
+            StringBuffer sb = new StringBuffer();
+            sb.append("  ");
+            sb.append(nodeLabel);
+            if (sb.length() < LEGEND_NAME_DECENT_CHAR_CELL_WIDTH) {
+                int innerFill = LEGEND_NAME_DECENT_CHAR_CELL_WIDTH
+                        - sb.length();
+                for (int i = 0; i < innerFill; i++) {
+                    sb.append(" ");
+                }
+            } else {
+                sb.append("  ");
+            }
+            nodeLabel = sb.toString();
+            styledNodeLabel = new StyledString(nodeLabel);
+            styledNodeLabel.setStyle(0, nodeLabel.length(), prodRscStyler);
+            return styledNodeLabel;
+        }
+
+        @Override
+        public Font getFont(Object element) {
+            Font ff = enabledLegendNameFont;
+            if (element instanceof AbstractResourceHolder) {
+                AbstractResourceHolder gr = (AbstractResourceHolder) element;
+
+                TreeItem treeItem = findTreeItemByResource(gr);
+                if (treeItem != null) {
+                    if (gr.getRsc().getProperties().isVisible()) {
+                        ff = enabledLegendNameFont;
+                    } else {
+                        ff = disabledLegendNameFont;
+                    }
+                    matchParentToChildrenVisibility(treeItem);
+                }
+            }
+            return ff;
+        }
+
+        @Override
+        public void addListener(ILabelProviderListener listener) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void dispose() {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public boolean isLabelProperty(Object element, String property) {
+            return false;
+        }
+
+        @Override
+        public void removeListener(ILabelProviderListener listener) {
+            // TODO Auto-generated method stub
+        }
+
+    }
+
+    private class ProductResourceStyle extends Styler {
+
+        @Override
+        public void applyStyles(TextStyle textStyle) {
+            textStyle.background = GlobalColor.get(GlobalColor.WHITE);
+            textStyle.foreground = GlobalColor.get(GlobalColor.BLACK);
+            textStyle.borderColor = GlobalColor.get(GlobalColor.BLACK);
+            textStyle.borderStyle = SWT.BORDER_SOLID;
+        }
+
+    }
+
     private class LegendTimeTreeColumnLabelProvider
             extends ColumnLabelProvider {
 
+        @Override
         public Font getFont(Object element) {
             return legendTimeFont;
         }
 
+        @Override
         public Image getImage(Object element) {
             Image image = null;
             return image;
         }
 
+        @Override
         public String getText(Object element) {
 
             String nodeLabel = null;
@@ -2001,223 +2183,6 @@ public class LegendBrowserComposite extends Composite {
             return nodeLabel;
         }
 
-    }
-
-    /*
-     * Here's how we control the items displayed in the tree.
-     */
-    private class LegendNameTreeColumnLabelProvider
-            extends ColumnLabelProvider {
-
-        public Font getFont(Object element) {
-            return legendNameFont;
-        }
-
-        public Image getImage(Object element) {
-            Image image = null;
-            if (element instanceof String) {
-                String productName = (String) element;
-                int imageWidth = 46;
-                int imageHeight = 18;
-
-                ImageData imageData = new ImageData(imageWidth, imageHeight, 24,
-                        new PaletteData(255, 255, 255));
-                imageData.transparentPixel = imageData.palette
-                        .getPixel(new RGB(255, 255, 255));
-                image = new Image(rootComposite.getDisplay(), imageData);
-                GC gc = new GC(image);
-                gc.setBackground(GlobalColor.get(GlobalColor.WHITE));
-                gc.fillRectangle(0, 0, imageWidth, imageHeight);
-
-                // if any ensemble members are visible then the root tree item
-                // should be "toggled on" ...
-                if (anyChildrenToggleOn(productName)) {
-                    gc.setBackground(GlobalColor.get(GlobalColor.BLACK));
-                }
-                // otherwise, the root tree item should appear "toggled off" ...
-                else {
-                    gc.setBackground(GlobalColor.get(GlobalColor.GRAY));
-                }
-
-                int listEntryLineUpperLeft_x = 4;
-                int listEntryTopLineUpperLeft_y = 4;
-                int listEntryMiddleLineUpperLeft_y = 8;
-                int listEntryBottomLineUpperLeft_y = 12;
-                int listEntryWidth = 23;
-                int listEntryHeight = 2;
-
-                // the icon for an ensemble product is three black
-                // horizontal bars which is an attempt to represent
-                // a list of the ensemble's pertubation members.
-                gc.fillRectangle(listEntryLineUpperLeft_x,
-                        listEntryTopLineUpperLeft_y, listEntryWidth,
-                        listEntryHeight);
-                gc.fillRectangle(listEntryLineUpperLeft_x,
-                        listEntryMiddleLineUpperLeft_y, listEntryWidth,
-                        listEntryHeight);
-                gc.fillRectangle(listEntryLineUpperLeft_x,
-                        listEntryBottomLineUpperLeft_y, listEntryWidth,
-                        listEntryHeight);
-
-                int bulletSize = 3;
-                int bulletUpperLeftMargin_x = 15;
-                int bulletUpperLeft_y = 9;
-
-                // then put a nice hyphen
-                gc.fillRectangle(listEntryWidth + bulletUpperLeftMargin_x,
-                        bulletUpperLeft_y, bulletSize + 2, bulletSize - 1);
-                gc.dispose();
-
-            } else if (element instanceof AbstractResourceHolder) {
-
-                AbstractResourceHolder gr = (AbstractResourceHolder) element;
-                RGB color = gr.getRsc().getCapability(ColorableCapability.class)
-                        .getColor();
-
-                int imageWidth = 46;
-                int imageHeight = 18;
-                int colorWidth = 24;
-                int colorHeight = 14;
-                int innerColorWidth = 20;
-                int innerColorHeight = 10;
-                int bulletSize = 3;
-                int bulletUpperLeftMargin_x = 13;
-                int bulletUpperLeft_y = 9;
-
-                ImageData imageData = new ImageData(imageWidth, imageHeight, 24,
-                        new PaletteData(255, 255, 255));
-                imageData.transparentPixel = imageData.palette
-                        .getPixel(new RGB(255, 255, 255));
-                image = new Image(rootComposite.getDisplay(), imageData);
-                GC gc = new GC(image);
-                gc.setBackground(GlobalColor.get(GlobalColor.WHITE));
-                gc.fillRectangle(0, 0, imageWidth, imageHeight);
-                if (gr.getRsc().getProperties().isVisible()) {
-
-                    // need the following tweaking integers which cosmetic
-                    // center things nicely
-                    gc.setBackground(GlobalColor.get(GlobalColor.BLACK));
-
-                    // the icon for a visible individual grid resources put the
-                    // color of the resource inside a black bordered rectangle.
-                    gc.fillRectangle(4, imageHeight - colorHeight - 2,
-                            colorWidth, colorHeight);
-
-                    if (element instanceof GeneratedGridResourceHolder) {
-                        color = Utilities.brighten(color);
-                    }
-                    gc.setBackground(SWTResourceManager.getColor(color));
-                    gc.fillRectangle(4 + ((colorWidth - innerColorWidth) / 2),
-                            (imageHeight - colorHeight)
-                                    + ((colorHeight - innerColorHeight) / 2)
-                                    - 2,
-                            innerColorWidth, innerColorHeight);
-
-                    // then put a nice hyphen
-                    gc.setBackground(GlobalColor.get(GlobalColor.BLACK));
-                    gc.fillRectangle(colorWidth + bulletUpperLeftMargin_x,
-                            bulletUpperLeft_y, bulletSize + 2, bulletSize - 1);
-                } else {
-
-                    // need the following tweaking integers which cosmetic
-                    // center things nicely
-                    gc.setBackground(GlobalColor.get(GlobalColor.GRAY));
-
-                    // the icon for a hidden individual grid resources put the
-                    // color of the resource inside a greyed bordered rectangle.
-                    gc.fillRectangle(4, imageHeight - colorHeight - 2,
-                            colorWidth, colorHeight);
-                    gc.setBackground(SWTResourceManager
-                            .getColor(Utilities.desaturate(color)));
-                    gc.fillRectangle(4 + ((colorWidth - innerColorWidth) / 2),
-                            (imageHeight - colorHeight)
-                                    + ((colorHeight - innerColorHeight) / 2)
-                                    - 2,
-                            innerColorWidth, innerColorHeight);
-
-                    gc.setBackground(GlobalColor.get(GlobalColor.GRAY));
-                    gc.fillRectangle(colorWidth + bulletUpperLeftMargin_x,
-                            bulletUpperLeft_y, bulletSize + 2, bulletSize - 1);
-                }
-                gc.dispose();
-
-            }
-            if (image != null) {
-                imageCache.add(image);
-            }
-            return image;
-        }
-
-        public String getText(Object element) {
-
-            String nodeLabel = null;
-            if (element instanceof String) {
-                nodeLabel = (String) element;
-            } else if (GeneratedGridResourceHolder.class
-                    .isAssignableFrom(element.getClass())) {
-                AbstractResourceHolder gr = (AbstractResourceHolder) element;
-                nodeLabel = gr.getSpecificName();
-            } else if (element instanceof GridResourceHolder) {
-
-                GridResourceHolder gr = (GridResourceHolder) element;
-                if ((gr.getEnsembleId() != null)
-                        && (gr.getEnsembleId().length() > 0)
-                        && ((AbstractGridResource<?>) (gr.getRsc()))
-                                .getDisplayType() != DisplayType.IMAGE) {
-                    nodeLabel = gr.getEnsembleId();
-                } else {
-                    nodeLabel = gr.getSpecificName();
-                }
-            } else if (TimeSeriesResourceHolder.class
-                    .isAssignableFrom(element.getClass())) {
-
-                TimeSeriesResourceHolder tsr = (TimeSeriesResourceHolder) element;
-                if ((tsr.getEnsembleId() != null)
-                        && (tsr.getEnsembleId().length() > 0)) {
-                    nodeLabel = tsr.getEnsembleId();
-                } else {
-                    if (element instanceof GeneratedTimeSeriesResourceHolder) {
-                        nodeLabel = tsr.getSpecificName();
-                    } else {
-                        nodeLabel = tsr.getGeneralName();
-                    }
-                }
-            } else if (element instanceof HistogramGridResourceHolder) {
-
-                HistogramGridResourceHolder gr = (HistogramGridResourceHolder) element;
-                if ((gr.getEnsembleId() != null)
-                        && (gr.getEnsembleId().length() > 0)) {
-                    nodeLabel = gr.getEnsembleId();
-                } else {
-                    nodeLabel = gr.getSpecificName();
-                }
-            }
-            // update the visibility status cosmetically (i.e. normal text
-            // versus graying-out)
-            if (element instanceof AbstractResourceHolder) {
-                AbstractResourceHolder gr = (AbstractResourceHolder) element;
-
-                TreeItem treeItem = findTreeItemByResource(gr);
-                if (treeItem != null) {
-                    if (gr.getRsc().getProperties().isVisible()) {
-                        treeItem.setForeground(
-                                EnsembleToolViewer.getEnabledForegroundColor());
-                    } else {
-                        treeItem.setForeground(EnsembleToolViewer
-                                .getDisabledForegroundColor());
-                    }
-                    matchParentToChildrenVisibility(treeItem);
-                }
-                // if (nodeLabel != null) {
-                // nodeLabel = nodeLabel.trim();
-                // if (gr != null && gr.requiresLoadCheck()
-                // && !gr.isLoadedAtFrame()) {
-                // nodeLabel = nodeLabel.concat(" (Not Loaded)");
-                // }
-                // }
-            }
-            return nodeLabel;
-        }
     }
 
     /*
