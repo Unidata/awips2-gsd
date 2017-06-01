@@ -5,8 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import org.eclipse.swt.graphics.RGB;
-
 import com.raytheon.uf.common.colormap.prefs.ColorMapParameters;
 import com.raytheon.uf.common.dataplugin.PluginDataObject;
 import com.raytheon.uf.common.dataplugin.grid.GridRecord;
@@ -31,7 +29,6 @@ import com.raytheon.uf.viz.core.rsc.AbstractResourceData;
 import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
 import com.raytheon.uf.viz.core.rsc.RenderingOrderFactory.ResourceOrder;
-import com.raytheon.uf.viz.core.rsc.capabilities.ColorableCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.DisplayTypeCapability;
 import com.raytheon.viz.grid.rsc.GridNameGenerator;
 import com.raytheon.viz.grid.rsc.GridNameGenerator.IGridNameResource;
@@ -42,7 +39,6 @@ import com.raytheon.viz.grid.xml.FieldDisplayTypesFactory;
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
 import gov.noaa.gsd.viz.ensemble.display.calculate.ERFCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.EnsembleCalculator;
-import gov.noaa.gsd.viz.ensemble.util.Utilities;
 
 /**
  * Based on the loaded ensemble product(s) data generated new resource with a
@@ -123,12 +119,6 @@ public class GeneratedEnsembleGridResource
                     .setNameGenerator(new GridNameGenerator());
         }
 
-        // Set color
-        ColorableCapability colorable = (ColorableCapability) this
-                .getCapability(ColorableCapability.class);
-        RGB color = Utilities.getRandomNiceContrastColor();
-        colorable.setColor(color);
-
     };
 
     /**
@@ -145,10 +135,6 @@ public class GeneratedEnsembleGridResource
         super(resourceData, loadProperties);
 
         calculator = c;
-        ColorableCapability colorable = (ColorableCapability) this
-                .getCapability(ColorableCapability.class);
-        RGB color = Utilities.getRandomNiceContrastColor();
-        colorable.setColor(color);
 
     }
 

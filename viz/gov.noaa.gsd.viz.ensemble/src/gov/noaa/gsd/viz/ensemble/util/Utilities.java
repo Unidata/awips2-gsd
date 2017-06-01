@@ -38,6 +38,8 @@ import com.raytheon.uf.viz.core.procedures.Bundle;
  */
 public class Utilities {
 
+    private static int lastRandom = 0;
+
     private Utilities() {
         super();
     }
@@ -66,47 +68,99 @@ public class Utilities {
     }
 
     /**
-     * generate a random color that is visbily not too dark nor light.
+     * This method returns either a randmomly generated color or a color
+     * randomly chosen from a set of global colors.
      * 
-     * @return
+     * @return RGB of the produced color
      */
     public static RGB getRandomNiceContrastColor() {
 
-        final int darkestShadeLowerThreshold = 160;
-        final int darkestShadeUpperThreshold = 185;
-        final int lightestShadeLowerThreshold = 195;
-        final int lightestShadeUpperThreshold = 235;
+        RGB niceColor = null;
 
-        /**
-         * For each of Red, Green, and Bluse components:
-         * 
-         * Find a random lower and upper thresholds to calculate the darkest and
-         * lightest possible values of the color's component.
+        /*
+         * Either randomly generate an RGB value or randomly pick an RGB value
+         * from the large list of global colors enumeration.
          */
-        Random rand = new Random();
-        final int r_darkestShade = Math.max(darkestShadeLowerThreshold,
-                rand.nextInt(darkestShadeUpperThreshold));
-        final int r_lightestShade = Math.max(lightestShadeLowerThreshold,
-                rand.nextInt(lightestShadeUpperThreshold));
-        final int g_darkestShade = Math.max(darkestShadeLowerThreshold,
-                rand.nextInt(darkestShadeUpperThreshold));
-        final int g_lightestShade = Math.max(lightestShadeLowerThreshold,
-                rand.nextInt(lightestShadeUpperThreshold));
-        final int b_darkestShade = Math.max(darkestShadeLowerThreshold,
-                rand.nextInt(darkestShadeUpperThreshold));
-        final int b_lightestShade = Math.max(lightestShadeLowerThreshold,
-                rand.nextInt(lightestShadeUpperThreshold));
+        Random random = new Random();
+        int index = random.nextInt(2);
+        if (index == 0) {
 
-        /**
-         * Now use the thresholds to create the random color value for each rgb
-         * component.
-         */
-        int r = Math.min(r_darkestShade, rand.nextInt(r_lightestShade));
-        int g = Math.min(g_darkestShade, rand.nextInt(g_lightestShade));
-        int b = Math.min(b_darkestShade, rand.nextInt(b_lightestShade));
+            /*
+             * To make sure we don't get anything close to a gray color, use
+             * different ranges for min and max for red, green, and blue, and
+             * randomly assign the ranges.
+             */
 
-        return new RGB(r, g, b);
+            final int a_max = 255;
+            final int a_min = 220;
 
+            final int b_max = 220;
+            final int b_min = 190;
+
+            final int c_max = 190;
+            final int c_min = 145;
+
+            int red = 0;
+            int blue = 0;
+            int green = 0;
+
+            /*
+             * Don't allow the same random number (i.e. from 0 - 5) to be used
+             * in consecutive calls which gives a greater chance of not getting
+             * similar colors on back-to-back calls.
+             */
+            int r = random.nextInt(6);
+            while (lastRandom == r) {
+                r = random.nextInt(6);
+            }
+            lastRandom = r;
+            switch (r) {
+            case 0:
+                red = (int) (Math.random() * (a_max - a_min) + a_min);
+                blue = (int) (Math.random() * (b_max - b_min) + b_min);
+                green = (int) (Math.random() * (c_max - c_min) + c_min);
+                break;
+            case 1:
+                red = (int) (Math.random() * (b_max - b_min) + b_min);
+                blue = (int) (Math.random() * (c_max - c_min) + c_min);
+                green = (int) (Math.random() * (a_max - a_min) + a_min);
+                break;
+            case 2:
+                red = (int) (Math.random() * (c_max - c_min) + c_min);
+                blue = (int) (Math.random() * (a_max - a_min) + a_min);
+                green = (int) (Math.random() * (b_max - b_min) + b_min);
+                break;
+            case 3:
+                red = (int) (Math.random() * (a_max - a_min) + a_min);
+                blue = (int) (Math.random() * (c_max - c_min) + c_min);
+                green = (int) (Math.random() * (b_max - b_min) + b_min);
+                break;
+            case 4:
+                red = (int) (Math.random() * (b_max - b_min) + b_min);
+                blue = (int) (Math.random() * (a_max - a_min) + a_min);
+                green = (int) (Math.random() * (c_max - c_min) + c_min);
+                break;
+            case 5:
+                red = (int) (Math.random() * (c_max - c_min) + c_min);
+                blue = (int) (Math.random() * (b_max - b_min) + b_min);
+                green = (int) (Math.random() * (a_max - a_min) + a_min);
+                break;
+            }
+
+            niceColor = new RGB(red, green, blue);
+
+        } else {
+            /*
+             * Return a random RGB between 0 and GlobalColor.size()
+             */
+            GlobalColor gcolor = null;
+            do {
+                index = random.nextInt(GlobalColor.size());
+                gcolor = GlobalColor.getAtOrdinal(index);
+            } while (gcolor.isHighContrast() == false);
+            niceColor = gcolor.getRGB();
+        }
+        return niceColor;
     }
 
     /**
@@ -171,7 +225,7 @@ public class Utilities {
     public static RGB brighten(RGB c) {
 
         float[] hsb = c.getHSB();
-        hsb[2] = 0.75f;
+        hsb[2] = 1.0f;
         RGB nc = new RGB(hsb[0], hsb[1], hsb[2]);
         return nc;
     }

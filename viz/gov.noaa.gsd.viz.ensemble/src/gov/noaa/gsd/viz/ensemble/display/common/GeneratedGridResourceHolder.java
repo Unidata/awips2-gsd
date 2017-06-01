@@ -1,15 +1,15 @@
 package gov.noaa.gsd.viz.ensemble.display.common;
 
+import java.util.StringTokenizer;
+
+import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
+
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
 import gov.noaa.gsd.viz.ensemble.display.calculate.ERFCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.Range;
 import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResourceData;
 import gov.noaa.gsd.viz.ensemble.util.Utilities;
-
-import java.util.StringTokenizer;
-
-import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 
 /**
  * Concrete resolution of accessors of generated grid resource attributes.
@@ -33,11 +33,11 @@ public class GeneratedGridResourceHolder extends AbstractResourceHolder {
 
     GeneratedEnsembleGridResource currRsc = null;
 
-    protected GeneratedGridResourceHolder(AbstractVizResource<?, ?> rsc,
-            boolean isSelected) {
+    public GeneratedGridResourceHolder(AbstractVizResource<?, ?> rsc) {
 
-        super(rsc, isSelected);
+        super(rsc);
         currRsc = (GeneratedEnsembleGridResource) rsc;
+        isGenerated = true;
     }
 
     @Override
@@ -73,6 +73,11 @@ public class GeneratedGridResourceHolder extends AbstractResourceHolder {
     }
 
     @Override
+    public String getGroupName() {
+        return "";
+    }
+
+    @Override
     public String getDataTime() {
         return "";
     }
@@ -85,12 +90,6 @@ public class GeneratedGridResourceHolder extends AbstractResourceHolder {
     @Override
     public Calculation getCalculation() {
         return currRsc.getCalculation();
-    }
-
-    @Override
-    public String getGroupName() {
-
-        return getSpecificName();
     }
 
     @Override
@@ -134,12 +133,12 @@ public class GeneratedGridResourceHolder extends AbstractResourceHolder {
 
     public Range getRange() {
         Range r = null;
-        if (GeneratedEnsembleGridResourceData.class.isAssignableFrom(currRsc
-                .getResourceData().getClass())) {
+        if (GeneratedEnsembleGridResourceData.class
+                .isAssignableFrom(currRsc.getResourceData().getClass())) {
             GeneratedEnsembleGridResourceData grd = (GeneratedEnsembleGridResourceData) currRsc
                     .getResourceData();
-            if (ERFCalculator.class.isAssignableFrom(grd.getCalculator()
-                    .getClass())) {
+            if (ERFCalculator.class
+                    .isAssignableFrom(grd.getCalculator().getClass())) {
                 ERFCalculator erf = (ERFCalculator) grd.getCalculator();
                 r = erf.getRange();
             }
@@ -150,6 +149,41 @@ public class GeneratedGridResourceHolder extends AbstractResourceHolder {
 
     @Override
     public boolean requiresLoadCheck() {
+        return false;
+    }
+
+    /**
+     * Boolean method to return true when two generated resources have the same
+     * calculation, level, and unit.
+     * 
+     * @param grh
+     *            the generated resource against which to compare similarity
+     * @return true if this generated resource is similar to the given grh
+     *         argument
+     */
+    public boolean isSimilarTo(GeneratedGridResourceHolder grh) {
+        boolean areSimilar = false;
+
+        if (getCalculation().equals(grh.getCalculation())
+                && getLevel().equals(grh.getLevel())
+                && getUnits().equals(grh.getUnits())) {
+            areSimilar = true;
+        }
+        return areSimilar;
+    }
+
+    @Override
+    public boolean isEnsembleGroup() {
+        return false;
+    }
+
+    @Override
+    public AbstractResourceHolder[] getChildren() {
+        return null;
+    }
+
+    @Override
+    public boolean hasChildren() {
         return false;
     }
 

@@ -1,5 +1,7 @@
 package gov.noaa.gsd.viz.ensemble.control;
 
+import java.util.List;
+
 /**
  * 
  * Let's the consumer add itself as a listener ro the "new resource registered"
@@ -27,4 +29,6 @@ public interface IResourceRegistrationProvider {
 
     public void removeResourceRegisteredListener(
             IResourceRegisteredListener listener);
+
+    public List<IResourceRegisteredListener> getResourceRegisteredListeners();
 }

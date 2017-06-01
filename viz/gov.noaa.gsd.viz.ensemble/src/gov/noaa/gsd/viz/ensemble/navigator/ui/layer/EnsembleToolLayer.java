@@ -1,11 +1,8 @@
 package gov.noaa.gsd.viz.ensemble.navigator.ui.layer;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
@@ -15,6 +12,7 @@ import org.eclipse.jface.viewers.TreePath;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PlatformUI;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
@@ -25,31 +23,36 @@ import com.raytheon.uf.viz.core.drawables.AbstractDescriptor;
 import com.raytheon.uf.viz.core.drawables.IDescriptor;
 import com.raytheon.uf.viz.core.drawables.IDescriptor.IFrameChangedListener;
 import com.raytheon.uf.viz.core.drawables.PaintProperties;
+import com.raytheon.uf.viz.core.drawables.PaintStatus;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.rsc.AbstractNameGenerator;
 import com.raytheon.uf.viz.core.rsc.AbstractRequestableResourceData;
-import com.raytheon.uf.viz.core.rsc.AbstractResourceData;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.core.rsc.DisplayType;
-import com.raytheon.uf.viz.core.rsc.IInitListener;
+import com.raytheon.uf.viz.core.rsc.IDisposeListener;
 import com.raytheon.uf.viz.core.rsc.IRefreshListener;
 import com.raytheon.uf.viz.core.rsc.IResourceDataChanged;
+import com.raytheon.uf.viz.core.rsc.IResourceGroup;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
+import com.raytheon.uf.viz.core.rsc.RenderingOrderFactory;
 import com.raytheon.uf.viz.core.rsc.RenderingOrderFactory.ResourceOrder;
-import com.raytheon.uf.viz.core.rsc.ResourceList;
+import com.raytheon.uf.viz.core.rsc.ResourceList.AddListener;
+import com.raytheon.uf.viz.core.rsc.ResourceList.RemoveListener;
 import com.raytheon.uf.viz.core.rsc.ResourceProperties;
 import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
-import com.raytheon.uf.viz.core.rsc.groups.BestResResource;
-import com.raytheon.uf.viz.core.rsc.tools.GenericToolsResourceData;
+import com.raytheon.uf.viz.core.rsc.capabilities.GroupNamingCapability;
+import com.raytheon.uf.viz.core.rsc.capabilities.ImagingCapability;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
 import com.raytheon.viz.grid.rsc.general.GridResource;
 import com.raytheon.viz.ui.input.EditableManager;
 import com.vividsolutions.jts.geom.Coordinate;
 
-import gov.noaa.gsd.viz.ensemble.control.EnsembleResourceManager;
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;
+import gov.noaa.gsd.viz.ensemble.control.IResourceRegisteredListener;
+import gov.noaa.gsd.viz.ensemble.control.IResourceRegistrationProvider;
 import gov.noaa.gsd.viz.ensemble.display.calculate.AvgM1StddevCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.AvgP1StddevCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
@@ -64,6 +67,8 @@ import gov.noaa.gsd.viz.ensemble.display.calculate.RangeCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.StddevCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.SumCalculator;
 import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.EnsembleMembersHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.HistogramGridResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.control.load.GeneratedDataLoader;
 import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
@@ -110,6 +115,7 @@ import gov.noaa.gsd.viz.ensemble.util.RequestableResourceMetadata;
  * Dec 29, 2016   19325      jing       Process image items in calculation menu
  * Feb 17, 2017   19325      jing       Added ERF image capability
  * Mar 01, 2017   19443    polster      Fix clear and close behavior
+ * Mar 17, 2017   19325      jing       Added resource group behavior
  * 
  * </pre>
  * 
@@ -117,9 +123,10 @@ import gov.noaa.gsd.viz.ensemble.util.RequestableResourceMetadata;
  * @version 1.0
  */
 public class EnsembleToolLayer
-        extends AbstractVizResource<AbstractResourceData, AbstractDescriptor>
-        implements IRefreshListener, IResourceDataChanged,
-        IFrameChangedListener, IInitListener {
+        extends AbstractVizResource<EnsembleToolLayerData, AbstractDescriptor>
+        implements IResourceGroup, IRefreshListener, IDisposeListener,
+        IResourceDataChanged, IFrameChangedListener, AddListener,
+        RemoveListener, IResourceRegistrationProvider {
 
     private static final transient IUFStatusHandler statusHandler = UFStatus
             .getHandler(EnsembleToolLayer.class);
@@ -140,25 +147,23 @@ public class EnsembleToolLayer
 
     private boolean isEditable = true;
 
-    private List<String> expandedElements = new ArrayList<String>();
+    private List<EnsembleMembersHolder> expandedElements = null;
 
     private TreePath[] expandedTreePaths = new TreePath[0];
-
-    private Map<String, List<AbstractResourceHolder>> ensemblesTree = null;
 
     private List<IToolLayerChanged> changeListeners = null;
 
     private EnsembleTool.EnsembleToolMode toolMode = EnsembleTool.EnsembleToolMode.LEGENDS_PLAN_VIEW;
 
-    // private IDisplayPaneContainer thisToolLayersContainer = null;
+    private final List<IResourceRegisteredListener> resourceRegisteredListeners = new CopyOnWriteArrayList<>();
 
-    public EnsembleToolLayer(
-            GenericToolsResourceData<EnsembleToolLayer> resourceData,
+    public EnsembleToolLayer(EnsembleToolLayerData resourceData,
             LoadProperties loadProperties) {
         super(resourceData, loadProperties);
-        ensemblesTree = new ConcurrentHashMap<>();
-        registerListener((IInitListener) this);
 
+        getCapability(GroupNamingCapability.class);// jing
+
+        expandedElements = new ArrayList<>();
         changeListeners = new ArrayList<>();
 
     }
@@ -172,31 +177,16 @@ public class EnsembleToolLayer
     }
 
     public boolean isEmpty() {
-        boolean isEmpty = false;
-        if (EnsembleResourceManager.getInstance().isEmpty(this)) {
-            isEmpty = true;
-        }
-        return isEmpty;
+        return getResourceList().isEmpty();
     }
 
-    synchronized public Map<String, List<AbstractResourceHolder>> getEnsembleResources() {
-
-        if (EnsembleResourceManager.getInstance()
-                .getResourceList(this) != null) {
-            ensemblesTree = EnsembleResourceManager.getInstance()
-                    .getResourceList(this).getAllRscsAsMap(ensemblesTree);
-        } else {
-            if (ensemblesTree == null) {
-                ensemblesTree = new ConcurrentHashMap<>();
-            }
-        }
-
-        return ensemblesTree;
+    public List<AbstractResourceHolder> getResourceHolders() {
+        return getResourceList().getResourceHolders();
     }
 
     /**
-     * Is the tool layer is supposed to keep track of the resource inside this
-     * resource pair?
+     * Is the tool layer is supposed to keep track of the resource (inside the
+     * resource pair argument)?
      * 
      * TODO: This method contains selection based on the state of the tool layer
      * mode (Legend vs Matrix). The better way of doing this would be to make
@@ -267,11 +257,11 @@ public class EnsembleToolLayer
         return false;
     }
 
-    public List<String> getExpandedElements() {
+    public List<EnsembleMembersHolder> getExpandedElements() {
         return expandedElements;
     }
 
-    public void setExpandedElements(List<String> ee) {
+    public void setExpandedElements(List<EnsembleMembersHolder> ee) {
         expandedElements = ee;
     }
 
@@ -285,59 +275,46 @@ public class EnsembleToolLayer
 
     public void unloadAllResources() {
 
-        if (EnsembleResourceManager.getInstance()
-                .getResourceList(this) == null) {
+        if (getResourceList() == null) {
             return;
         }
-        Map<String, List<AbstractResourceHolder>> allRscs = getEnsembleResources();
 
-        List<AbstractResourceHolder> currEnsembleMembers = null;
-        Set<String> keySet = allRscs.keySet();
-        Iterator<String> iter = keySet.iterator();
-        while (iter.hasNext()) {
-            String currRscListName = iter.next();
-            currEnsembleMembers = allRscs.get(currRscListName);
-            for (AbstractResourceHolder gr : currEnsembleMembers) {
+        List<AbstractResourceHolder> allRscs = getResourceList()
+                .getResourceHolders();
+
+        for (AbstractResourceHolder gr : allRscs) {
+            /*
+             * ignore the ensemble holder as it has no individual resource
+             * associated with it
+             */
+            if (gr.isIndivdualProduct()) {
                 AbstractVizResource<?, ?> rsc = gr.getRsc();
-                if (rsc instanceof TimeSeriesResource) {
-                    rsc.unload(getDescriptor().getResourceList());
-                    rsc.dispose();
-                } else {
-                    rsc.unload();
-                    rsc.dispose();
-                }
-                EnsembleResourceManager.getInstance().unregisterResource(gr,
-                        this, false);
+                getResourceList().removeRsc(rsc);
+                rsc.unload();
+                rsc.dispose();
             }
         }
 
-        EnsembleResourceManager.getInstance().updateFrameChanges(this);
-        if ((getResourceContainer() != null)
-                && (getResourceContainer().getActiveDisplayPane() != null)) {
-            getResourceContainer().getActiveDisplayPane().refresh();
+        if (toolMode == EnsembleToolMode.MATRIX) {
+            EnsembleTool.getInstance().clearAllByMode(EnsembleToolMode.MATRIX);
+        } else {
+            forceRefresh(true);
         }
-
     }
 
     public ResourcePair getResourcePair(FieldPlanePair e,
             ModelSources modelSrc) {
 
         ResourcePair foundRp = null;
-        ResourceList rscList = getResourceContainer().getActiveDisplayPane()
-                .getDescriptor().getResourceList();
         String fieldAbbrev = null;
         String plane = null;
-        for (ResourcePair rp : rscList) {
+        for (ResourcePair rp : getResourceList()) {
             if (rp != null && rp.getResourceData() != null
                     && rp.getResource() != null) {
                 /**
                  * TODO: Get the gest resolution resource and return it with the
                  * resource pair.
                  */
-                // if (rp.getResource() instanceof BestResResource) {
-                // BestResResource brr = (BestResResource) rp.getResource();
-                // brr.getBestResResource(time);
-                // } else
                 if (rp.getResourceData() instanceof AbstractRequestableResourceData) {
                     AbstractRequestableResourceData ard = (AbstractRequestableResourceData) rp
                             .getResourceData();
@@ -365,63 +342,41 @@ public class EnsembleToolLayer
     public ResourcePair getResourcePair(AbstractVizResource<?, ?> rsc) {
 
         ResourcePair foundRp = null;
-        ResourceList rscList = null;
 
-        /**
-         * TODO: Need to make the context menu work for BestResResource.
-         */
+        /* TODO: Will this work for BestResResource types? */
 
-        if (rsc instanceof BestResResource) {
-            BestResResource brr = (BestResResource) rsc;
-            rscList = brr.getResourceList();
-            for (ResourcePair rp : rscList) {
-                if (rsc.equals(rp.getResource())) {
-                    foundRp = rp;
-                    break;
-                }
-            }
-        } else {
-            if (TimeSeriesResource.class.isAssignableFrom(rsc.getClass())) {
-                rscList = getResourceContainer().getActiveDisplayPane()
-                        .getDescriptor().getResourceList();
-            } else {
-                rscList = getResourceContainer().getActiveDisplayPane()
-                        .getDescriptor().getResourceList();
-            }
-            for (ResourcePair rp : rscList) {
-                if (rsc.equals(rp.getResource())) {
-                    foundRp = rp;
-                    break;
-                }
+        for (ResourcePair rp : getResourceList()) {
+            if (rp.getResource().equals(rsc)) {
+                foundRp = rp;
+                break;
             }
         }
+
         return foundRp;
 
     }
 
     public void unloadAllResourcesByName(String ensembleName) {
 
-        List<AbstractResourceHolder> ensembleMembers = EnsembleResourceManager
-                .getInstance().getResourceList(this)
-                .getUserLoadedRscs(ensembleName);
-        int total = ensembleMembers.size();
-        int count = 0;
-        for (AbstractResourceHolder gr : ensembleMembers) {
-            count++;
-            if (count < total) {
-                EnsembleResourceManager.getInstance().unregisterResource(gr,
-                        this, false);
-            } else {
-                EnsembleResourceManager.getInstance().unregisterResource(gr,
-                        this, true);
+        boolean deleted = false;
+        AbstractVizResource<?, ?> rsc = null;
+        for (AbstractResourceHolder gr : getResourceHolders()) {
+            if (gr instanceof EnsembleMembersHolder) {
+                EnsembleMembersHolder emh = (EnsembleMembersHolder) gr;
+                if (emh.getGroupName().startsWith(ensembleName)) {
+                    for (AbstractResourceHolder arh : emh.getChildren()) {
+                        rsc = arh.getRsc();
+                        getResourceList().removeRsc(rsc);
+                        rsc.unload();
+                        rsc.dispose();
+                    }
+                    deleted = true;
+                }
             }
-            gr.getRsc().unload();
         }
-
-        EnsembleResourceManager.getInstance().updateFrameChanges(this);
-
-        getResourceContainer().getActiveDisplayPane().refresh();
-
+        if (deleted) {
+            forceRefresh(true);
+        }
     }
 
     public void propertiesChanged(ResourceProperties updatedProps) {
@@ -447,10 +402,22 @@ public class EnsembleToolLayer
 
         unloadAllResources();
 
-        /* AWIPS2_GSD VLab Issue #29204 */
-        EnsembleResourceManager.getInstance().remove(this);
-
         EnsembleTool.getInstance().checkForLastToolLayerClosed();
+
+        for (ResourcePair rp : this.getResourceList()) {
+            rp.getResource().unload();
+            rp.getResource().dispose();
+        }
+        this.getResourceList().clear();
+
+        if (resourceRegisteredListeners != null) {
+            resourceRegisteredListeners.clear();
+        }
+
+        if (expandedElements != null) {
+            expandedElements.clear();
+            expandedElements = null;
+        }
 
         isDisposed = true;
 
@@ -461,25 +428,56 @@ public class EnsembleToolLayer
         isDisposed = false;
         descriptor.getResourceList().getProperties(this)
                 .setRenderingOrderId("HIGHEST");
+        descriptor.addFrameChangedListener(this);
+        descriptor.getResourceList()
+                .addPostRemoveListener(EnsembleTool.getInstance());
+        resourceData.setNameGenerator(new EnsembleToolLayerNameGenerator(this));
+        resourceData.addChangeListener((IResourceDataChanged) this);
 
     }
 
-    @Override
-    public void inited(AbstractVizResource<?, ?> initedRsc) {
-
-        descriptor.addFrameChangedListener(this);
-        registerListener((IRefreshListener) this);
-        resourceData.addChangeListener((IResourceDataChanged) this);
-        resourceData.setNameGenerator(
-                new EnsembleToolLayerNameGeneratorWithTimeStampBasis(this));
-        descriptor.getResourceList()
-                .addPostRemoveListener(EnsembleTool.getInstance());
-
+    public void turnOffOtherHistograms(HistogramGridResourceHolder hgr) {
+        getResourceList().turnOffOtherHistograms(hgr);
     }
 
     @Override
     protected void paintInternal(IGraphicsTarget target,
             PaintProperties paintProps) throws VizException {
+
+        PaintStatus paintStatus = PaintStatus.INCOMPLETE;
+
+        /*
+         * Paint images first
+         */
+        for (ResourcePair rp : this.getResourceList()) {
+            AbstractVizResource<?, ?> resource = rp.getResource();
+            if (resource.getProperties().isVisible()) {
+                PaintProperties newProps = new PaintProperties(paintProps);
+
+                if (resource.hasCapability(ImagingCapability.class)) {
+                    paintProps.setAlpha(resource
+                            .getCapability(ImagingCapability.class).getAlpha());
+                    paintStatus = resource.paint(target, newProps);
+                }
+            }
+        }
+
+        /*
+         * Paint non-image resources after images and maps
+         */
+        for (ResourcePair rp : this.getResourceList()) {
+            AbstractVizResource<?, ?> resource = rp.getResource();
+            if (resource.getProperties().isVisible()
+                    && !resource.hasCapability(ImagingCapability.class)) {
+                PaintProperties newProps = new PaintProperties(paintProps);
+                paintStatus = resource.paint(target, newProps);
+            }
+        }
+
+        if (paintStatus != PaintStatus.PAINTED) {
+            updatePaintStatus(paintStatus);
+        }
+
     }
 
     public void transferFocusToEditor() {
@@ -497,9 +495,31 @@ public class EnsembleToolLayer
         }
     }
 
-    @Override
-    public void refresh() {
-        // TODO
+    /**
+     * Refresh the viewer and editor. If the repop argument is true then the
+     * entire resource list is reread and the ensemble object relations are
+     * recreated.
+     * 
+     * @param repop
+     *            whether to repopulate the resource object model.
+     */
+    public void forceRefresh(boolean repop) {
+        if (repop) {
+            getResourceList().forceRefresh();
+        }
+        EnsembleTool.getInstance().refreshView();
+        EnsembleTool.getInstance().refreshEditor();
+    }
+
+    /**
+     * This method is meant to be called when any resource in the resource list
+     * has changed and the gui tree in the viewer needs to be updated (i.e. not
+     * full refresh). The element argument is either a resource name or an
+     * abstract resource holder.
+     */
+    public void updateElementInView(AbstractResourceHolder arh) {
+        EnsembleTool.getInstance().updateElementInView(arh);
+        EnsembleTool.getInstance().getToolLayer().issueRefresh();
     }
 
     public void calculate(Calculation algorithm, final Range range) {
@@ -866,6 +886,7 @@ public class EnsembleToolLayer
     }
 
     public void setEditable(boolean makeEditable) {
+
         isEditable = makeEditable;
         EditableManager.makeEditable(this, makeEditable);
     }
@@ -878,27 +899,21 @@ public class EnsembleToolLayer
 
     }
 
-    class EnsembleToolLayerNameGeneratorWithTimeStampBasis
-            extends AbstractNameGenerator {
+    class EnsembleToolLayerNameGenerator extends AbstractNameGenerator {
 
         EnsembleToolLayer toolLayer = null;
 
-        EnsembleToolLayerNameGeneratorWithTimeStampBasis(EnsembleToolLayer tl) {
+        EnsembleToolLayerNameGenerator(EnsembleToolLayer tl) {
             toolLayer = tl;
         }
 
         @Override
         public String getName(AbstractVizResource<?, ?> resource) {
-            String timeBasis = "";
-            if (!isEmpty()) {
-                timeBasis = EnsembleTool.getInstance().getActiveResourceTime();
-                if (EnsembleResourceManager.isTimeEmpty(timeBasis)) {
-                    timeBasis = "";
-                } else {
-                    timeBasis = " (" + timeBasis + ") ";
-                }
+            String suffix = "";
+            if (toolLayer.isEditable()) {
+                suffix = suffix.concat(" (Editable)");
             }
-            String fullName = innerName + " " + timeBasis;
+            String fullName = innerName.concat(suffix);
             return fullName;
         }
 
@@ -906,7 +921,7 @@ public class EnsembleToolLayer
 
     @Override
     public ResourceOrder getResourceOrder() {
-        return ResourceOrder.HIGHEST;
+        return RenderingOrderFactory.getRenderingOrder("IMAGE_WORLD");
     }
 
     /*
@@ -951,10 +966,106 @@ public class EnsembleToolLayer
                 && object instanceof EditableCapability) {
             EditableCapability editability = (EditableCapability) object;
             isEditable = editability.isEditable();
-            for (IToolLayerChanged etl : changeListeners) {
-                etl.resourceChanged(this, type, object);
+            setEditable(isEditable);
+            issueRefresh();
+        }
+        for (IToolLayerChanged etl : changeListeners) {
+            etl.resourceChanged(this, type, object);
+        }
+    }
+
+    // jing start
+
+    @Override
+    public void project(CoordinateReferenceSystem mapData) throws VizException {
+        for (ResourcePair rp : getResourceList()) {
+            AbstractVizResource<?, ?> rsc = rp.getResource();
+            rsc.project(mapData);
+        }
+    }
+
+    public NavigatorResourceList getResourceList() {
+
+        return this.getResourceData().getResourceList();
+    }
+
+    /**
+     * This method gets called by the EnsembleToolLayerData.ResourceList has had
+     * a resource pair removed from it.
+     * 
+     * @param rp
+     *            the resource pair that was removed from the resource list
+     * @throws VizException
+     */
+    @Override
+    public void notifyRemove(ResourcePair rp) throws VizException {
+        rp.getResource().unregisterListener((IRefreshListener) this);
+        rp.getResource().unregisterListener((IDisposeListener) this);
+        EnsembleTool.getInstance().refreshView();
+        issueRefresh();
+    }
+
+    /**
+     * This method is called when the EnsembleToolLayerData.ResourceList has had
+     * a resource pair added to it.
+     * 
+     * @param rp
+     * @throws VizException
+     */
+    @Override
+    public void notifyAdd(ResourcePair rp) throws VizException {
+        rp.getResource().registerListener((IRefreshListener) this);
+        rp.getResource().registerListener((IDisposeListener) this);
+        issueRefresh();
+    }
+
+    @Override
+    public void disposed(AbstractVizResource<?, ?> rsc) {
+        if (getResourceList().contains(rsc)) {
+            getResourceList().removeRsc(rsc);
+        }
+        EnsembleTool.getInstance().refreshView();
+    }
+
+    public void updateGenerated(AbstractResourceHolder gr) {
+        if (getResourceList() != null) {
+            getResourceList().updateGenerated(gr);
+        }
+    }
+
+    @Override
+    public void addResourceRegisteredListener(
+            IResourceRegisteredListener listener) {
+
+        if (getToolMode() == EnsembleToolMode.MATRIX) {
+            synchronized (resourceRegisteredListeners) {
+                resourceRegisteredListeners.add(listener);
             }
         }
+
+    }
+
+    @Override
+    public void removeResourceRegisteredListener(
+            IResourceRegisteredListener listener) {
+
+        if (getToolMode() == EnsembleToolMode.MATRIX) {
+            synchronized (resourceRegisteredListeners) {
+                resourceRegisteredListeners.remove(listener);
+            }
+        }
+
+    }
+
+    @Override
+    public List<IResourceRegisteredListener> getResourceRegisteredListeners() {
+        synchronized (resourceRegisteredListeners) {
+            return resourceRegisteredListeners;
+        }
+    }
+
+    @Override
+    public void refresh() {
     }
 
 }

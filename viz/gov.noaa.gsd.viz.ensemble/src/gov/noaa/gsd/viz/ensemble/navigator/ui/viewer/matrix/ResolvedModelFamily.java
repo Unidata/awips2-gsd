@@ -148,17 +148,6 @@ public class ResolvedModelFamily extends ModelFamily {
         return s;
     }
 
-    /**
-     * Keep track of which resources are of the same kind. The associated
-     * resource set contains those resources sharing the same field/plane pair.
-     * 
-     * This method creates a thread-safe, ordered set.
-     */
-    synchronized public void add(FieldPlanePair fpp,
-            AbstractVizResource<?, ?> rsc) {
-        getAssociatedRscSet(fpp).add(rsc);
-    }
-
     public List<ModelSources> getSources() {
         return sources;
     }

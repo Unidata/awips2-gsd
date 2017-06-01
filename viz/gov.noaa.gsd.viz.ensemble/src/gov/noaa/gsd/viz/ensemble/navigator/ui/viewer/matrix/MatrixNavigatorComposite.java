@@ -3,7 +3,6 @@ package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jface.dialogs.MessageDialog;
@@ -43,6 +42,7 @@ import com.raytheon.uf.viz.core.VizApp;
 import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
 import com.raytheon.uf.viz.core.drawables.IFrameCoordinator;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
+import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.maps.display.VizMapEditor;
 import com.raytheon.uf.viz.core.maps.scales.MapScales.PartId;
 import com.raytheon.uf.viz.core.maps.scales.MapScalesManager;
@@ -68,6 +68,7 @@ import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.MatrixNavigationOperation;
 import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.EnsembleToolViewer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.FieldPlanePairChooserControl.FieldPlanePairControl;
 import gov.noaa.gsd.viz.ensemble.util.EnsembleToolImageStore;
@@ -112,6 +113,8 @@ public class MatrixNavigatorComposite extends Composite
     private static final transient IUFStatusHandler statusHandler = UFStatus
             .getHandler(MatrixNavigatorComposite.class);
 
+    public static final String MATRIX_EDITOR_TAB_TITLE = "Matrix";
+
     private VizMapEditor matrixEditor = null;
 
     private static ModelFamilyBrowserDialog modelFamilyDialog = null;
@@ -138,6 +141,8 @@ public class MatrixNavigatorComposite extends Composite
 
     private ModelSources lastSelectedSource = null;
 
+    private EnsembleToolLayer matrixToolLayer = null;
+
     /**
      * The constructor for the Matrix navigator control.
      * 
@@ -159,7 +164,6 @@ public class MatrixNavigatorComposite extends Composite
         isInitializing = true;
         matrixTabItem = itemMatrixTabItem;
         imageCache = new ArrayList<>();
-        createContents();
 
         EnsembleTool.getInstance().ignorePartActivatedEvent(true);
         try {
@@ -174,6 +178,8 @@ public class MatrixNavigatorComposite extends Composite
 
         modelFamilyDialog = new ModelFamilyBrowserDialog(getShell(), this);
 
+        createContents();
+
         isInitializing = false;
 
     }
@@ -183,7 +189,7 @@ public class MatrixNavigatorComposite extends Composite
      * 
      * @return the created editor
      */
-    public static AbstractEditor create() {
+    public AbstractEditor create() {
         AbstractEditor editor = null;
 
         ManagedMapScale editorScale = null;
@@ -207,7 +213,7 @@ public class MatrixNavigatorComposite extends Composite
                  * name "Matrix" ??
                  */
 
-                editor.setPartName(EnsembleTool.MATRIX_EDITOR_TAB_TITLE);
+                editor.setPartName(MATRIX_EDITOR_TAB_TITLE);
             } catch (Exception e) {
                 statusHandler.handle(Priority.SIGNIFICANT,
                         "Unable to load bundle for scale " + editorScale
@@ -219,9 +225,16 @@ public class MatrixNavigatorComposite extends Composite
                     "Unable to find an editor based map scale");
             editor = null;
         }
+        EnsembleToolLayer toolLayer = null;
         if (editor != null) {
-            EnsembleTool.getInstance().createToolLayer(editor,
-                    EnsembleToolMode.MATRIX);
+            try {
+                toolLayer = EnsembleTool.getInstance().createToolLayer(editor,
+                        EnsembleToolMode.MATRIX);
+            } catch (VizException e1) {
+                statusHandler.handle(Priority.SIGNIFICANT,
+                        "Unable to create tool layer for Matrix Navigator", e1);
+            }
+            matrixToolLayer = toolLayer;
             EnsembleTool.getInstance().setEditor(editor);
             EnsembleTool.getInstance().setHideLegendsMode();
             EnsembleTool.getInstance().refreshTool(true);
@@ -302,7 +315,7 @@ public class MatrixNavigatorComposite extends Composite
      */
     private void createFieldPlanesControlArea() {
         fieldPlaneChooserControl = new FieldPlanePairChooserControl(
-                (Composite) this, SWT.BORDER,
+                (Composite) this, SWT.BORDER, matrixToolLayer,
                 (IFieldPlanePairVisibilityChangedListener) this,
                 (IModelSourceSelectionProvider) this,
                 (IMatrixEditorFocusProvider) this,
@@ -616,24 +629,23 @@ public class MatrixNavigatorComposite extends Composite
      *            the map which contains the resources loaded into the matrix
      *            editor.
      */
-    synchronized private void select(final TreeItem treeItem) {
+    private void select(final TreeItem treeItem) {
 
         VizApp.runSync(new Runnable() {
 
             @Override
             public void run() {
                 if (treeItem == null || treeItem.isDisposed()
-                        || !isWidgetReady() || getShell() == null
-                        || getShell().isDisposed()) {
+                        || !isWidgetReady()) {
                     return;
                 }
                 if (treeItem.getData() instanceof ModelSources) {
 
                     getShell().setCursor(EnsembleToolViewer.getWaitCursor());
-                    Map<String, List<AbstractResourceHolder>> ensembleResourcesMap = EnsembleTool
-                            .getInstance().getCurrentToolLayerResources();
+                    List<AbstractResourceHolder> rscHolderList = EnsembleTool
+                            .getInstance().getResourceList();
 
-                    if (ensembleResourcesMap != null) {
+                    if (rscHolderList != null) {
                         modelSourceTree.select(treeItem);
                         ModelSources currSrc = (ModelSources) treeItem
                                 .getData();
@@ -642,8 +654,7 @@ public class MatrixNavigatorComposite extends Composite
                             return;
                         }
 
-                        refreshDisplayBySelectedSource(currSrc,
-                                ensembleResourcesMap);
+                        refreshDisplayBySelectedSource(currSrc, rscHolderList);
                         lastSelectedSource = currSrc;
 
                         getShell().setCursor(
@@ -665,36 +676,22 @@ public class MatrixNavigatorComposite extends Composite
      * resource name and a list of one to many resources associated with that
      * key (e.g. many resources are associated with an ensemble resource).
      * 
-     * @param rscMap
+     * @param rscHolderList
      *            the map of resources to hide.
      */
     private void hideAllResources(
-            final Map<String, List<AbstractResourceHolder>> rscMap) {
+            final List<AbstractResourceHolder> rscHolderList) {
 
-        if (rscMap == null || rscMap.isEmpty()) {
+        if (rscHolderList == null || rscHolderList.isEmpty()) {
             return;
         }
 
-        List<AbstractResourceHolder> currResources = null;
-        Set<String> loadedProductNames = rscMap.keySet();
-        Iterator<String> iterator = loadedProductNames.iterator();
-        String currName = null;
-        while (iterator.hasNext()) {
-            /*
-             * Either a top-level ensemble name (e.g. SREF) or an individual
-             * product name (e.g. NAM40 500MB Height)
-             */
-            currName = iterator.next();
-            currResources = rscMap.get(currName);
-            if (currResources != null) {
-                for (AbstractResourceHolder arh : currResources) {
-                    arh.getRsc().getProperties().setVisible(false);
-                    arh.getRsc().issueRefresh();
-                }
+        for (AbstractResourceHolder arh : rscHolderList) {
+            if (arh.isIndivdualProduct()) {
+                arh.getRsc().getProperties().setVisible(false);
+                arh.getRsc().issueRefresh();
             }
-
         }
-
     }
 
     /**
@@ -705,15 +702,16 @@ public class MatrixNavigatorComposite extends Composite
      * 
      * @param selectedSrc
      *            the newly selected model source
-     * @param ensembleResourcesMap
+     * @param rscHolderList
      *            the map which contains the resources loaded into the matrix
      *            editor.
      */
     public void refreshDisplayBySelectedSource(ModelSources selectedSrc,
-            Map<String, List<AbstractResourceHolder>> ensembleResourcesMap) {
+            List<AbstractResourceHolder> rscHolderList) {
 
-        hideAllResources(ensembleResourcesMap);
-        updateElementsBySelectedSource(selectedSrc, ensembleResourcesMap);
+        hideAllResources(rscHolderList);
+        updateElementsBySelectedSource(selectedSrc, rscHolderList);
+        EnsembleTool.getInstance().refreshEditor();
 
     }
 
@@ -724,9 +722,9 @@ public class MatrixNavigatorComposite extends Composite
      * @param ensembleResourcesMap
      */
     private void updateElementsBySelectedSource(final ModelSources currSrc,
-            final Map<String, List<AbstractResourceHolder>> rscMap) {
+            final List<AbstractResourceHolder> rscHolderList) {
 
-        if (rscMap == null || rscMap.isEmpty()) {
+        if (rscHolderList == null || rscHolderList.isEmpty()) {
             return;
         }
 
@@ -734,51 +732,39 @@ public class MatrixNavigatorComposite extends Composite
         List<FieldPlanePair> elements = fieldPlaneChooserControl
                 .getActiveFieldPlanePairs();
 
-        List<AbstractResourceHolder> currResources = null;
-        Set<String> loadedProductNames = rscMap.keySet();
-        Iterator<String> iterator = loadedProductNames.iterator();
         RequestableResourceMetadata rrmd = null;
         String fieldAbbrev = null;
         String plane = null;
-        String currName = null;
-        while (iterator.hasNext()) {
+
+        for (AbstractResourceHolder arh : rscHolderList) {
+
+            if (arh.isIndivdualProduct() == false) {
+                continue;
+            }
             /*
-             * Either a top-level ensemble name (e.g. SREF) or an individual
-             * product name (e.g. NAM40 500MB Height)
+             * Only look at resources having the same Source as the selected
+             * Source
              */
-            currName = iterator.next();
-            currResources = rscMap.get(currName);
-            if (currResources != null) {
-                for (AbstractResourceHolder arh : currResources) {
-                    /*
-                     * Only look at resources having the same Source as the
-                     * selected Source
-                     */
-                    if (arh.getRsc().getName().trim()
-                            .startsWith(currSrcName.trim())) {
-                        for (FieldPlanePair e : elements) {
-                            if (e.isResourceVisible()) {
-                                if (arh.getRsc()
-                                        .getResourceData() instanceof AbstractRequestableResourceData) {
-                                    AbstractRequestableResourceData ard = (AbstractRequestableResourceData) arh
-                                            .getRsc().getResourceData();
-                                    rrmd = new RequestableResourceMetadata(ard);
-                                    fieldAbbrev = rrmd.getFieldAbbrev();
-                                    plane = rrmd.getPlane();
-                                    if (e.getFieldAbbrev().equals(fieldAbbrev)
-                                            && e.getPlane().equals(plane)) {
-                                        arh.getRsc().getProperties()
-                                                .setVisible(true);
-                                        arh.getRsc().issueRefresh();
-                                    }
-                                }
+            if (arh.getRsc().getName().trim().startsWith(currSrcName.trim())) {
+                for (FieldPlanePair e : elements) {
+                    if (e.isResourceVisible()) {
+                        if (arh.getRsc()
+                                .getResourceData() instanceof AbstractRequestableResourceData) {
+                            AbstractRequestableResourceData ard = (AbstractRequestableResourceData) arh
+                                    .getRsc().getResourceData();
+                            rrmd = new RequestableResourceMetadata(ard);
+                            fieldAbbrev = rrmd.getFieldAbbrev();
+                            plane = rrmd.getPlane();
+                            if (e.getFieldAbbrev().equals(fieldAbbrev)
+                                    && e.getPlane().equals(plane)) {
+                                arh.getRsc().getProperties().setVisible(true);
+                                arh.getRsc().issueRefresh();
                             }
                         }
                     }
                 }
             }
         }
-        EditorUtil.getActiveVizContainer().refresh();
 
     }
 
@@ -789,10 +775,10 @@ public class MatrixNavigatorComposite extends Composite
     private void updateChangeInElementVisibility(final ModelSources selectedSrc,
             final FieldPlanePair changedElement) {
 
-        final Map<String, List<AbstractResourceHolder>> rscMap = EnsembleTool
-                .getInstance().getCurrentToolLayerResources();
+        final List<AbstractResourceHolder> rscHolderList = EnsembleTool
+                .getInstance().getResourceList();
 
-        if (rscMap == null || rscMap.isEmpty()) {
+        if (rscHolderList == null || rscHolderList.isEmpty()) {
             return;
         }
 
@@ -803,75 +789,61 @@ public class MatrixNavigatorComposite extends Composite
 
                 String currSrcName = selectedSrc.getModelName();
 
-                List<AbstractResourceHolder> currResources = null;
-                Set<String> loadedProductNames = rscMap.keySet();
-                Iterator<String> iterator = loadedProductNames.iterator();
                 RequestableResourceMetadata rrmd = null;
                 String fieldAbbrev = null;
                 String plane = null;
                 String currName = null;
-                while (iterator.hasNext()) {
+                for (AbstractResourceHolder arh : rscHolderList) {
+
+                    if (arh.isIndivdualProduct() == false) {
+                        continue;
+                    }
+
+                    currName = arh.getRsc().getName();
+
                     /*
-                     * The following name is either a top-level ensemble name
-                     * (e.g. SREF 500MB Height) or an individual product name
-                     * (e.g. NAM40 500MB Height)
+                     * Only look at resources having the same Source as the
+                     * selected Source
                      */
-                    currName = iterator.next();
-                    currResources = rscMap.get(currName);
-                    for (AbstractResourceHolder arh : currResources) {
-                        /*
-                         * Only look at resources having the same Source as the
-                         * selected Source
-                         */
-                        if (arh.getRsc().getName().trim()
-                                .startsWith(currSrcName.trim())) {
-                            if (arh.getRsc()
-                                    .getResourceData() instanceof AbstractRequestableResourceData) {
-                                AbstractRequestableResourceData ard = (AbstractRequestableResourceData) arh
-                                        .getRsc().getResourceData();
+                    if (currName.trim().startsWith(currSrcName.trim())) {
+                        if (arh.getRsc()
+                                .getResourceData() instanceof AbstractRequestableResourceData) {
+                            AbstractRequestableResourceData ard = (AbstractRequestableResourceData) arh
+                                    .getRsc().getResourceData();
 
-                                rrmd = new RequestableResourceMetadata(ard);
-                                fieldAbbrev = rrmd.getFieldAbbrev();
-                                plane = rrmd.getPlane();
+                            rrmd = new RequestableResourceMetadata(ard);
+                            fieldAbbrev = rrmd.getFieldAbbrev();
+                            plane = rrmd.getPlane();
 
-                                if (changedElement.getFieldAbbrev()
-                                        .equals(fieldAbbrev)
-                                        && changedElement.getPlane()
-                                                .equals(plane)) {
+                            if (changedElement.getFieldAbbrev()
+                                    .equals(fieldAbbrev)
+                                    && changedElement.getPlane()
+                                            .equals(plane)) {
 
-                                    arh.getRsc().getProperties().setVisible(
-                                            changedElement.isResourceVisible());
+                                arh.getRsc().getProperties().setVisible(
+                                        changedElement.isResourceVisible());
 
-                                    if (arh.getRsc().hasCapability(
-                                            DisplayTypeCapability.class)) {
-                                        DisplayType dt = arh.getRsc()
-                                                .getCapability(
-                                                        DisplayTypeCapability.class)
-                                                .getDisplayType();
-                                        if (dt == DisplayType.IMAGE) {
-                                            /**
-                                             * TODO: This apparently is not how
-                                             * color bars work.
-                                             */
-                                            if (arh.getRsc().getProperties()
-                                                    .isVisible()) {
-                                                /* show color bar */
-                                                setColorBarVisible(true);
-                                            } else {
-                                                /* hide color bar */
-                                                setColorBarVisible(false);
-                                            }
-
+                                if (arh.getRsc().hasCapability(
+                                        DisplayTypeCapability.class)) {
+                                    DisplayType dt = arh.getRsc()
+                                            .getCapability(
+                                                    DisplayTypeCapability.class)
+                                            .getDisplayType();
+                                    if (dt == DisplayType.IMAGE) {
+                                        if (arh.getRsc().getProperties()
+                                                .isVisible()) {
+                                            setColorBarVisible(true);
+                                        } else {
+                                            setColorBarVisible(false);
                                         }
-                                        arh.getRsc().issueRefresh();
                                     }
+                                    arh.getRsc().issueRefresh();
                                 }
-
                             }
                         }
                     }
                 }
-                EditorUtil.getActiveVizContainer().refresh();
+                EnsembleTool.getInstance().refreshEditor();
             }
         });
 
@@ -1003,9 +975,11 @@ public class MatrixNavigatorComposite extends Composite
 
     private void removeResourceByResourcePair(AbstractVizResource<?, ?> rsc) {
 
-        ResourceList rscList = matrixEditor.getActiveDisplayPane()
-                .getDescriptor().getResourceList();
-        rscList.removeRsc(rsc);
+        EnsembleToolLayer toolLayer = EnsembleTool.getToolLayer(matrixEditor);
+        if (toolLayer != null) {
+            toolLayer.getResourceList().removeRsc(rsc);
+            toolLayer.issueRefresh();
+        }
     }
 
     /**
@@ -1307,6 +1281,7 @@ public class MatrixNavigatorComposite extends Composite
                                 r.getResourceData().removeChangeListener(fppc);
                                 r.getCapability(ColorableCapability.class)
                                         .setColor(rgb);
+                                r.issueRefresh();
                                 r.getResourceData().addChangeListener(fppc);
                             }
                         }
@@ -1323,6 +1298,7 @@ public class MatrixNavigatorComposite extends Composite
                                 r.getResourceData().removeChangeListener(fppc);
                                 r.getCapability(DensityCapability.class)
                                         .setDensity(density);
+                                r.issueRefresh();
                                 r.getResourceData().addChangeListener(fppc);
                             }
                         }
@@ -1341,6 +1317,7 @@ public class MatrixNavigatorComposite extends Composite
                                 r.getResourceData().removeChangeListener(fppc);
                                 r.getCapability(OutlineCapability.class)
                                         .setLineStyle(style);
+                                r.issueRefresh();
                                 r.getResourceData().addChangeListener(fppc);
                             }
                             if (!(r.getCapability(OutlineCapability.class)
@@ -1348,6 +1325,7 @@ public class MatrixNavigatorComposite extends Composite
                                 r.getResourceData().removeChangeListener(fppc);
                                 r.getCapability(OutlineCapability.class)
                                         .setOutlineWidth(width);
+                                r.issueRefresh();
                                 r.getResourceData().addChangeListener(fppc);
                             }
                         }
@@ -1365,6 +1343,7 @@ public class MatrixNavigatorComposite extends Composite
                                 r.getResourceData().removeChangeListener(fppc);
                                 r.getCapability(MagnificationCapability.class)
                                         .setMagnification(mag);
+                                r.issueRefresh();
                                 r.getResourceData().addChangeListener(fppc);
                             }
                         }
@@ -1412,6 +1391,7 @@ public class MatrixNavigatorComposite extends Composite
                         rgb = matchToRsc
                                 .getCapability(ColorableCapability.class)
                                 .getColor();
+
                         if (rgb != null) {
                             currRsc.getCapability(ColorableCapability.class)
                                     .setColor(rgb);
@@ -1490,7 +1470,7 @@ public class MatrixNavigatorComposite extends Composite
 
         /*
          * The first resource found in the field/plane pair resource set can be
-         * used to match resource capabilities. The
+         * used to match resource capabilities.
          */
         Iterator<AbstractVizResource<?, ?>> rscSetIter = assocRscs.iterator();
         AbstractVizResource<?, ?> matchToRsc = rscSetIter.next();

@@ -68,15 +68,28 @@ public class EnsembleToolImageStore {
 
     public static Image REMOVE_SELECTED_IMG = null;
 
-    public static Image REMOVE_ALL_IMG = null;
-
     public static Image NICKNAME_IMG = null;
 
     public static Image NEW_IMG = null;
 
     public static Image VISIBILITY_IMG = null;
 
+    public static Image REFRESH_IMG = null;
+
+    public static Image OPEN_TOOLS_IMG = null;
+
+    public static Image REMOVE_ALL_IMG = null;
+
+    public static Image OPEN_BROWSER_IMG = null;
+
+    public static Image TOGGLE_EDITABLE_IMG = null;
+
     public static void constructImages() {
+
+        if (REFRESH_IMG == null) {
+            REFRESH_IMG = ImageResourceManager.getPluginImage(
+                    "gov.noaa.gsd.viz.ensemble", "icons/refresh-29x24.gif");
+        }
 
         if (SELECTION_POINTER_IMG == null) {
             SELECTION_POINTER_IMG = ImageResourceManager.getPluginImage(
@@ -149,11 +162,6 @@ public class EnsembleToolImageStore {
                     "gov.noaa.gsd.viz.ensemble", "icons/remove-selected.gif");
         }
 
-        if (REMOVE_ALL_IMG == null) {
-            REMOVE_ALL_IMG = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble", "icons/remove-all.gif");
-        }
-
         if (FAVORITES_IMG == null) {
             FAVORITES_IMG = ImageResourceManager.getPluginImage(
                     "gov.noaa.gsd.viz.ensemble", "icons/favorites.gif");
@@ -223,6 +231,26 @@ public class EnsembleToolImageStore {
         if (VISIBILITY_IMG == null) {
             VISIBILITY_IMG = ImageResourceManager.getPluginImage(
                     "gov.noaa.gsd.viz.ensemble", "icons/visibility.gif");
+        }
+
+        if (OPEN_BROWSER_IMG == null) {
+            OPEN_BROWSER_IMG = ImageResourceManager.getPluginImage(
+                    "gov.noaa.gsd.viz.ensemble",
+                    "icons/open-browser-16x16.gif");
+        }
+
+        if (TOGGLE_EDITABLE_IMG == null) {
+            TOGGLE_EDITABLE_IMG = ImageResourceManager.getPluginImage(
+                    "gov.noaa.gsd.viz.ensemble", "icons/power-on-16x16.gif");
+        }
+
+        if (REMOVE_ALL_IMG == null) {
+            REMOVE_ALL_IMG = ImageResourceManager.getPluginImage(
+                    "gov.noaa.gsd.viz.ensemble", "icons/remove-all-16x16.gif");
+        }
+        if (OPEN_TOOLS_IMG == null) {
+            OPEN_TOOLS_IMG = ImageResourceManager.getPluginImage(
+                    "gov.noaa.gsd.viz.ensemble", "icons/gears-16x16.gif");
         }
 
     }

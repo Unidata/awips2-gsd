@@ -1,12 +1,5 @@
 package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.legend;
 
-import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
-import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
-import gov.noaa.gsd.viz.ensemble.display.calculate.Range;
-import gov.noaa.gsd.viz.ensemble.display.calculate.RangeType;
-import gov.noaa.gsd.viz.ensemble.util.GlobalColor;
-import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
-
 import org.eclipse.jface.dialogs.IDialogConstants;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.swt.SWT;
@@ -24,6 +17,13 @@ import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
 
 import com.raytheon.viz.ui.dialogs.CaveJFACEDialog;
+
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
+import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
+import gov.noaa.gsd.viz.ensemble.display.calculate.Range;
+import gov.noaa.gsd.viz.ensemble.display.calculate.RangeType;
+import gov.noaa.gsd.viz.ensemble.util.GlobalColor;
+import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
 
 /**
  * A dialog which allows the user to choose create an ensemble relative
@@ -151,21 +151,23 @@ public class ERFProductDialog extends CaveJFACEDialog {
 
         addThresholdValueModifyBehavior();
 
+        parent.layout();
+
         return parent;
 
     }
 
     private void createVerticalSeparator() {
         new Label(mainPanelComposite, SWT.NONE).setLayoutData(
-                new GridData(SWT.LEFT, SWT.CENTER, false, false, 1, 2));
+                new GridData(SWT.LEFT, SWT.CENTER, true, false, 1, 2));
 
     }
 
     private void createRootArea(Composite parent) {
         mainPanelComposite = new Composite(parent, SWT.BORDER);
 
-        GridData rootCalculatorPanel_gd = new GridData(SWT.FILL, SWT.FILL,
-                false, true, 1, 1);
+        GridData rootCalculatorPanel_gd = new GridData(SWT.FILL, SWT.FILL, true,
+                true, 1, 1);
         mainPanelComposite.setLayoutData(rootCalculatorPanel_gd);
         mainPanelComposite.setLayout(new GridLayout(1, false));
     }

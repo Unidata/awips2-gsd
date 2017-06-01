@@ -1,8 +1,5 @@
 package gov.noaa.gsd.viz.ensemble.display.common;
 
-import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
-import gov.noaa.gsd.viz.ensemble.util.Utilities;
-
 import com.raytheon.uf.common.dataplugin.level.Level;
 import com.raytheon.uf.common.dataplugin.level.mapping.LevelMapping;
 import com.raytheon.uf.common.dataplugin.level.mapping.LevelMappingFactory;
@@ -12,6 +9,9 @@ import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.viz.grid.rsc.GridNameGenerator;
 import com.raytheon.viz.grid.rsc.GridNameGenerator.IGridNameResource;
 import com.raytheon.viz.grid.rsc.GridNameGenerator.LegendParameters;
+
+import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
+import gov.noaa.gsd.viz.ensemble.util.Utilities;
 
 /**
  * Concrete resolution of accessors of typical grid resource attributes.
@@ -35,10 +35,9 @@ public class GridResourceHolder extends AbstractResourceHolder {
 
     GridNameGenerator.IGridNameResource currRsc = null;
 
-    protected GridResourceHolder(AbstractVizResource<?, ?> rsc,
-            boolean isSelected) {
+    protected GridResourceHolder(AbstractVizResource<?, ?> rsc) {
 
-        super(rsc, isSelected);
+        super(rsc);
         currRsc = (GridNameGenerator.IGridNameResource) rsc;
     }
 
@@ -155,8 +154,7 @@ public class GridResourceHolder extends AbstractResourceHolder {
     public String getGroupName() {
         String units = getUnits();
         String sb = String.format("%s %s %s %s", getModel(), getLevel(),
-                getParameter(),
-                units != null && units.equals("") == false
+                getParameter(), units != null && units.equals("") == false
                         ? "(" + units + ")" : "");
         return sb;
     }
@@ -166,8 +164,8 @@ public class GridResourceHolder extends AbstractResourceHolder {
         String units = getUnits();
         String sb = String.format("%s %s %s %s %s", getModel(), getLevel(),
                 getParameter(),
-                units != null && units.equals("") == false
-                        ? "(" + units + ")" : "",
+                units != null && units.equals("") == false ? "(" + units + ")"
+                        : "",
                 getEnsembleId() != null && getEnsembleId().equals("") == false
                         ? getEnsembleId() : "");
 
@@ -198,6 +196,21 @@ public class GridResourceHolder extends AbstractResourceHolder {
     @Override
     public String getGeneralName() {
         return getSpecificName();
+    }
+
+    @Override
+    public boolean isEnsembleGroup() {
+        return false;
+    }
+
+    @Override
+    public AbstractResourceHolder[] getChildren() {
+        return null;
+    }
+
+    @Override
+    public boolean hasChildren() {
+        return false;
     }
 
 }

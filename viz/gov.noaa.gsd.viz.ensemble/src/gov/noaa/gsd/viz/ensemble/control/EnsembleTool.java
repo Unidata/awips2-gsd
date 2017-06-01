@@ -1,12 +1,15 @@
 package gov.noaa.gsd.viz.ensemble.control;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.eclipse.core.commands.Command;
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
+import org.eclipse.core.commands.NotEnabledException;
+import org.eclipse.core.commands.NotHandledException;
+import org.eclipse.core.commands.common.NotDefinedException;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.IEditorPart;
@@ -19,7 +22,9 @@ import org.eclipse.ui.IWorkbenchPartReference;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PartInitException;
 import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.commands.ICommandService;
 import org.eclipse.ui.part.EditorPart;
+import org.eclipse.ui.services.IServiceLocator;
 
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
@@ -27,6 +32,7 @@ import com.raytheon.uf.common.status.UFStatus.Priority;
 import com.raytheon.uf.viz.core.IDisplayPane;
 import com.raytheon.uf.viz.core.IDisplayPaneContainer;
 import com.raytheon.uf.viz.core.IRenderableDisplayChangedListener;
+import com.raytheon.uf.viz.core.VizApp;
 import com.raytheon.uf.viz.core.drawables.IDescriptor;
 import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
 import com.raytheon.uf.viz.core.drawables.IRenderableDisplay;
@@ -40,7 +46,6 @@ import com.raytheon.uf.viz.core.rsc.ResourceList;
 import com.raytheon.uf.viz.core.rsc.ResourceList.RemoveListener;
 import com.raytheon.uf.viz.core.rsc.ResourceType;
 import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
-import com.raytheon.uf.viz.core.rsc.tools.GenericToolsResourceData;
 import com.raytheon.uf.viz.d2d.core.legend.D2DLegendResource;
 import com.raytheon.uf.viz.d2d.core.legend.D2DLegendResource.LegendMode;
 import com.raytheon.uf.viz.xy.timeseries.TimeSeriesEditor;
@@ -48,11 +53,15 @@ import com.raytheon.uf.viz.xy.timeseries.display.TimeSeriesDescriptor;
 import com.raytheon.viz.ui.EditorUtil;
 import com.raytheon.viz.ui.editor.AbstractEditor;
 import com.raytheon.viz.ui.tools.AbstractTool;
+import com.raytheon.viz.volumebrowser.vbui.VolumeBrowserAction;
 
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
 import gov.noaa.gsd.viz.ensemble.display.calculate.Range;
 import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.EnsembleMembersHolder;
+import gov.noaa.gsd.viz.ensemble.display.common.HistogramGridResourceHolder;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayerData;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.IToolLayerChanged;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.EnsembleToolViewer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.GlobalPreferencesComposite;
@@ -108,13 +117,16 @@ import gov.noaa.gsd.viz.ensemble.util.ViewerWindowState;
  * Jan 15, 2016   12301    jing        Added accessor to viewer
  * Nov 19, 2016   19443    polster     Fix for swapping and other refactoring
  * Mar 01, 2017   19443    polster     Cleaned up clear and close behavior
+ * Mar 17  2017   19325    jing        Resource group behavior added
+ * 
  *         </pre>
  * 
  * @version 1.0
  */
 
-public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
-        IRenderableDisplayChangedListener, RemoveListener {
+public class EnsembleTool extends AbstractTool
+        implements IToolLayerChanged, IRenderableDisplayChangedListener,
+        RemoveListener, IToolModeChangedProvider {
 
     private static final transient IUFStatusHandler statusHandler = UFStatus
             .getHandler(EnsembleTool.class);
@@ -135,15 +147,9 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
         SWAPPED_IN, SWAPPED_OUT, NOT_SWAPPING
     }
 
-    public static final String MATRIX_EDITOR_TAB_TITLE = "Matrix";
-
-    public static final String MAP_EDITOR_TAB_TITLE = "Map";
-
     private static boolean isToolRunning = false;
 
     private static EnsembleTool SINGLETON = null;
-
-    protected static final int MAX_TOOL_LAYER_COUNT = 5;
 
     protected EnsembleToolViewer ensembleToolViewer = null;
 
@@ -160,6 +166,8 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
     private IDisplayPaneContainer lastUsedTimeSeriesEditorPane = null;
 
     private SwapState swapState = SwapState.NOT_SWAPPING;
+
+    private final List<IToolModeChangedListener> toolModeChangedListeners = new CopyOnWriteArrayList<>();
 
     /**
      * The EnsembleTool adheres to a singleton pattern. This method is the
@@ -181,7 +189,59 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
      * not interact with this tool when it is not isRunning.
      */
     private EnsembleTool() {
+        EnsembleResourceIngester.getInstance();
+        preOpenVolumeBrowser();
 
+    }
+
+    /**
+     * Create the VB dialog if it has not yet been created. Then force it to be
+     * hidden. This is so the user doesn't have to wait so long when they
+     * manually load the VB or load the model family browser in the Matrix
+     * navigator.
+     */
+    private void preOpenVolumeBrowser() {
+
+        if (!PlatformUI.getWorkbench().isClosing()) {
+            if (VolumeBrowserAction.getVolumeBrowserDlg() == null) {
+
+                /*
+                 * Obtain IServiceLocator implementer, e.g. from
+                 * PlatformUI.getWorkbench()
+                 */
+                IServiceLocator serviceLocator = PlatformUI.getWorkbench();
+
+                ICommandService commandService = (ICommandService) serviceLocator
+                        .getService(ICommandService.class);
+
+                Command command = commandService.getCommand(
+                        "com.raytheon.viz.volumebrowser.volumeBrowserRef");
+
+                /*
+                 * Optionally pass a ExecutionEvent instance, default no-param
+                 * arg creates blank event
+                 */
+
+                try {
+
+                    command.executeWithChecks(new ExecutionEvent());
+                } catch (ExecutionException | NotDefinedException
+                        | NotEnabledException | NotHandledException e) {
+                    statusHandler.handle(Priority.PROBLEM,
+                            e.getLocalizedMessage(), e);
+                }
+
+            }
+
+            VizApp.runAsync(new Runnable() {
+
+                @Override
+                public void run() {
+                    VolumeBrowserAction.getVolumeBrowserDlg().hide();
+                }
+            });
+
+        }
     }
 
     /**
@@ -221,7 +281,7 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
     @Override
     synchronized public void dispose() {
 
-        EnsembleResourceManager.getInstance().dispose();
+        EnsembleResourceIngester.getInstance().dispose();
 
         if (theEditorsListener != null) {
             PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage()
@@ -298,7 +358,15 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
                 }
             }
 
-            createToolLayer(editor, EnsembleToolMode.LEGENDS_PLAN_VIEW);
+            try {
+                EnsembleTool.getInstance().createToolLayer(editor,
+                        EnsembleToolMode.LEGENDS_PLAN_VIEW);
+            } catch (VizException e1) {
+                statusHandler.handle(Priority.SIGNIFICANT,
+                        "Unable to create tool layer for Plan View (map) editor",
+                        e1);
+            }
+
             refreshTool(false);
 
             setHideLegendsMode();
@@ -363,7 +431,6 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
         if (!PlatformUI.getWorkbench().isClosing()) {
 
             if (ensembleToolViewer != null) {
-                // ensembleToolViewer.clearAllByMode(toolLayer.getToolMode());
                 /*
                  * The matrix needs special attention as the composite needs to
                  * be disposed of so subsequent requests to open the Matrix
@@ -475,29 +542,23 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
     /**
      * Add a new ensemble tool layer to the given editor.
      */
-    public void createToolLayer(IDisplayPaneContainer editorPane,
-            EnsembleToolMode mode) {
+    public EnsembleToolLayer createToolLayer(IDisplayPaneContainer editorPane,
+            EnsembleToolMode mode) throws VizException {
 
+        EnsembleToolLayer etl = null;
         if (editorPane != null) {
             super.setEditor(editorPane);
             editor.addRenderableDisplayChangedListener(this);
             IDescriptor descr = editor.getActiveDisplayPane().getDescriptor();
-            EnsembleToolLayer etl = null;
-            try {
-                if (mode == EnsembleToolMode.MATRIX) {
-                    etl = constructToolLayer(editor, descr,
-                            EnsembleToolMode.MATRIX);
-                } else if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW) {
-                    etl = constructToolLayer(editor, descr,
-                            EnsembleToolMode.LEGENDS_PLAN_VIEW);
-                } else if (editor instanceof TimeSeriesEditor) {
-                    etl = constructToolLayer(editor, descr,
-                            EnsembleToolMode.LEGENDS_TIME_SERIES);
-                }
-            } catch (VizException e) {
-                statusHandler.error("Unable to create a tool layer in editor: "
-                        + ((AbstractEditor) editor).getTitle(), e);
-                return;
+            if (mode == EnsembleToolMode.MATRIX) {
+                etl = constructToolLayer(editor, descr,
+                        EnsembleToolMode.MATRIX);
+            } else if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW) {
+                etl = constructToolLayer(editor, descr,
+                        EnsembleToolMode.LEGENDS_PLAN_VIEW);
+            } else if (editor instanceof TimeSeriesEditor) {
+                etl = constructToolLayer(editor, descr,
+                        EnsembleToolMode.LEGENDS_TIME_SERIES);
             }
             if (etl != null) {
                 descr.getResourceList().add(etl);
@@ -507,6 +568,7 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
                 editor.refresh();
             }
         }
+        return etl;
     }
 
     /**
@@ -516,12 +578,10 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
             IDisplayPaneContainer editorPane, IDescriptor desc,
             EnsembleTool.EnsembleToolMode toolMode) throws VizException {
 
-        GenericToolsResourceData<EnsembleToolLayer> gtrd = null;
-
         String fullName = EnsembleToolLayer.DEFAULT_NAME + " "
                 + ((AbstractEditor) editorPane).getTitle().trim();
-        gtrd = new GenericToolsResourceData<EnsembleToolLayer>(fullName,
-                EnsembleToolLayer.class);
+
+        EnsembleToolLayerData etld = new EnsembleToolLayerData();
         LoadProperties props = null;
         if (desc instanceof TimeSeriesDescriptor) {
             props = new LoadProperties();
@@ -531,7 +591,7 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
             props = new LoadProperties();
         }
 
-        EnsembleToolLayer tool = gtrd.construct(props, desc);
+        EnsembleToolLayer tool = etld.construct(props, desc);
         tool.setToolMode(toolMode);
         tool.setInnerName(fullName);
 
@@ -572,96 +632,12 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
     }
 
     /**
-     * Given the group name (aka the top-level title of an ensemble product) set
-     * it to be the default resource for subsequent calculations on the
-     * ResourceManager.
-     */
-    public void setEnsembleCalculationResource(String rscGroupName) {
-        if (editor != null) {
-            EnsembleResourceManager.getInstance()
-                    .setEnsembleCalculationResourceName((AbstractEditor) editor,
-                            rscGroupName);
-        }
-    }
-
-    /**
-     * Get the group name (aka the top-level title of an ensemble product) for
-     * the default resource for subsequent calculations on the ResourceManager.
-     */
-    public String getEnsembleCalculationResourceName() {
-
-        String s = "";
-        if (editor != null) {
-            s = EnsembleResourceManager.getInstance()
-                    .getEnsembleCalculationResourceName(
-                            (AbstractEditor) editor);
-        }
-        return s;
-    }
-
-    /**
      * Update the legend time information in the navigator view.
      */
     public void frameChanged(FramesInfo framesInfo) {
         if (ensembleToolViewer != null) {
             ensembleToolViewer.frameChanged(framesInfo);
         }
-    }
-
-    /**
-     * Return the time basis resource name by getting the active editor and
-     * requesting the name from the ResourceManager.
-     */
-    public String getTimeBasisResourceName() {
-
-        String s = "";
-        if (getToolLayer() != null && !getToolLayer().isEmpty()) {
-            s = EnsembleResourceManager.getInstance()
-                    .getTimeBasisResourceName(getToolLayer());
-        }
-        return s;
-    }
-
-    /**
-     * Return the time basis legend time by getting the active editor and
-     * requesting the time from the ResourceManager.
-     */
-    public String getTimeBasisLegendTime() {
-
-        String s = "";
-        if (getToolLayer() != null && !getToolLayer().isEmpty()) {
-            s = EnsembleResourceManager.getInstance()
-                    .getTimeBasisLegendTime(getToolLayer());
-        }
-        return s;
-
-    }
-
-    /**
-     * Returns the active resource time so the active ensemble tool layer legend
-     * displays the time as it is displayed in the current frame of the active
-     * editor.
-     */
-    public String getActiveResourceTime() {
-        String rscTime = null;
-        EnsembleToolMode mode = EnsembleTool.getInstance().getToolMode();
-        if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW
-                || mode == EnsembleToolMode.LEGENDS_TIME_SERIES) {
-            rscTime = getTimeBasisLegendTime();
-        } else if (mode == EnsembleToolMode.MATRIX) {
-            rscTime = ensembleToolViewer.getActiveRscTime();
-        }
-
-        return rscTime;
-    }
-
-    public String getTimeSeriesPoint() {
-        String s = "";
-        if (getToolLayer() != null) {
-            s = EnsembleResourceManager.getInstance()
-                    .getTimeSeriesPoint(getToolLayer());
-        }
-        return s;
     }
 
     public IDisplayPaneContainer getActiveEditor() {
@@ -698,6 +674,7 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
         if (EnsembleTool.hasToolLayer(editorPane)) {
             super.setEditor(editorPane);
             EnsembleToolMode toolMode = getToolMode(editorPane);
+            setToolMode(toolMode);
             switch (toolMode) {
             case LEGENDS_PLAN_VIEW:
                 lastUsedLegendsEditorPane = editor;
@@ -719,6 +696,10 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
                 super.setEditor(null);
             }
         }
+    }
+
+    public void setToolMode(EnsembleTool.EnsembleToolMode toolMode) {
+        notifyToolModeChanged(toolMode);
     }
 
     /**
@@ -927,26 +908,6 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
     }
 
     /**
-     * Get the map of resources associated with the current active tool layer.
-     * If no tool layer is active then return an empty map.
-     */
-    public Map<String, List<AbstractResourceHolder>> getCurrentToolLayerResources() {
-
-        Map<String, List<AbstractResourceHolder>> ensembleResources = null;
-        EnsembleToolLayer etl = getToolLayer();
-        if (etl != null) {
-            ensembleResources = etl.getEnsembleResources();
-        } else {
-            ensembleResources = getEmptyResourceMap();
-        }
-        return ensembleResources;
-    }
-
-    public Map<String, List<AbstractResourceHolder>> getEmptyResourceMap() {
-        return new HashMap<>();
-    }
-
-    /**
      * Exercise a given calculation on the visible resources of a given tool
      * layer.
      */
@@ -976,8 +937,15 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
     public void refreshView() {
 
         if (isToolEditable()) {
-            ensembleToolViewer.refreshInput(getToolLayer());
+            ensembleToolViewer
+                    .refreshInput(getToolLayer().getResourceHolders());
             ensembleToolViewer.setEditable(true);
+        }
+    }
+
+    public void refreshEditor() {
+        if (editor != null) {
+            editor.refresh();
         }
     }
 
@@ -1041,6 +1009,21 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
 
     }
 
+    public List<AbstractResourceHolder> getResourceList() {
+        List<AbstractResourceHolder> resourceHolders = null;
+        if (getToolLayer() != null) {
+            resourceHolders = getToolLayer().getResourceHolders();
+        } else {
+            resourceHolders = getEmptyResourceList();
+        }
+        return resourceHolders;
+    }
+
+    public List<AbstractResourceHolder> getEmptyResourceList() {
+        List<AbstractResourceHolder> resourceHolders = new ArrayList<>();
+        return resourceHolders;
+    }
+
     /**
      * 
      * The sole purpose of this method is to minimize or restore the ensemble
@@ -1080,11 +1063,7 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
         boolean isEmpty = true;
         EnsembleToolLayer toolLayer = getToolLayer();
         if (toolLayer != null) {
-            Map<String, List<AbstractResourceHolder>> ensembleResources = toolLayer
-                    .getEnsembleResources();
-            if (ensembleResources != null) {
-                isEmpty = ensembleResources.isEmpty();
-            }
+            isEmpty = toolLayer.getResourceList().isEmpty();
         }
         return isEmpty;
     }
@@ -1178,7 +1157,7 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
     /**
      * Stores the most recent expansion of the legend tree resources.
      */
-    public void setExpandedElements(List<String> expandedElems) {
+    public void setExpandedElements(List<EnsembleMembersHolder> expandedElems) {
         EnsembleToolLayer etl = getToolLayer();
         if (etl != null) {
             etl.setExpandedElements(expandedElems);
@@ -1188,13 +1167,13 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
     /**
      * Gets the most recent expansion of the legend tree resources.
      */
-    public List<String> getExpandedElements() {
-        List<String> expandedElems = null;
+    public List<EnsembleMembersHolder> getExpandedElements() {
+        List<EnsembleMembersHolder> expandedElems = null;
         EnsembleToolLayer etl = getToolLayer();
         if (etl != null) {
             expandedElems = etl.getExpandedElements();
         } else {
-            expandedElems = new ArrayList<String>();
+            expandedElems = new ArrayList<EnsembleMembersHolder>();
 
         }
         return expandedElems;
@@ -1223,10 +1202,6 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
     public void clearToolLayer() {
         if (getToolLayer() != null) {
             getToolLayer().unloadAllResources();
-            /*
-             * TODO: Shouldn't this be a refreshTool call?
-             */
-            ensembleToolViewer.clearAllByActiveMode();
         }
     }
 
@@ -1369,6 +1344,32 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
     }
 
     /**
+     * Given a resource to load, find the EnsembleToolLayer in the same display
+     * in order to be able to associate the incoming resource with the proper
+     * tool layer.
+     */
+    public static EnsembleToolLayer getToolLayer(
+            AbstractVizResource<?, ?> rsc) {
+        EnsembleToolLayer toolLayer = null;
+
+        /* find the ensemble tool layer */
+        ResourceList r = rsc.getDescriptor().getResourceList();
+        if (r != null) {
+            List<AbstractVizResource<?, ?>> resources = r
+                    .getResourcesByType(EnsembleToolLayer.class);
+            if (resources == null || resources.isEmpty()) {
+                return null;
+            }
+            AbstractVizResource<?, ?> innerResource = resources.get(0);
+            if (innerResource == null) {
+                return null;
+            }
+            toolLayer = (EnsembleToolLayer) innerResource;
+        }
+        return toolLayer;
+    }
+
+    /**
      * Get the ensemble tool layer from the given editor.
      */
     public static EnsembleToolLayer getToolLayer(
@@ -1421,7 +1422,7 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
              * Don't allow the user to close the viewer if the tool layer is not
              * editable.
              */
-            if (!getToolLayer().isEditable()) {
+            if (getToolLayer() == null || !getToolLayer().isEditable()) {
                 return ISaveablePart2.CANCEL;
             }
 
@@ -1430,7 +1431,7 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
              * to close.
              */
             boolean shouldClose = true;
-            if (!getCurrentToolLayerResources().isEmpty()) {
+            if (!getToolLayer().getResourceList().isEmpty()) {
                 shouldClose = MessageDialog.openConfirm(
                         Display.getCurrent().getActiveShell(),
                         "Confirm Active Ensemble Tool Layer",
@@ -1499,6 +1500,73 @@ public class EnsembleTool extends AbstractTool implements IToolLayerChanged,
     public void handleViewerDisposed() {
         ensembleToolViewer = null;
         ignorePartActivatedEvent(false);
+    }
+
+    public ResourceList getActiveResourceList() {
+        ResourceList rl = null;
+        if (getToolLayer() != null) {
+            rl = getToolLayer().getResourceList();
+        } else {
+            rl = new ResourceList();
+        }
+        return rl;
+    }
+
+    public boolean activeToolLayerContains(AbstractVizResource<?, ?> rsc) {
+        boolean containsRsc = false;
+        if (this.getToolLayer() != null) {
+            containsRsc = getToolLayer().getResourceList().containsRsc(rsc);
+        }
+        return containsRsc;
+
+    }
+
+    public void turnOffOtherHistograms(HistogramGridResourceHolder hgr) {
+        if (getToolLayer() != null) {
+            getToolLayer().turnOffOtherHistograms(hgr);
+        }
+    }
+
+    public void updateGenerated(AbstractResourceHolder arh) {
+        if (getToolLayer() != null) {
+            getToolLayer().updateGenerated(arh);
+        }
+    }
+
+    /**
+     * This method is meant to be called when any resource in the resource list
+     * has changed and the gui tree in the viewer needs to be updated (i.e. not
+     * full refresh). The element argument is either a resource name or an
+     * abstract resource holder.
+     */
+    public void updateElementInView(AbstractResourceHolder arh) {
+        if (ensembleToolViewer != null) {
+            ensembleToolViewer.updateElementInTree(arh);
+        }
+    }
+
+    public void clearAllByMode(EnsembleToolMode mode) {
+        if (ensembleToolViewer != null) {
+            ensembleToolViewer.clearAllByMode(mode);
+        }
+    }
+
+    @Override
+    public void addToolModeChangedListener(IToolModeChangedListener listener) {
+        toolModeChangedListeners.add(listener);
+    }
+
+    @Override
+    public void removeToolModeChangedListener(
+            IToolModeChangedListener listener) {
+        toolModeChangedListeners.remove(listener);
+    }
+
+    @Override
+    public void notifyToolModeChanged(EnsembleToolMode toolmode) {
+        for (IToolModeChangedListener tmcl : toolModeChangedListeners) {
+            tmcl.toolModeChanged(toolmode);
+        }
     }
 
 }

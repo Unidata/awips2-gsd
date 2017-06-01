@@ -30,11 +30,12 @@ public class HistogramGridResourceHolder extends GenericResourceHolder {
 
     private HistogramResource<?> currRsc = null;
 
-    protected HistogramGridResourceHolder(AbstractVizResource<?, ?> rsc,
-            boolean isSelected) {
+    protected HistogramGridResourceHolder(AbstractVizResource<?, ?> rsc) {
 
-        super(rsc, isSelected);
+        super(rsc);
         currRsc = (HistogramResource<?>) rsc;
+        isGenerated = true;
+
     }
 
     @Override
@@ -93,16 +94,11 @@ public class HistogramGridResourceHolder extends GenericResourceHolder {
                 .getMode() == HistogramResource.DisplayMode.POINT_SAMPLING) {
             return Calculation.HISTOGRAM_SAMPLING;
         } else if (((HistogramResource<?>) this.rsc)
-                .getMode() == HistogramResource.DisplayMode.GRAPHIC_HISTGRAM) {
+                .getMode() == HistogramResource.DisplayMode.GRAPHIC_HISTOGRAM) {
             return Calculation.HISTOGRAM_GRAPHICS;
         } else {
             return Calculation.VALUE_SAMPLING;
         }
-    }
-
-    public String getGroupName() {
-
-        return getSpecificName();
     }
 
     @Override

@@ -1,6 +1,9 @@
 package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer;
 
+import java.util.List;
+
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CTabFolder;
 import org.eclipse.swt.custom.CTabItem;
@@ -10,7 +13,6 @@ import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Cursor;
 import org.eclipse.swt.graphics.Font;
-import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
@@ -28,12 +30,11 @@ import com.raytheon.uf.common.status.UFStatus.Priority;
 import com.raytheon.uf.viz.core.IDisplayPaneContainer;
 import com.raytheon.uf.viz.core.VizApp;
 import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
-import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.MatrixNavigationOperation;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
+import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.DistributionViewerComposite;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.legend.LegendBrowserComposite;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.MatrixNavigatorComposite;
@@ -145,14 +146,6 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
     public static int SAMPLING_COLUMN_INDEX = 3;
 
-    public static AbstractVizResource<?, ?> LAST_HIGHLIGHTED_RESOURCE = null;
-
-    public static RGB LAST_HIGHLIGHTED_RESOURCE_RGB = null;
-
-    public static int LAST_HIGHLIGHTED_RESOURCE_WIDTH = 1;
-
-    public static boolean LAST_HIGHLIGHTED_RESOURCE_OUTLINE_ASSERTED = false;
-
     private static Cursor selectionModeCursor = null;
 
     private static Cursor normalCursor = null;
@@ -162,6 +155,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
     private static boolean isDisposing = false;
 
     private static boolean isEditable = true;
+
+    private IToolBarManager toolbarMgr = null;
 
     public EnsembleToolViewer() {
     }
@@ -174,11 +169,13 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
      */
     public void createPartControl(Composite parent) {
 
-        /* the layout of the parent must be a Grid Layout */
-        setupRoot(parent);
+        toolbarMgr = getViewSite().getActionBars().getToolBarManager();
 
         /* fonts, images, and cursors */
         setupResources();
+
+        /* the layout of the parent must be a Grid Layout */
+        setupRoot(parent);
 
         /* this upper sash main tab folder is for all major ET tools */
         createMainToolsTabFolder();
@@ -307,8 +304,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
     }
 
     private void createMainToolsTabToolBar() {
-        ensembleToolBar = new EnsembleToolBar(mainToolsTabFolder, SWT.None,
-                this);
+        ensembleToolBar = new EnsembleToolBar(mainToolsTabFolder, toolbarMgr,
+                SWT.None, this);
     }
 
     private void createMainToolsTabFolder() {
@@ -393,16 +390,23 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
      */
     public void setToolMode(EnsembleTool.EnsembleToolMode mode) {
 
-        if (isWidgetReady()) {
-            if (mode == EnsembleTool.EnsembleToolMode.LEGENDS_PLAN_VIEW
-                    | mode == EnsembleTool.EnsembleToolMode.LEGENDS_TIME_SERIES) {
-                mainToolsTabFolder.setSelection(itemLegendsTabItem);
-                legendBrowser.setToolMode(mode);
-            } else if (mode == EnsembleTool.EnsembleToolMode.MATRIX) {
-                mainToolsTabFolder.setSelection(itemMatrixTabItem);
+        VizApp.runSync(new Runnable() {
+
+            @Override
+            public void run() {
+                if (isWidgetReady()) {
+                    if (mode == EnsembleTool.EnsembleToolMode.LEGENDS_PLAN_VIEW
+                            | mode == EnsembleTool.EnsembleToolMode.LEGENDS_TIME_SERIES) {
+                        mainToolsTabFolder.setSelection(itemLegendsTabItem);
+                        legendBrowser.setToolMode(mode);
+                    } else if (mode == EnsembleTool.EnsembleToolMode.MATRIX) {
+                        mainToolsTabFolder.setSelection(itemMatrixTabItem);
+                    }
+                    ensembleToolBar.setToolbarMode(mode);
+                }
             }
-            ensembleToolBar.setToolbarMode(mode);
-        }
+        });
+
     }
 
     public static Font getViewFontSmall() {
@@ -468,7 +472,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
      * the currently active editor, and disabled when the tool layer is set to
      * not-editable.
      */
-    synchronized public void setEditable(boolean enabled) {
+    public void setEditable(boolean enabled) {
 
         isEditable = enabled;
 
@@ -493,8 +497,8 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         if (EnsembleTool.getInstance().getToolMode() == EnsembleToolMode.NONE) {
             isReady = true;
         } else {
-            if (mainToolsTabFolder == null || mainToolsTabFolder.isDisposed()
-                    || !ensembleToolBar.isWidgetReady()) {
+            if (mainToolsTabFolder == null || mainToolsTabFolder.isDisposed()) {
+                // || !ensembleToolBar.isWidgetReady()) {
                 isReady = false;
             } else {
                 EnsembleToolMode mode = EnsembleTool.getInstance()
@@ -535,7 +539,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
     /**
      * Given a tool layer, refresh the input of the respective inner tool.
      */
-    synchronized public void refreshInput(final EnsembleToolLayer toolLayer) {
+    public void refreshInput(final List<AbstractResourceHolder> list) {
 
         VizApp.runSync(new Runnable() {
             @Override
@@ -547,7 +551,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
                     if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW
                             || mode == EnsembleToolMode.LEGENDS_TIME_SERIES) {
-                        legendBrowser.refreshInput(toolLayer);
+                        legendBrowser.refreshInput(list);
                         mainToolsTabFolder.setSelection(itemLegendsTabItem);
                     } else if (mode == EnsembleToolMode.MATRIX) {
                         if (matrixNavigator != null) {
@@ -560,7 +564,6 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                 }
             }
         });
-
     }
 
     /**
@@ -599,7 +602,9 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
             legendBrowser.clearAll();
             break;
         case MATRIX:
-            matrixNavigator.clearAllResources();
+            if (matrixNavigator != null) {
+                matrixNavigator.clearAllResources();
+            }
             break;
         default:
             break;
@@ -723,6 +728,20 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
         if (matrixNavigator != null && !matrixNavigator.isDisposed()) {
             matrixNavigator.dispose();
             matrixNavigator = null;
+        }
+    }
+
+    public void updateElementInTree(AbstractResourceHolder arh) {
+        EnsembleToolMode mode = EnsembleTool.getInstance().getToolMode();
+        if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW
+                || mode == EnsembleToolMode.LEGENDS_TIME_SERIES) {
+            legendBrowser.updateElementInTree(arh);
+        }
+        if (mode == EnsembleToolMode.MATRIX) {
+            if (EnsembleTool.getInstance().getToolLayer() != null) {
+                /* no need to repopulate on refresh */
+                EnsembleTool.getInstance().getToolLayer().forceRefresh(false);
+            }
         }
     }
 

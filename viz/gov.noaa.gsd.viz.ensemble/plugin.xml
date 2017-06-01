@@ -146,13 +146,13 @@
               </contextId>
           </classContext>
    </extension>
-   <extension
+      <extension
             point="com.raytheon.viz.ui.contextualMenu">
          <contextualMenu
-               actionClass="gov.noaa.gsd.viz.ensemble.action.ContourControlSelectionAction"
-               capabilityClass="gov.noaa.gsd.viz.ensemble.display.control.contour.ContourControlCapability"
-               name="gov.noaa.gsd.viz.ensemble.controlContourControl"
-               sortID="553">
+               actionClass="gov.noaa.gsd.viz.ensemble.action.RemoveEnsembleToolResourceAction"
+               name="Unload"
+               sortID="999">
          </contextualMenu>
-    </extension>
+      </extension>
+
 </plugin>

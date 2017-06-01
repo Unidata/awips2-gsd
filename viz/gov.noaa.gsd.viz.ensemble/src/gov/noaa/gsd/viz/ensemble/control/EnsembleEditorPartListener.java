@@ -5,7 +5,11 @@ import org.eclipse.ui.IEditorReference;
 import org.eclipse.ui.IPartListener2;
 import org.eclipse.ui.IWorkbenchPartReference;
 
+import com.raytheon.uf.common.status.IUFStatusHandler;
+import com.raytheon.uf.common.status.UFStatus;
+import com.raytheon.uf.common.status.UFStatus.Priority;
 import com.raytheon.uf.viz.core.IDisplayPaneContainer;
+import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.xy.timeseries.TimeSeriesEditor;
 
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolCompatibility;
@@ -29,6 +33,9 @@ import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;
  * @version 1.0
  */
 public class EnsembleEditorPartListener implements IPartListener2 {
+
+    private static final transient IUFStatusHandler statusHandler = UFStatus
+            .getHandler(EnsembleEditorPartListener.class);
 
     private boolean ignorePartActivatedEvent = false;
 
@@ -91,8 +98,14 @@ public class EnsembleEditorPartListener implements IPartListener2 {
                      * time to be associated.
                      */
                     if (!EnsembleTool.hasToolLayer(editor)) {
-                        EnsembleTool.getInstance().createToolLayer(editor,
-                                EnsembleToolMode.LEGENDS_TIME_SERIES);
+                        try {
+                            EnsembleTool.getInstance().createToolLayer(editor,
+                                    EnsembleToolMode.LEGENDS_TIME_SERIES);
+                        } catch (VizException e1) {
+                            statusHandler.handle(Priority.SIGNIFICANT,
+                                    "Unable to create tool layer for Time Series editor",
+                                    e1);
+                        }
                     }
                     EnsembleTool.getInstance().refreshTool(true);
                 }
