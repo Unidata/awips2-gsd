@@ -33,21 +33,15 @@ import gov.noaa.gsd.viz.ensemble.display.common.GeneratedGridResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.GeneratedTimeSeriesResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.GridResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.HistogramGridResourceHolder;
-import gov.noaa.gsd.viz.ensemble.display.control.contour.ContourControlCapability;
 import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResource;
 import gov.noaa.gsd.viz.ensemble.util.Utilities;
 
 /**
- * A list which holds Ensemble Tool resources. Any resources contained in this
- * list class will be associated with an ensemble tool layer of which there is
- * only one ensemble tool layer per editor. It is assumed this list is used to
- * allow the user to see what resources are loaded, into the ensemble tool, in
- * the ensemble viewer.
- * 
- * Offers accessor methods to get different flavors (generated, ensemble,
- * individual, tool, etc) of resources.
+ * Access and operate the Ensemble Tool resources. Any resources contained in
+ * this list class will be associated with an editor and is assumed to be
+ * controlled by the Ensemble Tool.
  * 
  * <pre>
  * 
@@ -55,8 +49,10 @@ import gov.noaa.gsd.viz.ensemble.util.Utilities;
  * 
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
- * May 17  2017   19443     polster     Initial creation
- * Jun 27  2017   19325     jing        Added contour capability.
+ * Nov 17, 2014    5056     jing        Initial creation
+ * Jan 17, 2016    13211    polster     Renamed GenericResourceHolder 
+ *                                      to AbstractResourceHolder
+ * Feb 08  2016    13211    polster     Use diamond operator to reduce verbosity
  * 
  * </pre>
  * 
@@ -98,7 +94,7 @@ public class NavigatorResourceList extends ResourceList {
 
         boolean added = super.add(rsc);
         if (added) {
-            configureResourceForEnsembleTool(rscHolder);
+            configureResourceForEnsembleTool(rsc);
             addResourceHolderForEnsembleTool(rscHolder);
             /* no need to repopulate on refresh */
             theToolLayer.forceRefresh(false);
@@ -124,16 +120,6 @@ public class NavigatorResourceList extends ResourceList {
         rscHolder.getRsc().registerListener(rscHolder);
 
         addToProductList(rscHolder);
-
-        /*
-         * Make sure we turn off the image load capability for generated
-         * resources
-         */
-        if (rscHolder.isGenerated() && rscHolder.getRsc()
-                .hasCapability(DisplayTypeCapability.class)) {
-            rscHolder.getRsc().getCapability(DisplayTypeCapability.class)
-                    .setSuppressingMenuItems(true);
-        }
 
         /* Change associated with repository AWIPS2_GSD Issue #29206. */
         if (rscHolder.getRsc() instanceof AbstractGridResource<?>) {
@@ -299,7 +285,8 @@ public class NavigatorResourceList extends ResourceList {
 
     }
 
-    private void configureResourceForEnsembleTool(AbstractResourceHolder rh) {
+    private void configureResourceForEnsembleTool(
+            AbstractVizResource<?, ?> rsc) {
 
         /*
          * The matrix navigator, if open, will be listening for incoming
@@ -309,13 +296,13 @@ public class NavigatorResourceList extends ResourceList {
                 .getToolMode() == EnsembleTool.EnsembleToolMode.MATRIX) {
             for (IResourceRegisteredListener listener : theToolLayer
                     .getResourceRegisteredListeners()) {
-                listener.resourceRegistered(rh.getRsc());
+                listener.resourceRegistered(rsc);
             }
         }
 
         // Set color
-        if (rh.getRsc().hasCapability(ColorableCapability.class)) {
-            ColorableCapability colorable = (ColorableCapability) rh.getRsc()
+        if (rsc.hasCapability(ColorableCapability.class)) {
+            ColorableCapability colorable = (ColorableCapability) rsc
                     .getCapability(ColorableCapability.class);
             RGB color = Utilities.getRandomNiceContrastColor();
             colorable.setColor(color);
@@ -325,22 +312,9 @@ public class NavigatorResourceList extends ResourceList {
          * For now, we suppress the 'Load as Image' menu item from the context
          * sensitive pop-up, for both the Legends and Matrix modes.
          */
-        if (rh.getRsc().hasCapability(DisplayTypeCapability.class)
-                && !rh.isGenerated()) {
-            rh.getRsc().getCapability(DisplayTypeCapability.class)
+        if (rsc.hasCapability(DisplayTypeCapability.class)) {
+            rsc.getCapability(DisplayTypeCapability.class)
                     .setSuppressingMenuItems(false);
-        } else {
-            rh.getRsc().getCapability(DisplayTypeCapability.class)
-                    .setSuppressingMenuItems(true);
-        }
-
-        /*
-         * Add "Contour Control" to grid resource displayed as contour.
-         */
-        if (rh.getRsc() instanceof AbstractGridResource<?>
-                && ((AbstractGridResource<?>) (rh.getRsc()))
-                        .getDisplayType() != DisplayType.IMAGE) {
-            rh.getRsc().getCapability(ContourControlCapability.class);
         }
 
         /*
@@ -353,10 +327,9 @@ public class NavigatorResourceList extends ResourceList {
 
             // Set to default density for all loaded resources if can
             // But it may be unmatched with current display. Fix it later
-            if (rh.getRsc().getCapability(DensityCapability.class) != null
-                    && !rh.isGenerated()) {
-                DensityCapability densityCapability = (DensityCapability) rh
-                        .getRsc().getCapability(DensityCapability.class);
+            if (rsc.getCapability(DensityCapability.class) != null) {
+                DensityCapability densityCapability = (DensityCapability) rsc
+                        .getCapability(DensityCapability.class);
                 densityCapability.setDensity(DEFAULT_DENSITY);
             }
         }

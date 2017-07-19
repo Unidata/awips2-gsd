@@ -50,7 +50,7 @@ import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
  * Nov 2015      12977     polster   Make ingest poll asynchronously
  * Dec 2016      19325      jing     Add image capability for ensemble grid display
  * Mar 01,2017   19443    polster    Fix Time Series load problem; class cast exception
- * Mar 17 2017   19325    polster    Refactored for IResourceGroup; renamed for its lesser role.
+ * Mar 17 2016   19325    polster    Refactored for IResourceGroup; renamed for its lesser role.
  * 
  *          </pre>
  */
@@ -119,9 +119,6 @@ public class EnsembleResourceIngester {
     public synchronized void register(AbstractVizResource<?, ?> rsc) {
 
         if (rsc == null) {
-            return;
-        }
-        if (!EnsembleTool.isCompatibleResource(rsc)) {
             return;
         }
 

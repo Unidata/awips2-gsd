@@ -21,7 +21,6 @@ import gov.noaa.gsd.viz.ensemble.util.Utilities;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Nov 17, 2014   5056      polster     Initial creation
- * Jun 27  2017   19325    jing         Fix isSimilarTo() method
  * 
  * </pre>
  * 
@@ -165,11 +164,9 @@ public class GeneratedGridResourceHolder extends AbstractResourceHolder {
     public boolean isSimilarTo(GeneratedGridResourceHolder grh) {
         boolean areSimilar = false;
 
-        if (currRsc.getDisplayType() == grh.currRsc.getDisplayType()
-                && (getCalculation().equals(grh.getCalculation())
-                        && getRsc().getName().equals(grh.getRsc().getName())
-                        && getLevel().equals(grh.getLevel())
-                        && getUnits().equals(grh.getUnits()))) {
+        if (getCalculation().equals(grh.getCalculation())
+                && getLevel().equals(grh.getLevel())
+                && getUnits().equals(grh.getUnits())) {
             areSimilar = true;
         }
         return areSimilar;

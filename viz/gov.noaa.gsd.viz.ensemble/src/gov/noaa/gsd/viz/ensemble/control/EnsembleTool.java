@@ -38,10 +38,8 @@ import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
 import com.raytheon.uf.viz.core.drawables.IRenderableDisplay;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
-import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
 import com.raytheon.uf.viz.core.maps.display.VizMapEditor;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
-import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.uf.viz.core.rsc.IResourceDataChanged.ChangeType;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
 import com.raytheon.uf.viz.core.rsc.ResourceList;
@@ -52,7 +50,6 @@ import com.raytheon.uf.viz.d2d.core.legend.D2DLegendResource;
 import com.raytheon.uf.viz.d2d.core.legend.D2DLegendResource.LegendMode;
 import com.raytheon.uf.viz.xy.timeseries.TimeSeriesEditor;
 import com.raytheon.uf.viz.xy.timeseries.display.TimeSeriesDescriptor;
-import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.ui.EditorUtil;
 import com.raytheon.viz.ui.editor.AbstractEditor;
 import com.raytheon.viz.ui.tools.AbstractTool;
@@ -195,26 +192,6 @@ public class EnsembleTool extends AbstractTool
         EnsembleResourceIngester.getInstance();
         preOpenVolumeBrowser();
 
-    }
-
-    /**
-     * The Ensemble Tool currently (as of 17.3.1) only allows image and contour
-     * data to be loaded.
-     */
-    public static boolean isCompatibleResource(AbstractVizResource<?, ?> rsc) {
-
-        boolean isCompatible = false;
-        if (rsc instanceof TimeSeriesResource) {
-            isCompatible = true;
-        } else if (rsc instanceof AbstractGridResource<?>) {
-            if (((AbstractGridResource<?>) rsc)
-                    .getDisplayType() == DisplayType.IMAGE
-                    || ((AbstractGridResource<?>) rsc)
-                            .getDisplayType() == DisplayType.CONTOUR) {
-                isCompatible = true;
-            }
-        }
-        return isCompatible;
     }
 
     /**

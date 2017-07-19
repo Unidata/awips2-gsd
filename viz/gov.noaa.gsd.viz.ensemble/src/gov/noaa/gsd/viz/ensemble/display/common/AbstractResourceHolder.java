@@ -40,7 +40,6 @@ import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResou
  * Jan 17, 2016    13211    polster     Renamed class from GenericResourceHolder
  *                                      to AbstractResourceHolder
  * Dec 29, 2016    19325    jing        Deal with Image display type in equals()
- * Jun 27  2017    19325    jing        Reinvestigate equals() and save as TODO
  * 
  * </pre>
  * 
@@ -101,20 +100,7 @@ public abstract class AbstractResourceHolder
     // AbstractResourceHolder gr = (AbstractResourceHolder) o;
     // equals = this.getSpecificName().equals(gr.getSpecificName());
     // // Catch image case that the two names are different.
-    // if (this.getRsc() == null || this.getRsc().getName() == null
-    // || gr.getRsc() == null || gr.getRsc().getName() == null) {
-    // if (gr.getRsc() == null) {
-    // System.out.println(
-    // ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> gr.getRsc() is
-    // null.");
-    // } else if (gr.getRsc().getName() == null) {
-    // System.out.println(
-    // ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    // gr.getRsc().getName() is null.");
-    // }
-    // new Exception().printStackTrace();
-    //
-    // } else if (!this.getRsc().getName().equals(gr.getRsc().getName())) {
+    // if (!this.getRsc().getName().equals(gr.getRsc().getName())) {
     // equals = false;
     // }
     //
