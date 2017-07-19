@@ -50,6 +50,10 @@ import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.ui.progress.UIJob;
 
+import com.raytheon.uf.common.status.IUFStatusHandler;
+import com.raytheon.uf.common.status.UFStatus;
+import com.raytheon.uf.common.status.UFStatus.Priority;
+import com.raytheon.uf.common.style.StyleException;
 import com.raytheon.uf.viz.core.VizApp;
 import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
@@ -70,6 +74,7 @@ import gov.noaa.gsd.viz.ensemble.display.common.GeneratedTimeSeriesResourceHolde
 import gov.noaa.gsd.viz.ensemble.display.common.GridResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.HistogramGridResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.TimeSeriesResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.control.contour.ContourControlDialog;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.EnsembleToolViewer;
@@ -100,7 +105,8 @@ import gov.noaa.gsd.viz.ensemble.util.Utilities;
  * Dec 29, 2016   19325      jing        Legend for an image member
  * Feb 17, 2017   19325      jing        Added ERF image capability
  * Mar 01, 2017   19443      polster     Clear all method force clears to empty map
- * Mar 17 2017    19325      jing        Resource group behavior added
+ * Mar 17 2017    19443      jing        Resource group behavior added
+ * Mar 31, 2017   19598      jing        Contour control feature
  * 
  * </pre>
  * 
@@ -108,6 +114,9 @@ import gov.noaa.gsd.viz.ensemble.util.Utilities;
  * @version 1.0
  */
 public class LegendBrowserComposite extends Composite {
+
+    private static final transient IUFStatusHandler statusHandler = UFStatus
+            .getHandler(LegendBrowserComposite.class);
 
     private DistributionViewerComposite distributionViewerComposite = null;
 
@@ -127,6 +136,8 @@ public class LegendBrowserComposite extends Composite {
 
     final private ITreeViewerListener expandCollapseListener = new LegendTreeExpandCollapseListener();
 
+    private ContourControlDialog contourDialog = null;
+
     private ERFProductDialog erfDialog = null;
 
     protected TreeItem foundTreeItem = null;
@@ -142,6 +153,8 @@ public class LegendBrowserComposite extends Composite {
     private MenuItem addERFLayerMenuItem = null;
 
     private MenuItem addERFImageLayerMenuItem = null;
+
+    private MenuItem contourMenuItem = null;
 
     private TreeViewerColumn column0 = null;
 
@@ -672,6 +685,58 @@ public class LegendBrowserComposite extends Composite {
         }
     }
 
+    private void startContourControl(String mousedEnsembleName)
+            throws StyleException {
+        List<AbstractResourceHolder> rhs = getEnsembleMemberGenericResources(
+                mousedEnsembleName);
+        if (rhs == null || rhs.isEmpty()
+                || !(rhs.get(0).getRsc() instanceof AbstractGridResource)) {
+            return;
+        }
+        List<AbstractGridResource<?>> rscList = new ArrayList<AbstractGridResource<?>>();
+        for (AbstractResourceHolder rh : rhs) {
+            rscList.add((AbstractGridResource<?>) rh.getRsc());
+        }
+        contourDialog = new ContourControlDialog(rootComposite.getShell(),
+                mousedEnsembleName, rscList);
+
+        /*
+         * TODO: This code tests the stylePreferences and label preferences
+         * objs. All member resources share one stylePreferences and one label
+         * preference object in the baseline code, which is not right. It maybe
+         * a fundamental problem for D2D data display. For dealing with the
+         * sharing problem, we clone the original StylePreferences object and
+         * assign a new object to the grid resources related to the
+         * "Contour Control". See the code in the
+         * EnsembleResourceManager::registerResource() and registerGenerated().
+         * 
+         * It requires adding two methods in ufcore:
+         * 
+         * AbstractGridResource.java, public AbstractStylePreferences
+         * getStylePreferences() { return stylePreferences; } public void
+         * setStylePreferences(AbstractStylePreferences stylePreferences) {
+         * this.stylePreferences = stylePreferences; }
+         * 
+         * For long term, AWIPS2 team should fix the baseline bug which may
+         * impact the contour and other display. Need to keep this code at this
+         * location for ET until the bug in base line is fixed.
+         * 
+         * for (AbstractResourceHolder rh : rhs){ AbstractGridResource rsc =
+         * (AbstractGridResource) (rh.getRsc()); LabelingPreferences
+         * labelingPreferences = null; AbstractStylePreferences stylePreferences
+         * = rsc .getStylePreferences(); if (stylePreferences instanceof
+         * ContourPreferences) { labelingPreferences = ((ContourPreferences)
+         * stylePreferences) .getContourLabeling(); float incrementOrig =
+         * labelingPreferences.getIncrement(); // valuesOrig
+         * =labelingPreferences.getValues(); }
+         */
+
+        if (contourDialog.open() == Window.OK) {
+            contourDialog.close();
+            contourDialog = null;
+        }
+    }
+
     public void refreshInput(final List<AbstractResourceHolder> rscList) {
 
         VizApp.runSync(new Runnable() {
@@ -1132,8 +1197,7 @@ public class LegendBrowserComposite extends Composite {
                             .getToolMode();
                     if (mode == EnsembleToolMode.LEGENDS_TIME_SERIES) {
                         addERFLayerMenuItem.setEnabled(false);
-                    }
-                    if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW) {
+                    } else if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW) {
                         addERFLayerMenuItem.setEnabled(true);
                     }
 
@@ -1148,6 +1212,32 @@ public class LegendBrowserComposite extends Composite {
                             });
 
                     /*
+                     * Contour control for ensemble product.
+                     */
+                    contourMenuItem = new MenuItem(legendMenu, SWT.PUSH);
+                    contourMenuItem.setText("Contour Control");
+
+                    if (mode == EnsembleToolMode.LEGENDS_TIME_SERIES) {
+                        contourMenuItem.setEnabled(false);
+                    } else if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW) {
+                        contourMenuItem.setEnabled(true);
+                    }
+
+                    contourMenuItem.addListener(SWT.Selection, new Listener() {
+
+                        public void handleEvent(Event event) {
+
+                            try {
+                                startContourControl(ensMemberName);
+                            } catch (StyleException e) {
+                                statusHandler.handle(Priority.WARN,
+                                        e.getLocalizedMessage(), e);
+                            }
+
+                        }
+                    });
+
+                    /*
                      * Relative frequency image menu item allows the user to
                      * generate a probability image display demonstrating the
                      * chance a value p(x) lies within a range, outside a range,
@@ -1157,6 +1247,13 @@ public class LegendBrowserComposite extends Composite {
                             SWT.PUSH);
                     addERFImageLayerMenuItem
                             .setText("Relative Frequency Image");
+
+                    /* only enable the ERF menu item if we are in plan view */
+                    if (mode == EnsembleToolMode.LEGENDS_TIME_SERIES) {
+                        addERFImageLayerMenuItem.setEnabled(false);
+                    } else if (mode == EnsembleToolMode.LEGENDS_PLAN_VIEW) {
+                        addERFImageLayerMenuItem.setEnabled(true);
+                    }
 
                     addERFImageLayerMenuItem.addListener(SWT.Selection,
                             new Listener() {
@@ -1266,11 +1363,8 @@ public class LegendBrowserComposite extends Composite {
                     menuMgr.addMenuListener(new IMenuListener() {
 
                         public void menuAboutToShow(IMenuManager manager) {
-                            // EnsembleToolLayer toolLayer =
-                            // EnsembleResourceManager
-                            // .getToolLayer(gr.getRsc());
                             EnsembleToolLayer toolLayer = EnsembleTool
-                                    .getInstance().getToolLayer(gr.getRsc());
+                                    .getToolLayer(gr.getRsc());
                             if (toolLayer == null) {
                                 return;
                             }
