@@ -33,8 +33,8 @@ import com.raytheon.uf.viz.xy.timeseries.adapter.AbstractTimeSeriesAdapter;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.core.graphing.util.GraphPrefsFactory;
 import com.raytheon.viz.core.graphing.xy.XYData;
-
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
+
 
 /**
  * Uses cached data and parameters of loaded members in the time series display,
