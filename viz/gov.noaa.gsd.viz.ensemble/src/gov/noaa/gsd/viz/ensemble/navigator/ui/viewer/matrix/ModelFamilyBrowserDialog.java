@@ -1,10 +1,5 @@
 package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix;
 
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.EnsembleToolViewer;
-import gov.noaa.gsd.viz.ensemble.util.EnsembleToolImageStore;
-import gov.noaa.gsd.viz.ensemble.util.GlobalColor;
-import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +7,10 @@ import java.util.List;
 import org.eclipse.jface.dialogs.IDialogConstants;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
+import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.ITreeContentProvider;
+import org.eclipse.jface.viewers.SelectionChangedEvent;
+import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.viewers.Viewer;
@@ -36,8 +34,6 @@ import org.eclipse.swt.widgets.ToolItem;
 import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swt.widgets.TreeItem;
 
-import com.raytheon.uf.common.localization.IPathManager;
-import com.raytheon.uf.common.localization.PathManagerFactory;
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.common.status.UFStatus.Priority;
@@ -48,6 +44,11 @@ import com.raytheon.viz.volumebrowser.datacatalog.DataCatalogManager;
 import com.raytheon.viz.volumebrowser.datacatalog.IDataCatalog;
 import com.raytheon.viz.volumebrowser.datacatalog.IDataCatalogEntry;
 import com.raytheon.viz.volumebrowser.vbui.SelectedData;
+
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.EnsembleToolViewer;
+import gov.noaa.gsd.viz.ensemble.util.EnsembleToolImageStore;
+import gov.noaa.gsd.viz.ensemble.util.GlobalColor;
+import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
 
 /**
  * This class represents the analog to the Volume Browser but to be used instead
@@ -61,6 +62,7 @@ import com.raytheon.viz.volumebrowser.vbui.SelectedData;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Oct 08, 2015  12371      polster     Initial creation
+ * Nov 19, 2016  19443      polster     Change from loader to activator
  * 
  * </pre>
  * 
@@ -68,13 +70,16 @@ import com.raytheon.viz.volumebrowser.vbui.SelectedData;
  * @version 1.0
  */
 
-public class ModelFamilyDialog extends CaveJFACEDialog {
+public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
 
     private static final transient IUFStatusHandler statusHandler = UFStatus
-            .getHandler(ModelFamilyDialog.class);
+            .getHandler(ModelFamilyBrowserDialog.class);
 
-    private final static IPathManager pathMgr = PathManagerFactory
-            .getPathManager();
+    private static final String GO_ACTION = "Go";
+
+    private static final String WAIT_ACTION = "Wait...";
+
+    private static final String CLOSE_ACTION = "Close";
 
     private Composite rootComposite = null;
 
@@ -85,7 +90,7 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
 
     private Composite modelSourcesRootComposite = null;
 
-    private Button loadBtn;
+    private Button openBtn;
 
     private Button closeBtn;
 
@@ -93,23 +98,23 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
 
     private ScrolledComposite modelFamiliesScrolledComposite = null;
 
-    private ScrolledComposite elementSetScrolledComposite = null;
+    private ScrolledComposite fieldPlanePairScrolledComposite = null;
 
-    Composite elementSetsRootComposite = null;
+    Composite fieldPlanePairsRootComposite = null;
 
     private Tree modelSourcesTree = null;
 
     private TreeViewer modelSourcesTreeViewer = null;
 
-    private ToolItem newElementSetToolItem = null;
+    private ToolItem newFieldPlanePairToolItem = null;
 
     private Tree modelFamiliesTree = null;
 
     private TreeViewer modelFamiliesTreeViewer = null;
 
-    private Tree elementSetTree = null;
+    private Tree fieldPlanePairTree = null;
 
-    private TreeViewer elementSetTreeViewer = null;
+    private TreeViewer fieldPlanePairTreeViewer = null;
 
     private ToolBar modelFamiliesToolBar = null;
 
@@ -119,9 +124,9 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
 
     private Composite modelFamiliesRootComposite = null;
 
-    private FieldPlanePairSet currElementSet = null;
+    private FieldPlanePairSet currFieldPlanePairSet = null;
 
-    private final FieldPlanePairSet emptyElementSet = new FieldPlanePairSet();
+    private final FieldPlanePairSet emptyFieldPlanePair = new FieldPlanePairSet();
 
     final private int minimumTreeHeight = 180;
 
@@ -146,7 +151,7 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
      * @param parent
      * @param style
      */
-    public ModelFamilyDialog(Shell parent, IModelFamilyListener esl) {
+    public ModelFamilyBrowserDialog(Shell parent, IModelFamilyListener esl) {
         super(parent);
 
         setShellStyle(SWT.RESIZE | SWT.APPLICATION_MODAL);
@@ -185,8 +190,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
 
         mainRootComposite = new Composite(rootComposite, SWT.NONE);
         mainRootComposite.setLayout(new GridLayout(10, false));
-        mainRootComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true,
-                true, 1, 1));
+        mainRootComposite.setLayoutData(
+                new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
 
     }
 
@@ -211,7 +216,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
      * composite.
      */
     private void createModelSourcesRoot() {
-        modelSourcesRootComposite = new Composite(mainRootComposite, SWT.BORDER);
+        modelSourcesRootComposite = new Composite(mainRootComposite,
+                SWT.BORDER);
         modelSourcesRootComposite.setLayout(new GridLayout(1, false));
         GridData sourcesRootComposite_gd = new GridData(SWT.FILL, SWT.FILL,
                 false, true, 3, 1);
@@ -226,8 +232,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
 
         Composite sourcesHeaderComposite = new Composite(
                 modelSourcesRootComposite, SWT.BORDER);
-        sourcesHeaderComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL,
-                false, false, 2, 1));
+        sourcesHeaderComposite.setLayoutData(
+                new GridData(SWT.FILL, SWT.FILL, false, false, 2, 1));
         GridLayout sourcesHeaderComposite_gl = new GridLayout(2, false);
         sourcesHeaderComposite_gl.marginHeight = 3;
         sourcesHeaderComposite_gl.marginWidth = 5;
@@ -237,14 +243,14 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
         sourcesHeaderComposite_gl.marginBottom = 0;
         sourcesHeaderComposite_gl.horizontalSpacing = 0;
         sourcesHeaderComposite.setLayout(sourcesHeaderComposite_gl);
-        sourcesHeaderComposite.setBackground(GlobalColor
-                .get(GlobalColor.PALE_DULL_AZURE));
+        sourcesHeaderComposite
+                .setBackground(GlobalColor.get(GlobalColor.PALE_LIGHT_AZURE));
 
         Label sourcesHeaderLbl = new Label(sourcesHeaderComposite, SWT.NONE);
-        sourcesHeaderLbl.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true,
-                false, 1, 1));
-        sourcesHeaderLbl.setBackground(GlobalColor
-                .get(GlobalColor.LIGHTER_GRAY));
+        sourcesHeaderLbl.setLayoutData(
+                new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
+        sourcesHeaderLbl
+                .setBackground(GlobalColor.get(GlobalColor.LIGHTER_GRAY));
         sourcesHeaderLbl.setAlignment(SWT.CENTER);
         sourcesHeaderLbl.setText("Sources");
 
@@ -255,8 +261,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
      */
     private void createModelSourcesMainBody() {
         modelSourcesScrolledComposite = new ScrolledComposite(
-                modelSourcesRootComposite, SWT.BORDER | SWT.H_SCROLL
-                        | SWT.V_SCROLL);
+                modelSourcesRootComposite,
+                SWT.BORDER | SWT.H_SCROLL | SWT.V_SCROLL);
         GridLayout sourcesScrolledComposite_gl = new GridLayout();
         modelSourcesScrolledComposite.setLayout(sourcesScrolledComposite_gl);
         modelSourcesScrolledComposite.setMinHeight(minimumTreeHeight);
@@ -277,9 +283,9 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
 
         modelSourcesTree = new Tree(modelSourcesScrolledComposite, SWT.BORDER
                 | SWT.H_SCROLL | SWT.V_SCROLL | SWT.MULTI | SWT.FULL_SELECTION);
-        modelSourcesTree.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true,
-                true, 1, 1));
-        modelSourcesTree.setLinesVisible(false);
+        modelSourcesTree.setLayoutData(
+                new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
+        modelSourcesTree.setLinesVisible(true);
         modelSourcesTree.setHeaderVisible(false);
 
         modelSourcesTreeViewer = new TreeViewer(modelSourcesTree);
@@ -366,8 +372,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
                             selectedData = new SelectedData(
                                     currModelSrc.getModelName(),
                                     currModelSrc.getModelId(), "Height", "GH",
-                                    "500MB", "500MB", currModelSrc.getModelId()
-                                            + "::GH::500MB");
+                                    "500MB", "500MB",
+                                    currModelSrc.getModelId() + "::GH::500MB");
 
                             catalogEntry = DataCatalogManager
                                     .getDataCatalogManager()
@@ -426,22 +432,22 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
 
         Composite modelFamiliesHeaderComposite = new Composite(
                 modelFamiliesRootComposite, SWT.BORDER);
-        modelFamiliesHeaderComposite.setLayoutData(new GridData(SWT.FILL,
-                SWT.TOP, false, false, 10, 1));
+        modelFamiliesHeaderComposite.setLayoutData(
+                new GridData(SWT.FILL, SWT.TOP, false, false, 10, 1));
         GridLayout modelFamiliesHeaderComposite_gl = new GridLayout(1, false);
         modelFamiliesHeaderComposite_gl.marginHeight = 3;
         modelFamiliesHeaderComposite_gl.marginWidth = 6;
         modelFamiliesHeaderComposite.setLayout(modelFamiliesHeaderComposite_gl);
 
-        modelFamiliesHeaderComposite.setBackground(GlobalColor
-                .get(GlobalColor.PALE_DULL_AZURE));
+        modelFamiliesHeaderComposite
+                .setBackground(GlobalColor.get(GlobalColor.PALE_LIGHT_AZURE));
 
         Label modelFamiliesHeaderLbl = new Label(modelFamiliesHeaderComposite,
                 SWT.NONE);
-        modelFamiliesHeaderLbl.setLayoutData(new GridData(SWT.FILL, SWT.CENTER,
-                true, true, 1, 1));
-        modelFamiliesHeaderLbl.setBackground(GlobalColor
-                .get(GlobalColor.LIGHTER_GRAY));
+        modelFamiliesHeaderLbl.setLayoutData(
+                new GridData(SWT.FILL, SWT.CENTER, true, true, 1, 1));
+        modelFamiliesHeaderLbl
+                .setBackground(GlobalColor.get(GlobalColor.LIGHTER_GRAY));
         modelFamiliesHeaderLbl.setAlignment(SWT.CENTER);
         modelFamiliesHeaderLbl.setText("Model Families");
 
@@ -455,7 +461,7 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
 
         createModelFamiliesTreeArea();
 
-        createElementsSetTreeArea();
+        createFieldPlanePairTreeArea();
 
     }
 
@@ -465,8 +471,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
     private void createModelFamiliesTreeArea() {
 
         modelFamiliesScrolledComposite = new ScrolledComposite(
-                modelFamiliesRootComposite, SWT.BORDER | SWT.H_SCROLL
-                        | SWT.V_SCROLL);
+                modelFamiliesRootComposite,
+                SWT.BORDER | SWT.H_SCROLL | SWT.V_SCROLL);
         GridData modelFamiliesComposite_gd = new GridData(SWT.FILL, SWT.FILL,
                 true, true, 6, 8);
 
@@ -478,13 +484,19 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
         modelFamiliesScrolledComposite.setExpandHorizontal(true);
         modelFamiliesScrolledComposite.setExpandVertical(true);
 
-        modelFamiliesTree = new Tree(modelFamiliesScrolledComposite, SWT.BORDER
-                | SWT.SINGLE);
-        modelFamiliesTree.setLayoutData(new GridData(SWT.LEFT, SWT.FILL, true,
-                true, 1, 1));
+        modelFamiliesTree = new Tree(modelFamiliesScrolledComposite,
+                SWT.BORDER | SWT.SINGLE);
+        modelFamiliesTree.setLayoutData(
+                new GridData(SWT.LEFT, SWT.FILL, true, true, 1, 1));
         modelFamiliesTree.setLinesVisible(false);
         modelFamiliesTree.setHeaderVisible(false);
 
+        /*
+         * Sometimes the request to get field/plane pairs in the call to
+         * doModelFamiliesTreeSelection takes a long time. Set the background of
+         * the selected tree item to a happy 'waiting' color. Then once the wait
+         * is over, set the background of the tree item back to normal.
+         */
         modelFamiliesTree.addSelectionListener(new SelectionListener() {
 
             @Override
@@ -517,54 +529,64 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
      * Defines the contents of the tree section of the field/plane pairs
      * component.
      */
-    private void createElementsSetTreeArea() {
+    private void createFieldPlanePairTreeArea() {
 
-        elementSetsRootComposite = new Composite(modelFamiliesRootComposite,
+        fieldPlanePairsRootComposite = new Composite(modelFamiliesRootComposite,
                 SWT.BORDER);
-        elementSetsRootComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL,
-                true, true, 4, 8));
-        elementSetsRootComposite.setBackground(GlobalColor
-                .get(GlobalColor.GRAY));
-        GridLayout elementSetsRootComposite_gl = new GridLayout(1, true);
-        elementSetsRootComposite_gl.marginHeight = 0;
-        elementSetsRootComposite_gl.marginTop = 0;
-        elementSetsRootComposite_gl.marginLeft = 0;
-        elementSetsRootComposite_gl.marginRight = 0;
-        elementSetsRootComposite_gl.marginBottom = 0;
-        elementSetsRootComposite_gl.marginWidth = 0;
-        elementSetsRootComposite.setLayout(elementSetsRootComposite_gl);
+        fieldPlanePairsRootComposite.setLayoutData(
+                new GridData(SWT.FILL, SWT.FILL, true, true, 4, 8));
+        fieldPlanePairsRootComposite
+                .setBackground(GlobalColor.get(GlobalColor.GRAY));
+        GridLayout fieldPlanePairsRootComposite_gl = new GridLayout(1, true);
+        fieldPlanePairsRootComposite_gl.marginHeight = 0;
+        fieldPlanePairsRootComposite_gl.marginTop = 0;
+        fieldPlanePairsRootComposite_gl.marginLeft = 0;
+        fieldPlanePairsRootComposite_gl.marginRight = 0;
+        fieldPlanePairsRootComposite_gl.marginBottom = 0;
+        fieldPlanePairsRootComposite_gl.marginWidth = 0;
+        fieldPlanePairsRootComposite.setLayout(fieldPlanePairsRootComposite_gl);
 
-        elementSetScrolledComposite = new ScrolledComposite(
-                elementSetsRootComposite, SWT.H_SCROLL | SWT.V_SCROLL);
-        GridData elementSetComposite_gd = new GridData(SWT.FILL, SWT.FILL,
+        fieldPlanePairScrolledComposite = new ScrolledComposite(
+                fieldPlanePairsRootComposite, SWT.H_SCROLL | SWT.V_SCROLL);
+        GridData fieldPlanePairComposite_gd = new GridData(SWT.FILL, SWT.FILL,
                 true, true, 1, 1);
-        elementSetScrolledComposite.setLayoutData(elementSetComposite_gd);
-        GridLayout elementSetScrolledComposite_gl = new GridLayout(1, true);
-        elementSetScrolledComposite_gl.marginHeight = 0;
-        elementSetScrolledComposite_gl.marginWidth = 0;
-        elementSetScrolledComposite.setLayout(elementSetScrolledComposite_gl);
-        elementSetScrolledComposite.setMinWidth(160);
-        elementSetScrolledComposite.setMinHeight(240);
+        fieldPlanePairScrolledComposite
+                .setLayoutData(fieldPlanePairComposite_gd);
+        GridLayout fieldPlanePairScrolledComposite_gl = new GridLayout(1, true);
+        fieldPlanePairScrolledComposite_gl.marginHeight = 0;
+        fieldPlanePairScrolledComposite_gl.marginWidth = 0;
+        fieldPlanePairScrolledComposite
+                .setLayout(fieldPlanePairScrolledComposite_gl);
+        fieldPlanePairScrolledComposite.setMinWidth(160);
+        fieldPlanePairScrolledComposite.setMinHeight(240);
 
-        elementSetScrolledComposite.setExpandHorizontal(true);
-        elementSetScrolledComposite.setExpandVertical(true);
+        fieldPlanePairScrolledComposite.setExpandHorizontal(true);
+        fieldPlanePairScrolledComposite.setExpandVertical(true);
 
-        elementSetTree = new Tree(elementSetScrolledComposite, SWT.BORDER
-                | SWT.MULTI | SWT.FULL_SELECTION);
-        elementSetTree.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true,
-                true, 1, 1));
-        elementSetTree.setLinesVisible(true);
-        elementSetTree.setHeaderVisible(true);
+        fieldPlanePairTree = new Tree(fieldPlanePairScrolledComposite,
+                SWT.BORDER);
+        fieldPlanePairTree.setLayoutData(
+                new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
+        fieldPlanePairTree.setLinesVisible(true);
+        fieldPlanePairTree.setHeaderVisible(false);
 
-        // genericTree.addMouseListener(new GenericTreeMouseListener());
-        elementSetTreeViewer = new TreeViewer(elementSetTree);
-        createElementSetColumns(elementSetTreeViewer);
-
-        elementSetTreeViewer
-                .setSorter(new AlphaNumericElementSetNodeTreeSorter());
-        elementSetTreeViewer
-                .setContentProvider(new ElementSetsTreeContentProvider());
-        elementSetScrolledComposite.setContent(elementSetTree);
+        fieldPlanePairTreeViewer = new TreeViewer(fieldPlanePairTree);
+        fieldPlanePairTreeViewer
+                .setSorter(new AlphaNumericFieldPlanePairNodeTreeSorter());
+        fieldPlanePairTreeViewer
+                .setContentProvider(new FieldPlanePairsTreeContentProvider());
+        fieldPlanePairScrolledComposite.setContent(fieldPlanePairTree);
+        fieldPlanePairTreeViewer
+                .addSelectionChangedListener(new ISelectionChangedListener() {
+                    @Override
+                    public void selectionChanged(
+                            final SelectionChangedEvent event) {
+                        if (!event.getSelection().isEmpty()) {
+                            fieldPlanePairTreeViewer
+                                    .setSelection(StructuredSelection.EMPTY);
+                        }
+                    }
+                });
     }
 
     /**
@@ -594,7 +616,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
      * @param modelSourceTreeViewer
      *            the tree viewer against which the columns are composed.
      */
-    private void createModelFamiliesColumns(TreeViewer modelFamiliesTreeViewer) {
+    private void createModelFamiliesColumns(
+            TreeViewer modelFamiliesTreeViewer) {
 
         ColumnLabelProvider clpn = new ModelFamilyNameColumnLabelProvider();
         TreeViewerColumn familyName = new TreeViewerColumn(
@@ -608,45 +631,6 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
     }
 
     /**
-     * Creates the column definitions for the field/plane pairs tree. There are
-     * two columns in the tree. One for a visibility icon, and the other for the
-     * field/plane pair name.
-     * 
-     * @param modelSourceTreeViewer
-     *            the tree viewer against which the columns are composed.
-     */
-    private void createElementSetColumns(TreeViewer fieldPlanePairsTreeViewer) {
-
-        ColumnLabelProvider clpd = new ElementSetDummyColumnLabelProvider();
-        TreeViewerColumn dummyColumn = new TreeViewerColumn(
-                fieldPlanePairsTreeViewer, SWT.LEFT);
-        dummyColumn.getColumn().setWidth(2);
-        dummyColumn.getColumn().setMoveable(false);
-        dummyColumn.getColumn().setAlignment(SWT.LEFT);
-        dummyColumn.setLabelProvider(clpd);
-
-        ColumnLabelProvider clpv = new ElementSetVisibilityColumnLabelProvider();
-        TreeViewerColumn visibility = new TreeViewerColumn(
-                fieldPlanePairsTreeViewer, SWT.CENTER);
-        visibility.getColumn().setWidth(24);
-        visibility.getColumn().setMoveable(false);
-        visibility.getColumn().setAlignment(SWT.CENTER);
-        visibility.getColumn().setImage(EnsembleToolImageStore.VISIBILITY_IMG);
-        visibility.setLabelProvider(clpv);
-
-        ColumnLabelProvider clpf = new ElementSetNameColumnLabelProvider();
-        TreeViewerColumn fieldPlaneName = new TreeViewerColumn(
-                fieldPlanePairsTreeViewer, SWT.LEFT);
-        fieldPlaneName.getColumn().setWidth(140);
-        fieldPlaneName.getColumn().setMoveable(false);
-        fieldPlaneName.getColumn().setResizable(true);
-        /* we only want the column header text centered, so pad with spaces */
-        fieldPlaneName.getColumn().setText("            Plane - Field ");
-        fieldPlaneName.setLabelProvider(clpf);
-
-    }
-
-    /**
      * When a model family is selected, this method fills the field/plane pairs
      * tree associated with that selected family.
      */
@@ -656,12 +640,26 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
 
             @Override
             public void run() {
-                getShell().setCursor(EnsembleToolViewer.waitCursor);
+                openBtn.setEnabled(false);
+                openBtn.setText(WAIT_ACTION);
+                getShell().setCursor(EnsembleToolViewer.getWaitCursor());
+            }
+        });
+
+        VizApp.runAsync(new Runnable() {
+
+            @Override
+            public void run() {
+
+                if (!isWidgetReady()) {
+                    return;
+                }
 
                 TreeItem[] treeItems = modelFamiliesTree.getSelection();
-                if (treeItems != null && treeItems.length > 0) {
+                if (treeItems != null && treeItems.length > 0
+                        && treeItems[0] != null && !treeItems[0].isDisposed()) {
                     if (treeItems[0].getData() instanceof ModelFamilyType) {
-                        elementSetTreeViewer.setInput(emptyElementSet);
+                        fieldPlanePairTreeViewer.setInput(emptyFieldPlanePair);
                     }
 
                     if (treeItems[0].getData() instanceof ModelFamilySubType) {
@@ -687,7 +685,9 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
                                 foundModelDef.getFamilySubType());
                     }
                 }
-                getShell().setCursor(EnsembleToolViewer.normalCursor);
+                getShell().setCursor(EnsembleToolViewer.getNormalCursor());
+                openBtn.setText(GO_ACTION);
+                openBtn.setEnabled(true);
             }
         });
     }
@@ -806,8 +806,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
             statusHandler.handle(Priority.PROBLEM, e.getLocalizedMessage(), e);
         }
 
-        currElementSet = currFamily.getFieldPlanePairs();
-        elementSetTreeViewer.setInput(currElementSet);
+        currFieldPlanePairSet = currFamily.getFieldPlanePairs();
+        fieldPlanePairTreeViewer.setInput(currFieldPlanePairSet);
 
     }
 
@@ -821,48 +821,40 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
 
         Composite modelFamiliesToolBarComposite = new Composite(
                 modelFamiliesRootComposite, SWT.BORDER);
-        modelFamiliesToolBarComposite.setLayoutData(new GridData(SWT.FILL,
-                SWT.CENTER, false, false, 4, 1));
+        modelFamiliesToolBarComposite.setLayoutData(
+                new GridData(SWT.FILL, SWT.CENTER, false, false, 4, 1));
         GridLayout modelFamiliesToolBarComposite_gl = new GridLayout(10, false);
         modelFamiliesToolBarComposite
                 .setLayout(modelFamiliesToolBarComposite_gl);
 
-        modelFamiliesToolBarComposite.setBackground(GlobalColor
-                .get(GlobalColor.GRAY));
+        modelFamiliesToolBarComposite
+                .setBackground(GlobalColor.get(GlobalColor.GRAY));
 
         Composite dummySpacer0 = new Composite(modelFamiliesToolBarComposite,
                 SWT.NONE);
         dummySpacer0.setBackground(GlobalColor.get(GlobalColor.GRAY));
         dummySpacer0.setLayout(new GridLayout());
-        dummySpacer0.setLayoutData(new GridData(SWT.LEFT, SWT.FILL, false,
-                false, 1, 1));
+        dummySpacer0.setLayoutData(
+                new GridData(SWT.LEFT, SWT.FILL, false, false, 1, 1));
 
         modelFamiliesToolBar = new ToolBar(modelFamiliesToolBarComposite,
                 SWT.BORDER_SOLID | SWT.RIGHT);
-        modelFamiliesToolBar.setLayoutData(new GridData(SWT.LEFT, SWT.FILL,
-                false, false, 4, 1));
+        modelFamiliesToolBar.setLayoutData(
+                new GridData(SWT.LEFT, SWT.FILL, false, false, 4, 1));
 
         Composite dummySpacer1 = new Composite(modelFamiliesToolBarComposite,
                 SWT.NONE);
         dummySpacer1.setBackground(GlobalColor.get(GlobalColor.GRAY));
         dummySpacer1.setLayout(new GridLayout());
-        dummySpacer1.setLayoutData(new GridData(SWT.RIGHT, SWT.FILL, true,
-                false, 5, 1));
+        dummySpacer1.setLayoutData(
+                new GridData(SWT.RIGHT, SWT.FILL, true, false, 5, 1));
 
-        newElementSetToolItem = new ToolItem(modelFamiliesToolBar, SWT.PUSH
-                | SWT.BORDER);
+        newFieldPlanePairToolItem = new ToolItem(modelFamiliesToolBar,
+                SWT.PUSH | SWT.BORDER);
 
-        newElementSetToolItem.setImage(EnsembleToolImageStore.NEW_IMG);
+        newFieldPlanePairToolItem.setImage(EnsembleToolImageStore.NEW_IMG);
 
-        newElementSetToolItem.setToolTipText("Add an element set");
-
-        newElementSetToolItem.addSelectionListener(new SelectionAdapter() {
-
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-            }
-
-        });
+        newFieldPlanePairToolItem.setToolTipText("Add an element set");
 
         new ToolItem(modelFamiliesToolBar, SWT.SEPARATOR);
         clearSelectedModelFamiliesToolItem = new ToolItem(modelFamiliesToolBar,
@@ -875,10 +867,11 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
                 .setToolTipText("Clear selected element sets");
 
         clearSelectedModelFamiliesToolItem
-                .addSelectionListener(new SelectionListener() {
+                .addSelectionListener(new SelectionAdapter() {
 
                     @Override
                     public void widgetSelected(SelectionEvent e) {
+                        // TODO reserved for future use
                     }
 
                     @Override
@@ -896,10 +889,11 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
         clearAllModelFamiliesToolItem.setToolTipText("Clear all element sets");
 
         clearAllModelFamiliesToolItem
-                .addSelectionListener(new SelectionListener() {
+                .addSelectionListener(new SelectionAdapter() {
 
                     @Override
                     public void widgetSelected(SelectionEvent e) {
+                        // TODO reserved for future use
                     }
 
                     @Override
@@ -914,8 +908,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
     /**
      * This is the content provider for the model families tree.
      */
-    private class ModelFamilyTreeContentProvider implements
-            ITreeContentProvider {
+    private class ModelFamilyTreeContentProvider
+            implements ITreeContentProvider {
 
         @Override
         public Object[] getElements(Object inputElement) {
@@ -937,8 +931,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
                     List<ModelFamilySubType> childItemsFancyList = new ArrayList<>();
                     int i = 0;
                     for (ModelFamilySubType mfst : allSubFamilies) {
-                        if (topLevelMenuName.equals(mfst.getParentType()
-                                .getName())) {
+                        if (topLevelMenuName
+                                .equals(mfst.getParentType().getName())) {
                             childItemsFancyList.add(mfst);
                             i++;
                         }
@@ -960,9 +954,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
         public Object getParent(Object element) {
 
             ModelFamilyType parent = null;
-            ModelFamilySubType child = null;
             if (element instanceof ModelFamilySubType) {
-                child = (ModelFamilySubType) element;
+                ModelFamilySubType child = (ModelFamilySubType) element;
                 parent = child.getParentType();
             }
             return parent;
@@ -986,7 +979,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
         }
 
         @Override
-        public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
+        public void inputChanged(Viewer viewer, Object oldInput,
+                Object newInput) {
             /* ignore */
         }
 
@@ -995,18 +989,18 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
     /**
      * This is the content provider for the element sets tree.
      */
-    private class ElementSetsTreeContentProvider implements
-            ITreeContentProvider {
+    private class FieldPlanePairsTreeContentProvider
+            implements ITreeContentProvider {
 
         @Override
         public Object[] getElements(Object inputElement) {
 
             FieldPlanePair[] rootTreeItems = null;
 
-            if (currElementSet == null) {
+            if (currFieldPlanePairSet == null) {
                 rootTreeItems = new FieldPlanePair[0];
             } else {
-                List<FieldPlanePair> nodes = currElementSet.getNodes();
+                List<FieldPlanePair> nodes = currFieldPlanePairSet.getNodes();
                 if (nodes != null && nodes.size() > 0) {
                     rootTreeItems = new FieldPlanePair[nodes.size()];
                     rootTreeItems = nodes.toArray(rootTreeItems);
@@ -1036,7 +1030,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
         }
 
         @Override
-        public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
+        public void inputChanged(Viewer viewer, Object oldInput,
+                Object newInput) {
             /* ignore */
         }
 
@@ -1045,8 +1040,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
     /**
      * This is the content provider for the model sources tree.
      */
-    private class ModelSourcesTreeContentProvider implements
-            ITreeContentProvider {
+    private class ModelSourcesTreeContentProvider
+            implements ITreeContentProvider {
 
         @Override
         public Object[] getElements(Object inputElement) {
@@ -1092,7 +1087,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
         }
 
         @Override
-        public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
+        public void inputChanged(Viewer viewer, Object oldInput,
+                Object newInput) {
             /* ignore */
         }
 
@@ -1110,11 +1106,12 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
      */
     @Override
     protected void createButtonsForButtonBar(Composite parent) {
-        loadBtn = createButton(parent, IDialogConstants.PROCEED_ID, "Load",
+        openBtn = createButton(parent, IDialogConstants.PROCEED_ID, GO_ACTION,
                 false);
-        closeBtn = createButton(parent, IDialogConstants.OK_ID, "Close", false);
+        closeBtn = createButton(parent, IDialogConstants.OK_ID, CLOSE_ACTION,
+                false);
         final Composite rootComposite = modelFamiliesRootComposite;
-        loadBtn.addSelectionListener(new SelectionListener() {
+        openBtn.addSelectionListener(new SelectionListener() {
 
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -1124,7 +1121,7 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
                 if (sourceItems.length < 2) {
                     MessageDialog.open(MessageDialog.INFORMATION,
                             rootComposite.getShell(), "Select a Source",
-                            "You must select two or more sources to load.",
+                            "You must select two or more sources to be a family.",
                             SWT.NONE);
 
                 } else {
@@ -1134,8 +1131,7 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
                         MessageDialog.open(MessageDialog.INFORMATION,
                                 rootComposite.getShell(),
                                 "Select a Model Family",
-                                "You must select one model family to load.",
-                                SWT.NONE);
+                                "You must select a model family.", SWT.NONE);
                     } else {
                         TreeItem ti = selectedFamily[0];
                         if (ti.getData() instanceof ModelFamilySubType) {
@@ -1169,8 +1165,14 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
 
         });
 
-        loadBtn.setEnabled(true);
+        openBtn.setEnabled(true);
         closeBtn.setEnabled(true);
+    }
+
+    @Override
+    public int open() {
+        currFieldPlanePairSet = null;
+        return super.open();
     }
 
     /**
@@ -1183,15 +1185,24 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
     }
 
     public IDataCatalog getDataCatalog(IDataCatalogEntry catalogEntry) {
-        return DataCatalogManager.getDataCatalogManager().getDataCatalog(
-                catalogEntry.getSelectedData());
+        return DataCatalogManager.getDataCatalogManager()
+                .getDataCatalog(catalogEntry.getSelectedData());
+    }
+
+    private boolean isWidgetReady() {
+        boolean isReady = true;
+        if (modelSourcesTree == null || modelSourcesTreeViewer == null
+                || modelSourcesTree.isDisposed()) {
+            isReady = false;
+        }
+        return isReady;
     }
 
     /**
      * This class controls how items are displayed in the model sources tree.
      */
-    private class ModelSourcesNameColumnLabelProvider extends
-            ColumnLabelProvider {
+    private class ModelSourcesNameColumnLabelProvider
+            extends ColumnLabelProvider {
 
         public Font getFont(Object element) {
 
@@ -1220,13 +1231,12 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
     /**
      * Here's how we control what model family names are displayed in the tree.
      */
-    private class ModelFamilyNameColumnLabelProvider extends
-            ColumnLabelProvider {
+    private class ModelFamilyNameColumnLabelProvider
+            extends ColumnLabelProvider {
 
         public Font getFont(Object element) {
 
-            Font f = null;
-            f = SWTResourceManager.getFont("dialog", 11, SWT.NONE);
+            Font f = SWTResourceManager.getFont("dialog", 11, SWT.NONE);
             return f;
         }
 
@@ -1246,78 +1256,6 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
             return retval;
         }
 
-    }
-
-    /**
-     * This class is needed give a *dummy* first (i.e. left-most) column the
-     * element set tree. This cosmetically pads the tree so subsequent columns
-     * don't look so squashed.
-     */
-    private class ElementSetDummyColumnLabelProvider extends
-            ColumnLabelProvider {
-
-        public Font getFont(Object element) {
-            return null;
-        }
-
-        public Image getImage(Object element) {
-            return null;
-        }
-
-        public String getText(Object element) {
-            return " ";
-        }
-    }
-
-    /**
-     * Here's how we control the visibility column of the element set tree. If
-     * the model has a default of making the element (field/plane pair) visible
-     * then this class will place a dot image in the row entry.
-     */
-    private class ElementSetVisibilityColumnLabelProvider extends
-            ColumnLabelProvider {
-
-        public Font getFont(Object element) {
-            return null;
-        }
-
-        public Image getImage(Object element) {
-            Image image = null;
-            FieldPlanePair currItem = (FieldPlanePair) element;
-            if (currItem.isVisible()) {
-                image = EnsembleToolImageStore.DOT_IMG;
-            }
-            return image;
-        }
-
-        public String getText(Object element) {
-            return null;
-        }
-    }
-
-    /**
-     * Here's how we control the name of the field/plane pairs displayed in the
-     * element set tree.
-     */
-    private class ElementSetNameColumnLabelProvider extends ColumnLabelProvider {
-
-        public Font getFont(Object element) {
-
-            Font f = null;
-            f = SWTResourceManager.getFont("courier new", 10, SWT.NONE);
-            return f;
-        }
-
-        public Image getImage(Object element) {
-
-            return null;
-        }
-
-        public String getText(Object element) {
-            FieldPlanePair currItem = (FieldPlanePair) element;
-            /* Pad with a space or two so we text isn't too close to edge */
-            return " " + currItem.toString();
-        }
     }
 
     /**
@@ -1358,7 +1296,8 @@ public class ModelFamilyDialog extends CaveJFACEDialog {
      * Sorts the element set tree in alphabetcal order by field/plane pair name.
      * 
      */
-    private class AlphaNumericElementSetNodeTreeSorter extends ViewerSorter {
+    private class AlphaNumericFieldPlanePairNodeTreeSorter
+            extends ViewerSorter {
 
         public int compare(Viewer v, Object av1, Object av2) {
 

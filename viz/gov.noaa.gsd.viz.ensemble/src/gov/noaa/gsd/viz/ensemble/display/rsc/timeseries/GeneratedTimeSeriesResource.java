@@ -1,7 +1,5 @@
 package gov.noaa.gsd.viz.ensemble.display.rsc.timeseries;
 
-import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
-
 import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,7 +33,8 @@ import com.raytheon.uf.viz.xy.timeseries.adapter.AbstractTimeSeriesAdapter;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.core.graphing.util.GraphPrefsFactory;
 import com.raytheon.viz.core.graphing.xy.XYData;
-import com.raytheon.uf.viz.core.rsc.groups.ICombinedResourceData.CombineOperation;
+import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
+
 
 /**
  * Uses cached data and parameters of loaded members in the time series display,
@@ -60,7 +59,7 @@ import com.raytheon.uf.viz.core.rsc.groups.ICombinedResourceData.CombineOperatio
  * Feb, 2014     5056       jing       Initial creation
  * 
  * 
- * </pre>
+ *          </pre>
  */
 public class GeneratedTimeSeriesResource<T extends AbstractResourceData>
         extends TimeSeriesResource {
@@ -212,8 +211,8 @@ public class GeneratedTimeSeriesResource<T extends AbstractResourceData>
             // GribTimeSeriesAdapter to be GridRecords
             String message = "Unexpected PluginDataObject type; got "
                     + pdo.getClass().getName() + " expected GridRecord";
-            statusHandler.handle(Priority.PROBLEM, message, new Exception(
-                    message));
+            statusHandler.handle(Priority.PROBLEM, message,
+                    new Exception(message));
         }
 
         // Added interface to TimeSeriesResource solution
@@ -236,7 +235,8 @@ public class GeneratedTimeSeriesResource<T extends AbstractResourceData>
                 level.setValue(preferredLevel.getLevelonevalue());
                 prefs = GraphPrefsFactory.buildPreferences(
                         ((GeneratedTimeSeriesResourceData) resourceData)
-                                .getYParameter().code, level);
+                                .getYParameter().code,
+                        level);
 
             } catch (StyleException e) {
                 throw new VizException(e);
@@ -294,15 +294,15 @@ public class GeneratedTimeSeriesResource<T extends AbstractResourceData>
             // Make legend for point data
             StringBuilder sb = new StringBuilder(String.format(
                     "%s %s pt%s %s%s %s%s", source, resourceData.getLevelKey(),
-                    resourceData.getPointLetter(), lat, y >= 0 ? "N" : "S",
-                    lat, y >= 0 ? "N" : "S", lon, x >= 0 ? "E" : "W"));
+                    resourceData.getPointLetter(), lat, y >= 0 ? "N" : "S", lat,
+                    y >= 0 ? "N" : "S", lon, x >= 0 ? "E" : "W"));
 
             if (stnID != null) {
                 sb.append(" ").append(stnID);
             }
             sb.append(String.format(" %s %s %s", parameterName, "TSer",
-                    units != null && units.equals("") == false ? "(" + units
-                            + ")" : ""));
+                    units != null && units.equals("") == false
+                            ? "(" + units + ")" : ""));
             resultingName = sb.toString();
         }
 

@@ -1,7 +1,5 @@
 package gov.noaa.gsd.viz.ensemble.control;
 
-import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,6 +17,8 @@ import com.raytheon.uf.viz.core.rsc.ResourceList.AddListener;
 import com.raytheon.uf.viz.core.rsc.ResourceList.RemoveListener;
 import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
 import com.raytheon.viz.ui.perspectives.IRenderableDisplayCustomizer;
+
+import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 
 /**
  * The ensemble tool renderable display customizer classes contain the event
@@ -45,8 +45,8 @@ import com.raytheon.viz.ui.perspectives.IRenderableDisplayCustomizer;
  * @author jing
  * @version 1.0
  */
-public class EnsembleToolDisplayCustomizer implements
-        IRenderableDisplayCustomizer {
+public class EnsembleToolDisplayCustomizer
+        implements IRenderableDisplayCustomizer {
 
     private final transient IUFStatusHandler statusHandler = UFStatus
             .getHandler(EnsembleToolDisplayCustomizer.class);
@@ -99,8 +99,8 @@ public class EnsembleToolDisplayCustomizer implements
         }
     }
 
-    private static class EnsembleToolRscLoadListener implements AddListener,
-            RemoveListener, IInitListener {
+    private static class EnsembleToolRscLoadListener
+            implements AddListener, RemoveListener, IInitListener {
 
         // the display we are listening to
         private final IRenderableDisplay display;
@@ -144,11 +144,12 @@ public class EnsembleToolDisplayCustomizer implements
         @Override
         public void notifyAdd(ResourcePair rp) throws VizException {
 
-            EnsembleToolLayer toolLayer = EnsembleResourceManager
+            EnsembleToolLayer toolLayer = EnsembleTool
                     .getToolLayer(rp.getResource());
             if (toolLayer != null && toolLayer.isEditable()) {
 
-                if ((rp.getResource().hasCapability(EditableCapability.class) == true)
+                if ((rp.getResource()
+                        .hasCapability(EditableCapability.class) == true)
                         && (!(rp.getResource() instanceof EnsembleToolLayer))) {
                     EnsembleTool.getInstance().setForeignEditableToolLoading();
                 }
@@ -160,13 +161,14 @@ public class EnsembleToolDisplayCustomizer implements
                      * TODO: This needs to be controlled/vetted by the tool
                      * layer
                      */
-                    if (toolLayer.getToolMode() == EnsembleTool.EnsembleToolMode.MATRIX) {
+                    if (toolLayer
+                            .getToolMode() == EnsembleTool.EnsembleToolMode.MATRIX) {
                         rsc.getProperties().setVisible(false);
                     }
 
                     rsc.registerListener(this);
                     if (rsc.getStatus() == ResourceStatus.INITIALIZED) {
-                        EnsembleResourceManager.getInstance()
+                        EnsembleResourceIngester.getInstance()
                                 .addResourceForRegistration(rsc);
                     }
                 }
@@ -183,7 +185,7 @@ public class EnsembleToolDisplayCustomizer implements
         @Override
         public synchronized void inited(AbstractVizResource<?, ?> rsc) {
             if (rsc != null) {
-                EnsembleResourceManager.getInstance()
+                EnsembleResourceIngester.getInstance()
                         .addResourceForRegistration(rsc);
             }
         }

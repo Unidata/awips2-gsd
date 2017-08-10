@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Ensemble-Tool
 Bundle-SymbolicName: gov.noaa.gsd.viz.ensemble; singleton:=true
-Bundle-Version: 2.16.1.1
+Bundle-Version: 4.17.3.1
 Bundle-Vendor: NOAA-ESL-GSD
 Eclipse-RegisterBuddy: com.raytheon.uf.viz.core.rsc
 Require-Bundle: org.eclipse.ui;bundle-version="3.8.2",
@@ -35,6 +35,7 @@ Require-Bundle: org.eclipse.ui;bundle-version="3.8.2",
 Bundle-RequiredExecutionEnvironment: JavaSE-1.7
 Bundle-ActivationPolicy: lazy
 Export-Package: gov.noaa.gsd.viz.ensemble.display.control.load,
+ gov.noaa.gsd.viz.ensemble.display.rsc.timeseries,
  gov.noaa.gsd.viz.ensemble.navigator.ui.layer
 Import-Package: com.raytheon.uf.viz.core.grid.rsc,
  com.raytheon.uf.viz.core.grid.rsc.data

@@ -34,7 +34,7 @@
             <with
                   variable="activeEditor">
                <instanceof
-                     value="gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.VizMatrixEditor">
+                     value="com.raytheon.uf.viz.core.maps.display.VizMapEditor">
                </instanceof>
             </with>
          </activeWhen>
@@ -53,17 +53,6 @@
          </command>
       </menuContribution>
          
-   </extension>
-
-   <extension
-         point="org.eclipse.ui.editors">
-      <editor
-            class="gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.VizMatrixEditor"
-            default="true"
-            icon="icons/delta-map.gif"  
-            id="gov.noaa.gsd.viz.ensemble.ui.map.MatrixEditor"
-            name="Matrix">
-      </editor>
    </extension>
 
    <extension
@@ -151,11 +140,26 @@
       <extension
           point="com.raytheon.uf.viz.core.classContext">
           <classContext
-            class="gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.VizMatrixEditor">
+            class="com.raytheon.uf.viz.core.maps.display.VizMapEditor">
               <contextId
                   id="gov.noaa.gsd.viz.ensemble.matrix.navigator.context">
               </contextId>
           </classContext>
    </extension>
+      <extension
+            point="com.raytheon.viz.ui.contextualMenu">
+         <contextualMenu
+               actionClass="gov.noaa.gsd.viz.ensemble.action.ContourControlSelectionAction"
+               capabilityClass="gov.noaa.gsd.viz.ensemble.display.control.contour.ContourControlCapability"
+               name="ContourControl"
+               sortID="998">
+         </contextualMenu>
+         <contextualMenu
+               actionClass="gov.noaa.gsd.viz.ensemble.action.RemoveEnsembleToolResourceAction"
+               name="Unload"
+               sortID="999">
+         </contextualMenu>
+         
+      </extension>
 
 </plugin>

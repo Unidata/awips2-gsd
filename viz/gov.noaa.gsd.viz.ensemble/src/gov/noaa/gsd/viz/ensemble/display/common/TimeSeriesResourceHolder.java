@@ -1,13 +1,13 @@
 package gov.noaa.gsd.viz.ensemble.display.common;
 
-import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
-import gov.noaa.gsd.viz.ensemble.util.Utilities;
-
 import com.raytheon.uf.common.style.level.SingleLevel;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.d2d.xy.adapters.timeseries.GridTimeSeriesAdapter;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.vividsolutions.jts.geom.Coordinate;
+
+import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
+import gov.noaa.gsd.viz.ensemble.util.Utilities;
 
 /**
  * Concrete resolution of accessors of time series resource attributes.
@@ -19,6 +19,7 @@ import com.vividsolutions.jts.geom.Coordinate;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Nov 17, 2014   5056      polster     Initial creation
+ * May 01, 2017  26745      polster     Initial Creation.
  * 
  * </pre>
  * 
@@ -31,10 +32,9 @@ public class TimeSeriesResourceHolder extends AbstractResourceHolder {
 
     TimeSeriesResource currRsc = null;
 
-    protected TimeSeriesResourceHolder(AbstractVizResource<?, ?> rsc,
-            boolean isSelected) {
+    protected TimeSeriesResourceHolder(AbstractVizResource<?, ?> rsc) {
 
-        super(rsc, isSelected);
+        super(rsc);
         currRsc = (TimeSeriesResource) rsc;
     }
 
@@ -60,9 +60,10 @@ public class TimeSeriesResourceHolder extends AbstractResourceHolder {
             Coordinate c = currRsc.getResourceData().getCoordinate();
             String ns = c.y >= 0 ? "N" : "S";
             String ew = c.x >= 0 ? "E" : "W";
-            latlon = String.format("Point %s: %d%s %d%s", currRsc
-                    .getResourceData().getPointLetter(), Math.round(Math
-                    .abs(c.y)), ns, Math.round(Math.abs(c.x)), ew);
+            latlon = String.format("Point %s: %d%s %d%s",
+                    currRsc.getResourceData().getPointLetter(),
+                    Math.round(Math.abs(c.y)), ns, Math.round(Math.abs(c.x)),
+                    ew);
         }
 
         return latlon;
@@ -134,14 +135,15 @@ public class TimeSeriesResourceHolder extends AbstractResourceHolder {
                         .getAdapter();
                 if (((adapter) != null)
                         && (((adapter).getArbitraryRecord()) != null)
-                        && (((adapter).getArbitraryRecord().getInfo()) != null)) {
+                        && (((adapter).getArbitraryRecord()
+                                .getInfo()) != null)) {
 
                     ensId = adapter.getArbitraryRecord().getInfo()
                             .getEnsembleId();
 
                     if ((getModel() != null)
-                            && ((ensId != null && ensId.length() > 0) && (getModel()
-                                    .indexOf("SREF") >= 0))) {
+                            && ((ensId != null && ensId.length() > 0)
+                                    && (getModel().indexOf("SREF") >= 0))) {
                         ensId = srefPerturbationPrettyfied(ensId);
                     }
                 }
@@ -173,9 +175,9 @@ public class TimeSeriesResourceHolder extends AbstractResourceHolder {
     public String getGroupName() {
 
         String sb = String.format("%s %s %s %s %s", getModel(), getLevel(),
-                getParameter(), getLocation(), getUnits() != null
-                        && getUnits().equals("") == false ? "(" + getUnits()
-                        + ")" : "");
+                getParameter(), getLocation(),
+                getUnits() != null && getUnits().equals("") == false
+                        ? "(" + getUnits() + ")" : "");
         String nodeLabel = Utilities.removeExtraSpaces(sb.toString());
         return nodeLabel;
 
@@ -183,17 +185,12 @@ public class TimeSeriesResourceHolder extends AbstractResourceHolder {
 
     @Override
     public String getGeneralName() {
-        String sb = String
-                .format("%s %s %s %s %s",
-                        getModel(),
-                        getLevel(),
-                        getParameter(),
-                        getUnits() != null && getUnits().equals("") == false ? "("
-                                + getUnits() + ")"
-                                : "",
-                        getEnsembleId() != null
-                                && getEnsembleId().equals("") == false ? getEnsembleId()
-                                : "");
+        String sb = String.format("%s %s %s %s %s", getModel(), getLevel(),
+                getParameter(),
+                getUnits() != null && getUnits().equals("") == false
+                        ? "(" + getUnits() + ")" : "",
+                getEnsembleId() != null && getEnsembleId().equals("") == false
+                        ? getEnsembleId() : "");
         String nodeLabel = Utilities.removeExtraSpaces(sb.toString());
         return nodeLabel;
     }
@@ -201,18 +198,12 @@ public class TimeSeriesResourceHolder extends AbstractResourceHolder {
     @Override
     public String getSpecificName() {
 
-        String sb = String
-                .format("%s %s %s %s %s %s",
-                        getModel(),
-                        getLevel(),
-                        getParameter(),
-                        getLocation(),
-                        getUnits() != null && getUnits().equals("") == false ? "("
-                                + getUnits() + ")"
-                                : "",
-                        getEnsembleId() != null
-                                && getEnsembleId().equals("") == false ? getEnsembleId()
-                                : "");
+        String sb = String.format("%s %s %s %s %s %s", getModel(), getLevel(),
+                getParameter(), getLocation(),
+                getUnits() != null && getUnits().equals("") == false
+                        ? "(" + getUnits() + ")" : "",
+                getEnsembleId() != null && getEnsembleId().equals("") == false
+                        ? getEnsembleId() : "");
         String nodeLabel = Utilities.removeExtraSpaces(sb.toString());
         return nodeLabel;
     }
@@ -239,6 +230,21 @@ public class TimeSeriesResourceHolder extends AbstractResourceHolder {
 
     @Override
     public boolean requiresLoadCheck() {
+        return false;
+    }
+
+    @Override
+    public boolean isEnsembleGroup() {
+        return false;
+    }
+
+    @Override
+    public AbstractResourceHolder[] getChildren() {
+        return null;
+    }
+
+    @Override
+    public boolean hasChildren() {
         return false;
     }
 

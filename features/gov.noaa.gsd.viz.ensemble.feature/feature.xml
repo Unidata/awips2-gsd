@@ -2,7 +2,7 @@
 <feature
       id="gov.noaa.gsd.viz.ensemble.feature"
       label="Ensemble Tool Feature"
-      version="4.16.2.2"
+      version="4.17.3.1"
       provider-name="GSD">
 
    <description url="http://www.example.com/description">
