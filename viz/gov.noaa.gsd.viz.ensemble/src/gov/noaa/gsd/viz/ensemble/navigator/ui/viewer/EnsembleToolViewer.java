@@ -69,8 +69,8 @@ import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
  * 
  * 5) Allow users to change interactivity behavior via a Preferences control.
  * 
- * 6) Allow users to display meta-information for a selected resource via an
- * Information pane.
+ * Information pane. 6) Allow users to display meta-information for a selected
+ * resource via an
  * 
  * 
  * <pre>
@@ -90,7 +90,7 @@ import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
  * Oct 12, 2016   19443      polster     Create matrix contents on first request to open
  * Mar 01, 2017   19443      polster     Fixed invalid thread access problem on cursor change
  * Mar 01, 2017   19443      polster     Fixed clear of Matrix navigator problem.
- * 
+ * Dec 01, 2017   41520      polster     Added update matrix controls when view is refreshed
  * 
  * </pre>
  * 
@@ -435,6 +435,10 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
         super.dispose();
 
+        if (ensembleToolBar != null) {
+            ensembleToolBar.dispose();
+        }
+
         EnsembleToolViewer.setDisposing(true);
 
         if (legendBrowser != null) {
@@ -556,6 +560,7 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
                     } else if (mode == EnsembleToolMode.MATRIX) {
                         if (matrixNavigator != null) {
                             mainToolsTabFolder.setSelection(itemMatrixTabItem);
+                            matrixNavigator.updateControls();
                         }
                     }
                 }
@@ -613,8 +618,10 @@ public class EnsembleToolViewer extends ViewPart implements ISaveablePart2 {
 
     /* Fixed in association with AWIPS2_GSD repository Issue #29204 */
     public void resetMatrixNavigator() {
-        matrixNavigator.dispose();
-        matrixNavigator = null;
+        if (matrixNavigator != null) {
+            matrixNavigator.dispose();
+            matrixNavigator = null;
+        }
     }
 
     public static Color getEnabledForegroundColor() {

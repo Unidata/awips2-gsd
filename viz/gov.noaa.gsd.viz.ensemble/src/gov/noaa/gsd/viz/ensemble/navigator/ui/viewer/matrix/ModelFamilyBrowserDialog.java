@@ -63,6 +63,7 @@ import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
  * ------------ ---------- ----------- --------------------------
  * Oct 08, 2015  12371      polster     Initial creation
  * Nov 19, 2016  19443      polster     Change from loader to activator
+ * Dec 01, 2017  41520      polster     Class name ModelSources changed to ModelSourceKind
  * 
  * </pre>
  * 
@@ -138,7 +139,7 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
 
     private IModelFamilyListener familyLoadListener = null;
 
-    private List<ModelSources> notAvailableOnServer = null;
+    private List<ModelSourceKind> notAvailableOnServer = null;
 
     /**
      * Data Catalog Entry
@@ -343,16 +344,16 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
                     }
                 }
 
-                List<ModelSources> relevantModelSources = ModelFamilyDefinitions
+                List<ModelSourceKind> relevantModelSources = ModelFamilyDefinitions
                         .getModelSources(foundModelDef.getFamilyType(),
                                 foundModelDef.getFamilySubType());
 
                 SelectedData selectedData = null;
-                ModelSources currModelSrc = null;
+                ModelSourceKind currModelSrc = null;
                 treeItems = modelSourcesTree.getItems();
                 for (TreeItem ti : treeItems) {
-                    if (ti.getData() instanceof ModelSources) {
-                        currModelSrc = (ModelSources) ti.getData();
+                    if (ti.getData() instanceof ModelSourceKind) {
+                        currModelSrc = (ModelSourceKind) ti.getData();
                         if (relevantModelSources.contains(currModelSrc)) {
 
                             // Example SelectedData:
@@ -731,14 +732,14 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
                     }
                 }
 
-                List<ModelSources> relevantModelSources = ModelFamilyDefinitions
+                List<ModelSourceKind> relevantModelSources = ModelFamilyDefinitions
                         .getModelSources(foundModelDef.getFamilyType(),
                                 foundModelDef.getFamilySubType());
-                ModelSources currSrc = null;
+                ModelSourceKind currSrc = null;
                 treeItems = modelSourcesTree.getItems();
                 for (TreeItem ti : treeItems) {
-                    if (ti.getData() instanceof ModelSources) {
-                        currSrc = (ModelSources) ti.getData();
+                    if (ti.getData() instanceof ModelSourceKind) {
+                        currSrc = (ModelSourceKind) ti.getData();
                         if (notAvailableOnServer.contains(currSrc)
                                 || !relevantModelSources.contains(currSrc)) {
                             modelSourcesTree.deselect(ti);
@@ -769,14 +770,14 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
      */
     private void enableRelevantModelSources(ModelFamilyType mft,
             ModelFamilySubType mfst) {
-        List<ModelSources> relevantModelSources = ModelFamilyDefinitions
+        List<ModelSourceKind> relevantModelSources = ModelFamilyDefinitions
                 .getModelSources(mft, mfst);
-        ModelSources currSrc = null;
+        ModelSourceKind currSrc = null;
         modelSourcesTree.deselectAll();
         TreeItem[] treeItems = modelSourcesTree.getItems();
         for (TreeItem ti : treeItems) {
-            if (ti.getData() instanceof ModelSources) {
-                currSrc = (ModelSources) ti.getData();
+            if (ti.getData() instanceof ModelSourceKind) {
+                currSrc = (ModelSourceKind) ti.getData();
                 if (!notAvailableOnServer.contains(currSrc)
                         && relevantModelSources.contains(currSrc)) {
                     ti.setForeground(GlobalColor.get(GlobalColor.BLACK));
@@ -1045,30 +1046,30 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
 
         @Override
         public Object[] getElements(Object inputElement) {
-            ModelSources[] rootTreeElements = ModelSources.values();
-            List<ModelSources> onlyActiveItems = new ArrayList<>();
+            ModelSourceKind[] rootTreeElements = ModelSourceKind.values();
+            List<ModelSourceKind> onlyActiveItems = new ArrayList<>();
             int i = 0;
-            for (ModelSources modelSource : rootTreeElements) {
+            for (ModelSourceKind modelSource : rootTreeElements) {
                 if (modelSource.isActive()) {
                     onlyActiveItems.add(modelSource);
                     i++;
                 }
             }
-            ModelSources[] activeItems = null;
+            ModelSourceKind[] activeItems = null;
             if (i > 0) {
-                activeItems = new ModelSources[i];
+                activeItems = new ModelSourceKind[i];
                 for (int j = 0; j < i; j++) {
                     activeItems[j] = onlyActiveItems.get(j);
                 }
             } else {
-                activeItems = new ModelSources[0];
+                activeItems = new ModelSourceKind[0];
             }
             return activeItems;
         }
 
         @Override
         public Object[] getChildren(Object parentElement) {
-            return new ModelSources[0];
+            return new ModelSourceKind[0];
         }
 
         @Override
@@ -1116,7 +1117,7 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
             @Override
             public void widgetSelected(SelectionEvent e) {
 
-                ModelSources currSource = null;
+                ModelSourceKind currSource = null;
                 TreeItem[] sourceItems = modelSourcesTree.getSelection();
                 if (sourceItems.length < 2) {
                     MessageDialog.open(MessageDialog.INFORMATION,
@@ -1135,9 +1136,9 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
                     } else {
                         TreeItem ti = selectedFamily[0];
                         if (ti.getData() instanceof ModelFamilySubType) {
-                            List<ModelSources> sourceList = new ArrayList<>();
+                            List<ModelSourceKind> sourceList = new ArrayList<>();
                             for (TreeItem item : sourceItems) {
-                                currSource = (ModelSources) item.getData();
+                                currSource = (ModelSourceKind) item.getData();
                                 sourceList.add(currSource);
                             }
                             ResolvedModelFamily resolvedFamily = null;
@@ -1219,8 +1220,8 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
         public String getText(Object element) {
 
             String retval = null;
-            if (element instanceof ModelSources) {
-                ModelSources d = (ModelSources) element;
+            if (element instanceof ModelSourceKind) {
+                ModelSourceKind d = (ModelSourceKind) element;
                 retval = d.getModelName();
             }
             return retval;

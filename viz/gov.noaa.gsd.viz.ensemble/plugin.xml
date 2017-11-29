@@ -34,7 +34,7 @@
             <with
                   variable="activeEditor">
                <instanceof
-                     value="com.raytheon.uf.viz.core.maps.display.VizMapEditor">
+                     value="gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.VizMatrixEditor">
                </instanceof>
             </with>
          </activeWhen>
@@ -92,7 +92,7 @@
             commandId="gov.noaa.gsd.viz.ensemble.matrix.navigation.controls"
             contextId="gov.noaa.gsd.viz.ensemble.matrix.navigator.context"
             schemeId="com.raytheon.viz.ui.cave.scheme"
-            sequence="ARROW_UP">
+            sequence="ALT+ARROW_UP">
          <parameter
                id="operation"
                value="UP_MODEL_SOURCE">
@@ -102,7 +102,7 @@
             commandId="gov.noaa.gsd.viz.ensemble.matrix.navigation.controls"
             contextId="gov.noaa.gsd.viz.ensemble.matrix.navigator.context"
             schemeId="com.raytheon.viz.ui.cave.scheme"
-            sequence="ARROW_DOWN">
+            sequence="ALT+ARROW_DOWN">
          <parameter
                id="operation"
                value="DOWN_MODEL_SOURCE">
@@ -112,7 +112,7 @@
             commandId="gov.noaa.gsd.viz.ensemble.matrix.navigation.controls"
             contextId="gov.noaa.gsd.viz.ensemble.matrix.navigator.context"
             schemeId="com.raytheon.viz.ui.cave.scheme"
-            sequence="ARROW_LEFT">
+            sequence="ALT+ARROW_LEFT">
          <parameter
                id="operation"
                value="LEFT_FRAME">
@@ -122,7 +122,7 @@
             commandId="gov.noaa.gsd.viz.ensemble.matrix.navigation.controls"
             contextId="gov.noaa.gsd.viz.ensemble.matrix.navigator.context"
             schemeId="com.raytheon.viz.ui.cave.scheme"
-            sequence="ARROW_RIGHT">
+            sequence="ALT+ARROW_RIGHT">
          <parameter
                id="operation"
                value="RIGHT_FRAME">
@@ -133,18 +133,17 @@
          point="org.eclipse.ui.contexts">
       <context
             id="gov.noaa.gsd.viz.ensemble.matrix.navigator.context"
-            name="EnsembleTool_MatrixNavigator"
-            parentId="com.raytheon.viz.ui.loopContext">
+            name="EnsembleTool_MatrixNavigator">
       </context>
    </extension>
       <extension
           point="com.raytheon.uf.viz.core.classContext">
-          <classContext
-            class="com.raytheon.uf.viz.core.maps.display.VizMapEditor">
-              <contextId
+         <classContext
+               class="gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.VizMatrixEditor">
+            <contextId
                   id="gov.noaa.gsd.viz.ensemble.matrix.navigator.context">
-              </contextId>
-          </classContext>
+            </contextId>
+         </classContext>
    </extension>
       <extension
             point="com.raytheon.viz.ui.contextualMenu">
@@ -160,6 +159,24 @@
                sortID="999">
          </contextualMenu>
          
+      </extension>
+      <extension
+            point="org.eclipse.ui.editors">
+         <editor
+               class="gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.VizMatrixEditor"
+               default="false"
+               icon="icons/delta-map.gif"
+               id="gov.noaa.gsd.viz.ensemble.navigator.matrix.editor"
+               name="Matrix">
+         </editor>
+      </extension>
+      <extension
+            point="com.raytheon.uf.viz.core.descriptor">
+         <descriptor
+               class="gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.MatrixDescriptor"
+               editor="gov.noaa.gsd.viz.ensemble.navigator.matrix.editor"
+               name="MatrixDescriptor">
+         </descriptor>
       </extension>
 
 </plugin>

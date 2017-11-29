@@ -19,7 +19,8 @@ import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
  *   
  *    Date         Ticket#     Engineer    Description
  *    ------------ ----------  ----------- --------------------------
- *    Feb 23 2016    13211       polster     Initial Creation.
+ *    Feb 23 2016    13211      polster     Initial creation
+ *    Dec 01, 2017   41520      polster     Cleaned up comments
  * 
  * </pre>
  * 
@@ -28,17 +29,10 @@ import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
  */
 public class MatrixNavigationTool extends AbstractTool {
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * com.raytheon.viz.ui.tools.AbstractTool#execute(org.eclipse.core.commands
-     * .ExecutionEvent)
-     */
     @Override
     public Object execute(ExecutionEvent arg0) throws ExecutionException {
-
         this.editor = EditorUtil.getActiveVizContainer();
+
         if (editor != null && EnsembleTool.isMatrixEditor(editor)) {
 
             String operationStr = arg0.getParameter("operation");
@@ -48,7 +42,6 @@ public class MatrixNavigationTool extends AbstractTool {
             EnsembleTool.getInstance().matrixNavigationRequest(operation);
 
             editor.refresh();
-
 
         }
 

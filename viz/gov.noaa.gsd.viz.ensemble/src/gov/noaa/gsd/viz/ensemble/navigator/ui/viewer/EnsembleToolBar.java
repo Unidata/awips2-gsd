@@ -58,6 +58,7 @@ import gov.noaa.gsd.viz.ensemble.util.EnsembleToolImageStore;
  * Dec 29, 2016   19325      jing        Added image items in the calculation menu
  * Mar 01, 2017   19443      polster     Fixed toggle editability problem
  * Jun 01, 2017   19443      polster     Switched to using Eclipse contribution/actions
+ * Dec 01, 2017   41520      polster     Added test for isDisposed
  * 
  * </pre>
  * 
@@ -135,7 +136,9 @@ public class EnsembleToolBar extends Composite
         /*
          * TODO: Need the menu changes to refresh immediately.
          */
-        getParent().redraw();
+        if (!getParent().isDisposed()) {
+            getParent().redraw();
+        }
     }
 
     public void setEnabled(boolean isEnabled) {

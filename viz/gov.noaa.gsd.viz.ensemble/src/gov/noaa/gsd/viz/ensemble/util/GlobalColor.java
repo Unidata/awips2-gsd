@@ -33,6 +33,7 @@ public enum GlobalColor {
     CERULEAN(new RGB(29, 172, 214), true), //
     CHERRY_RED(new RGB(255, 0, 31), true), //
     DARKER_GRAY(new RGB(130, 130, 130), false), //
+    DARKISH_GRAY(new RGB(160, 160, 160), false), //
     DEEP_BLUE(new RGB(3, 2, 255), false), //
     GRAY(new RGB(190, 190, 190), false), //
     GREEN(new RGB(0, 204, 0), false), //

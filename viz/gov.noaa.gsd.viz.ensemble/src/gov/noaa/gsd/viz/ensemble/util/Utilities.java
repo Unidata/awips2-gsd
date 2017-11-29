@@ -320,11 +320,11 @@ public class Utilities {
         return result;
     }
 
-    public static void dumpStackTrace(int traceCount) {
+    public static void dumpStackTrace(int traceCount, String header) {
 
         Exception e = new Exception();
         StackTraceElement[] traces = e.getStackTrace();
-        System.out.println("________________");
+        System.out.println(">>>>>>>>>>>>>>> " + header + " >>>>>> begin");
         int count = 0;
         for (StackTraceElement ste : traces) {
             if (ste.toString().indexOf("dumpStackTrace") >= 0) {
@@ -335,6 +335,7 @@ public class Utilities {
             if (count == traceCount)
                 break;
         }
+        System.out.println(">>>>>>>>>>>>>>> " + header + " >>>>>> end");
         System.out.println(
                 "__________________________________________________________________");
 
