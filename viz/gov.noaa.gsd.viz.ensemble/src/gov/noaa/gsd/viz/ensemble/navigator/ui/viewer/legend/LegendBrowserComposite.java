@@ -105,8 +105,9 @@ import gov.noaa.gsd.viz.ensemble.util.Utilities;
  * Dec 29, 2016   19325      jing        Legend for an image member
  * Feb 17, 2017   19325      jing        Added ERF image capability
  * Mar 01, 2017   19443      polster     Clear all method force clears to empty map
- * Mar 17 2017    19443      jing        Resource group behavior added
+ * Mar 17  2017   19443      jing        Resource group behavior added
  * Mar 31, 2017   19598      jing        Contour control feature
+ * Jan 10, 2018   20524      polster     Fixed time series get legend name
  * 
  * </pre>
  * 
@@ -2157,6 +2158,8 @@ public class LegendBrowserComposite extends Composite {
                     if ((tsr.getEnsembleId() != null)
                             && (tsr.getEnsembleId().length() > 0)) {
                         nodeLabel = tsr.getEnsembleId();
+                    } else {
+                        nodeLabel = tsr.getSpecificName();
                     }
                 } else if (element instanceof GeneratedTimeSeriesResourceHolder) {
                     nodeLabel = gr.getSpecificName();

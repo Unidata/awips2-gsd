@@ -66,7 +66,9 @@ public class EnsembleToolImageStore {
 
     public static Image DIAGNOSTICS_IMG = null;
 
-    public static Image REMOVE_SELECTED_IMG = null;
+    public static Image CLOSE_IMG = null;
+
+    public static Image CLOSE_LIGHTENED_IMG = null;
 
     public static Image NICKNAME_IMG = null;
 
@@ -157,9 +159,14 @@ public class EnsembleToolImageStore {
                     "gov.noaa.gsd.viz.ensemble", "icons/nickname.gif");
         }
 
-        if (REMOVE_SELECTED_IMG == null) {
-            REMOVE_SELECTED_IMG = ImageResourceManager.getPluginImage(
-                    "gov.noaa.gsd.viz.ensemble", "icons/remove-selected.gif");
+        if (CLOSE_IMG == null) {
+            CLOSE_IMG = ImageResourceManager.getPluginImage(
+                    "gov.noaa.gsd.viz.ensemble", "icons/close.gif");
+        }
+
+        if (CLOSE_LIGHTENED_IMG == null) {
+            CLOSE_LIGHTENED_IMG = ImageResourceManager.getPluginImage(
+                    "gov.noaa.gsd.viz.ensemble", "icons/close-lightened.gif");
         }
 
         if (FAVORITES_IMG == null) {

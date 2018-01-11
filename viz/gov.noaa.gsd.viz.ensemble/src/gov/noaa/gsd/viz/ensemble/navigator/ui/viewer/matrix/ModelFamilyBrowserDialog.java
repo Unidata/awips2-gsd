@@ -20,6 +20,7 @@ import org.eclipse.swt.custom.ScrolledComposite;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
+import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
@@ -27,6 +28,7 @@ import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.ToolBar;
@@ -64,6 +66,7 @@ import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
  * Oct 08, 2015  12371      polster     Initial creation
  * Nov 19, 2016  19443      polster     Change from loader to activator
  * Dec 01, 2017  41520      polster     Class name ModelSources changed to ModelSourceKind
+ * Jan 10, 2018  20525      polster     Legend now displayed for model source state
  * 
  * </pre>
  * 
@@ -81,6 +84,12 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
     private static final String WAIT_ACTION = "Wait...";
 
     private static final String CLOSE_ACTION = "Close";
+
+    private static Color MODEL_SOURCE_FOUND = null;
+
+    private static Color MODEL_NOT_ON_SERVER = null;
+
+    private static Color MODEL_SOURCE_NOT_IN_FAMILY = null;
 
     private Composite rootComposite = null;
 
@@ -158,8 +167,15 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
         setShellStyle(SWT.RESIZE | SWT.APPLICATION_MODAL);
         setBlockOnOpen(true);
 
+        MODEL_SOURCE_FOUND = GlobalColor.get(GlobalColor.BLACK);
+
+        MODEL_NOT_ON_SERVER = GlobalColor.get(GlobalColor.LIGHT_RED);
+
+        MODEL_SOURCE_NOT_IN_FAMILY = GlobalColor.get(GlobalColor.MEDIUM_GRAY);
+
         familyLoadListener = esl;
         notAvailableOnServer = new ArrayList<>();
+
     }
 
     /**
@@ -275,6 +291,55 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
 
         modelSourcesScrolledComposite.setExpandHorizontal(true);
         modelSourcesScrolledComposite.setExpandVertical(true);
+
+        Group dialogLegendGrp = new Group(modelSourcesRootComposite,
+                SWT.BORDER);
+        dialogLegendGrp.setBackground(GlobalColor.get(GlobalColor.LIGHT_GRAY));
+        GridData dialogLegendComp_gd = new GridData(SWT.FILL, SWT.BOTTOM, true,
+                true, 1, 1);
+        dialogLegendGrp.setLayoutData(dialogLegendComp_gd);
+        GridLayout dialogLegendComp_gl = new GridLayout(1, true);
+        dialogLegendGrp.setLayout(dialogLegendComp_gl);
+        dialogLegendGrp.setText("Legend");
+
+        Label modelSourceNotAvailableLbl = new Label(dialogLegendGrp,
+                SWT.BORDER | SWT.CENTER);
+        modelSourceNotAvailableLbl
+                .setFont(SWTResourceManager.getFont("dialog", 10, SWT.NONE));
+        modelSourceNotAvailableLbl
+                .setBackground(GlobalColor.get(GlobalColor.WHITE));
+        modelSourceNotAvailableLbl
+                .setForeground(ModelFamilyBrowserDialog.MODEL_NOT_ON_SERVER);
+        modelSourceNotAvailableLbl.setText(" Source Not Available ");
+        GridData notAvailableLbl_gd = new GridData(SWT.FILL, SWT.FILL, true,
+                true, 1, 1);
+        modelSourceNotAvailableLbl.setLayoutData(notAvailableLbl_gd);
+
+        Label modelSourceNotInFamilyLbl = new Label(dialogLegendGrp,
+                SWT.BORDER | SWT.CENTER);
+        modelSourceNotInFamilyLbl
+                .setFont(SWTResourceManager.getFont("dialog", 10, SWT.NONE));
+        modelSourceNotInFamilyLbl
+                .setBackground(GlobalColor.get(GlobalColor.WHITE));
+        modelSourceNotInFamilyLbl.setForeground(
+                ModelFamilyBrowserDialog.MODEL_SOURCE_NOT_IN_FAMILY);
+        modelSourceNotInFamilyLbl.setText(" Source Not In Family ");
+        GridData notInFamilyLbl_gd = new GridData(SWT.FILL, SWT.FILL, true,
+                true, 1, 1);
+        modelSourceNotInFamilyLbl.setLayoutData(notInFamilyLbl_gd);
+
+        Label modelSourceFoundLbl = new Label(dialogLegendGrp,
+                SWT.BORDER | SWT.CENTER);
+        modelSourceFoundLbl
+                .setFont(SWTResourceManager.getFont("dialog", 10, SWT.NONE));
+        modelSourceFoundLbl.setBackground(GlobalColor.get(GlobalColor.WHITE));
+        modelSourceFoundLbl
+                .setForeground(ModelFamilyBrowserDialog.MODEL_SOURCE_FOUND);
+        modelSourceFoundLbl.setText(" Source Found ");
+        GridData modelSourceFoundLbl_gd = new GridData(SWT.FILL, SWT.FILL, true,
+                true, 1, 1);
+        modelSourceFoundLbl.setLayoutData(modelSourceFoundLbl_gd);
+
     }
 
     /**
@@ -780,11 +845,11 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
                 currSrc = (ModelSourceKind) ti.getData();
                 if (!notAvailableOnServer.contains(currSrc)
                         && relevantModelSources.contains(currSrc)) {
-                    ti.setForeground(GlobalColor.get(GlobalColor.BLACK));
+                    ti.setForeground(MODEL_SOURCE_FOUND);
                 } else if (notAvailableOnServer.contains(currSrc)) {
-                    ti.setForeground(GlobalColor.get(GlobalColor.LIGHT_RED));
+                    ti.setForeground(MODEL_NOT_ON_SERVER);
                 } else if (!relevantModelSources.contains(currSrc)) {
-                    ti.setForeground(GlobalColor.get(GlobalColor.MEDIUM_GRAY));
+                    ti.setForeground(MODEL_SOURCE_NOT_IN_FAMILY);
                 }
             }
         }
@@ -862,7 +927,7 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
                 SWT.PUSH | SWT.BORDER);
 
         clearSelectedModelFamiliesToolItem
-                .setImage(EnsembleToolImageStore.REMOVE_SELECTED_IMG);
+                .setImage(EnsembleToolImageStore.CLOSE_IMG);
 
         clearSelectedModelFamiliesToolItem
                 .setToolTipText("Clear selected element sets");
@@ -1107,10 +1172,12 @@ public class ModelFamilyBrowserDialog extends CaveJFACEDialog {
      */
     @Override
     protected void createButtonsForButtonBar(Composite parent) {
+
         openBtn = createButton(parent, IDialogConstants.PROCEED_ID, GO_ACTION,
                 false);
         closeBtn = createButton(parent, IDialogConstants.OK_ID, CLOSE_ACTION,
                 false);
+
         final Composite rootComposite = modelFamiliesRootComposite;
         openBtn.addSelectionListener(new SelectionListener() {
 

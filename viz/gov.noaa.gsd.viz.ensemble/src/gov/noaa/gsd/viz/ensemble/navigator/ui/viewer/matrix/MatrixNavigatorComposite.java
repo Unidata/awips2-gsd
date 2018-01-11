@@ -137,7 +137,7 @@ public class MatrixNavigatorComposite extends Composite
 
     private TreeViewer modelSourceTreeViewer = null;
 
-    private Tree modelSourceTree = null;
+    private static Tree modelSourceTree = null;
 
     private ScrolledComposite modelSourceRootContainerScrolledComp = null;
 
@@ -242,6 +242,10 @@ public class MatrixNavigatorComposite extends Composite
         }
         MatrixNavigatorComposite.isExtant = true;
         return matrixEditor;
+    }
+
+    public static boolean isEmpty() {
+        return (modelSourceTree.getItemCount() == 0);
     }
 
     public static boolean isExtant() {

@@ -15,6 +15,7 @@ import java.util.Set;
 
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.RGB;
+import org.geotools.filter.expression.ThisPropertyAccessorFactory;
 
 import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.procedures.Bundle;
@@ -30,6 +31,7 @@ import com.raytheon.uf.viz.core.procedures.Bundle;
  * ------------ ---------- ----------- --------------------------
  * Oct 08, 2014  5056       polster     Initial creation
  * Nov 19, 2016  19443      polster     Add a dump bundle method
+ * Jan 10, 2018  20525      polster     High contrast color accessor now works
  * 
  * </pre>
  * 
@@ -38,7 +40,19 @@ import com.raytheon.uf.viz.core.procedures.Bundle;
  */
 public class Utilities {
 
-    private static int lastRandom = 0;
+    private static int NEXT_HUE_POSITION = 0;
+
+    private static final int DARKER_LUMINOSITY = 50;
+
+    private static final int MEDIUM_LUMINOSITY = 63;
+
+    private static final int LIGHTER_LUMINOSITY = 77;
+
+    private static final int NUM_HUES = 20;
+
+    private static final int HUE_MAX_IN_HSL = 359;
+
+    private static final int MAX_TINGE_CHANGE_AMOUNT = 12;
 
     private Utilities() {
         super();
@@ -68,98 +82,124 @@ public class Utilities {
     }
 
     /**
-     * This method returns either a randmomly generated color or a color
-     * randomly chosen from a set of global colors.
+     * This method returns a randmomly generated color that is guaranteed to be
+     * visually (color/hue) different between calls.
      * 
      * @return RGB of the produced color
      */
-    public static RGB getRandomNiceContrastColor() {
+    synchronized public static RGB getRandomNiceContrastColor() {
+
+        HSLColor chosenColor = null;
 
         RGB niceColor = null;
 
-        /*
-         * Either randomly generate an RGB value or randomly pick an RGB value
-         * from the large list of global colors enumeration.
-         */
-        Random random = new Random();
-        int index = random.nextInt(2);
-        if (index == 0) {
+        float hue = 0.0f; // 0 - 359 always separated by roughly 20
+        float saturation = 100.0f; // always 100%
+        float luminosity = 0.0f; // 50% (darker), 63% (medium), or 70% (lighter)
 
-            /*
-             * To make sure we don't get anything close to a gray color, use
-             * different ranges for min and max for red, green, and blue, and
-             * randomly assign the ranges.
-             */
-
-            final int a_max = 255;
-            final int a_min = 220;
-
-            final int b_max = 220;
-            final int b_min = 190;
-
-            final int c_max = 190;
-            final int c_min = 145;
-
-            int red = 0;
-            int blue = 0;
-            int green = 0;
-
-            /*
-             * Don't allow the same random number (i.e. from 0 - 5) to be used
-             * in consecutive calls which gives a greater chance of not getting
-             * similar colors on back-to-back calls.
-             */
-            int r = random.nextInt(6);
-            while (lastRandom == r) {
-                r = random.nextInt(6);
-            }
-            lastRandom = r;
-            switch (r) {
-            case 0:
-                red = (int) (Math.random() * (a_max - a_min) + a_min);
-                blue = (int) (Math.random() * (b_max - b_min) + b_min);
-                green = (int) (Math.random() * (c_max - c_min) + c_min);
-                break;
-            case 1:
-                red = (int) (Math.random() * (b_max - b_min) + b_min);
-                blue = (int) (Math.random() * (c_max - c_min) + c_min);
-                green = (int) (Math.random() * (a_max - a_min) + a_min);
-                break;
-            case 2:
-                red = (int) (Math.random() * (c_max - c_min) + c_min);
-                blue = (int) (Math.random() * (a_max - a_min) + a_min);
-                green = (int) (Math.random() * (b_max - b_min) + b_min);
-                break;
-            case 3:
-                red = (int) (Math.random() * (a_max - a_min) + a_min);
-                blue = (int) (Math.random() * (c_max - c_min) + c_min);
-                green = (int) (Math.random() * (b_max - b_min) + b_min);
-                break;
-            case 4:
-                red = (int) (Math.random() * (b_max - b_min) + b_min);
-                blue = (int) (Math.random() * (a_max - a_min) + a_min);
-                green = (int) (Math.random() * (c_max - c_min) + c_min);
-                break;
-            case 5:
-                red = (int) (Math.random() * (c_max - c_min) + c_min);
-                blue = (int) (Math.random() * (b_max - b_min) + b_min);
-                green = (int) (Math.random() * (a_max - a_min) + a_min);
-                break;
-            }
-
-            niceColor = new RGB(red, green, blue);
-
-        } else {
-            /*
-             * Return a random RGB between 0 and GlobalColor.size()
-             */
-            GlobalColor gcolor = null;
-            do {
-                index = random.nextInt(GlobalColor.size());
-                gcolor = GlobalColor.getAtOrdinal(index);
-            } while (gcolor.isHighContrast() == false);
-            niceColor = gcolor.getRGB();
+        switch (NEXT_HUE_POSITION) {
+        case 0:
+            hue = 0.0f;
+            break;
+        case 1:
+            hue = 28.0f;
+            break;
+        case 2:
+            hue = 85.0f;
+            break;
+        case 3:
+            hue = 145.0f;
+            break;
+        case 4:
+            hue = 205.0f;
+            break;
+        case 5:
+            hue = 270.0f;
+            break;
+        case 6:
+            hue = 335.0f;
+            break;
+        case 7:
+            hue = 60.0f;
+            break;
+        case 8:
+            hue = 120.0f;
+            break;
+        case 9:
+            hue = 180.0f;
+            break;
+        case 10:
+            hue = 240.0f;
+            break;
+        case 11:
+            hue = 300.0f;
+            break;
+        case 12:
+            hue = (float) HUE_MAX_IN_HSL;
+            break;
+        case 13:
+            hue = 36.0f;
+            break;
+        case 14:
+            hue = 142.0f;
+            break;
+        case 15:
+            hue = 208.0f;
+            break;
+        case 16:
+            hue = 256.0f;
+            break;
+        case 17:
+            hue = 286.0f;
+            break;
+        case 18:
+            hue = 322.0f;
+            break;
+        case (NUM_HUES - 1):
+            hue = 195.0f;
+            break;
         }
+
+        /*
+         * Randomize the hue +/- by some tinge factor. Increase the hue when the
+         * result isn't greater than the max hue. Otherwise decrease hue.
+         */
+        Random rn = new Random();
+        int randomHueTinger = rn.nextInt(MAX_TINGE_CHANGE_AMOUNT + 1);
+        if (hue < (HUE_MAX_IN_HSL - MAX_TINGE_CHANGE_AMOUNT)) {
+            hue += randomHueTinger;
+        } else {
+            hue -= randomHueTinger;
+        }
+
+        /*
+         * bump the index for next time into this method to guarantee different
+         * color on subsequent calls
+         */
+        NEXT_HUE_POSITION++;
+        if (NEXT_HUE_POSITION == NUM_HUES) {
+            NEXT_HUE_POSITION = 0;
+        }
+
+        int randomLuminosity = rn.nextInt(3);
+        switch (randomLuminosity) {
+        case 0:
+            luminosity = DARKER_LUMINOSITY;
+            break;
+        case 1:
+            luminosity = MEDIUM_LUMINOSITY;
+            break;
+        case 2:
+            luminosity = LIGHTER_LUMINOSITY;
+            break;
+        }
+
+        chosenColor = new HSLColor(hue, saturation, luminosity);
+
+        niceColor = new RGB(chosenColor.getRGB().getRed(),
+                chosenColor.getRGB().getGreen(),
+                chosenColor.getRGB().getBlue());
+
         return niceColor;
     }
 
