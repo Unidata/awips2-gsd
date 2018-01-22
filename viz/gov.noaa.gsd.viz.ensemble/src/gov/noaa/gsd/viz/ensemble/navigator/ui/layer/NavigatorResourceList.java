@@ -57,6 +57,7 @@ import gov.noaa.gsd.viz.ensemble.util.Utilities;
  * ------------ ---------- ----------- --------------------------
  * May 17  2017   19443     polster     Initial creation
  * Jun 27  2017   19325     jing        Added contour capability.
+ * Dec 01, 2017   41520     polster     Added find resource method
  * 
  * </pre>
  * 
@@ -135,7 +136,6 @@ public class NavigatorResourceList extends ResourceList {
                     .setSuppressingMenuItems(true);
         }
 
-        /* Change associated with repository AWIPS2_GSD Issue #29206. */
         if (rscHolder.getRsc() instanceof AbstractGridResource<?>) {
             if (((AbstractGridResource<?>) rscHolder.getRsc())
                     .getDisplayType() == DisplayType.IMAGE) {
@@ -390,6 +390,20 @@ public class NavigatorResourceList extends ResourceList {
                 members);
 
         return cowMembers;
+    }
+
+    public AbstractVizResource<?, ?> findResource(
+            AbstractVizResource<?, ?> srcRsc) {
+
+        AbstractVizResource<?, ?> foundRsc = null;
+        for (ResourcePair rp : EnsembleTool.getInstance()
+                .getActiveResourceList()) {
+            if (rp.getResource().getName().equals(srcRsc.getName())) {
+                foundRsc = rp.getResource();
+                break;
+            }
+        }
+        return foundRsc;
     }
 
     /**

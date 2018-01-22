@@ -37,7 +37,8 @@ import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
  * 
  * Date         Ticket#    Engineer          Description
  * ------------ ---------- -----------    --------------------------
- * Dec 9, 2014    5056    epolster jing      Initial creation
+ * Dec 9, 2014    5056     polster jing      Initial creation
+ * Dec 1, 2017    41520    polster           Fixed approach to ingest registration
  * 
  * </pre>
  * 
@@ -157,20 +158,17 @@ public class EnsembleToolDisplayCustomizer
                 AbstractVizResource<?, ?> rsc = rp.getResource();
                 if ((rsc != null) && (toolLayer.isResourceCompatible(rp))) {
 
-                    /**
-                     * TODO: This needs to be controlled/vetted by the tool
-                     * layer
+                    /*
+                     * TODO: Is this going to catch every resource or can one
+                     * slip through the cracks?
                      */
-                    if (toolLayer
-                            .getToolMode() == EnsembleTool.EnsembleToolMode.MATRIX) {
-                        rsc.getProperties().setVisible(false);
-                    }
-
-                    rsc.registerListener(this);
                     if (rsc.getStatus() == ResourceStatus.INITIALIZED) {
                         EnsembleResourceIngester.getInstance()
                                 .addResourceForRegistration(rsc);
+                    } else {
+                        rsc.registerListener(this);
                     }
+
                 }
             }
         }

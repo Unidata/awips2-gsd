@@ -53,6 +53,7 @@ import gov.noaa.gsd.viz.ensemble.util.RequestableResourceMetadata;
  * ------------ ---------- ----------- --------------------------
  * Jan 20, 2016   12566     polster     Initial creation
  * Nov 19, 2016  19443      polster     Refactoring for 17.1.1 release
+ * Dec 01, 2017  41520      polster     Class name ModelSources changed to ModelSourceKind
  * 
  * </pre>
  * 
@@ -72,7 +73,7 @@ public class ResolvedModelFamily extends ModelFamily {
 
     private static final int INITIAL_LOAD_COUNT = 12;
 
-    private List<ModelSources> sources = null;
+    private List<ModelSourceKind> sources = null;
 
     /*
      * For each model source, store a list of load-info nodes that contain a
@@ -80,7 +81,7 @@ public class ResolvedModelFamily extends ModelFamily {
      * only the load information necessary to load the associated (individual)
      * field plane pair.
      */
-    private Map<ModelSources, List<FPPLoadInfo>> resolvedFamilyMap = null;
+    private Map<ModelSourceKind, List<FPPLoadInfo>> resolvedFamilyMap = null;
 
     /*
      * For each Field/Plane pair, store all resources in the active editor that
@@ -89,7 +90,7 @@ public class ResolvedModelFamily extends ModelFamily {
     private Map<FieldPlanePair, Set<AbstractVizResource<?, ?>>> associatedRscMap = null;
 
     public ResolvedModelFamily(ModelFamily givenFamily,
-            List<ModelSources> givenSources) throws VizException {
+            List<ModelSourceKind> givenSources) throws VizException {
 
         // copy constructor
         super(givenFamily);
@@ -116,10 +117,10 @@ public class ResolvedModelFamily extends ModelFamily {
         /*
          * sort (ascending) by the shortest time resolution (time steps).
          */
-        Collections.sort(sources, new Comparator<ModelSources>() {
+        Collections.sort(sources, new Comparator<ModelSourceKind>() {
 
             @Override
-            public int compare(ModelSources o1, ModelSources o2) {
+            public int compare(ModelSourceKind o1, ModelSourceKind o2) {
                 DatasetInfoLookup lookup = DatasetInfoLookup.getInstance();
                 DatasetInfo info1 = lookup.getInfo(o1.getModelId());
                 DatasetInfo info2 = lookup.getInfo(o2.getModelId());
@@ -148,14 +149,14 @@ public class ResolvedModelFamily extends ModelFamily {
         return s;
     }
 
-    public List<ModelSources> getSources() {
+    public List<ModelSourceKind> getSources() {
         return sources;
     }
 
     /**
      * Get any resource that matches a model source and a field/plane pair.
      */
-    public AbstractVizResource<?, ?> getResource(ModelSources modelSource,
+    public AbstractVizResource<?, ?> getResource(ModelSourceKind modelSource,
             FieldPlanePair fpp) {
 
         AbstractVizResource<?, ?> foundRsc = null;
@@ -217,12 +218,12 @@ public class ResolvedModelFamily extends ModelFamily {
          * Walk the sources and load the parameter-supplied field/plane pair for
          * each source.
          */
-        Set<Entry<ModelSources, List<FPPLoadInfo>>> srcSet = resolvedFamilyMap
+        Set<Entry<ModelSourceKind, List<FPPLoadInfo>>> srcSet = resolvedFamilyMap
                 .entrySet();
-        Iterator<Entry<ModelSources, List<FPPLoadInfo>>> srcIter = srcSet
+        Iterator<Entry<ModelSourceKind, List<FPPLoadInfo>>> srcIter = srcSet
                 .iterator();
         while (srcIter.hasNext()) {
-            Entry<ModelSources, List<FPPLoadInfo>> currSrcEntry = srcIter
+            Entry<ModelSourceKind, List<FPPLoadInfo>> currSrcEntry = srcIter
                     .next();
             List<FPPLoadInfo> currFppLoadInfoList = currSrcEntry.getValue();
             for (FPPLoadInfo fppInfo : currFppLoadInfoList) {
@@ -249,7 +250,7 @@ public class ResolvedModelFamily extends ModelFamily {
         FPPLoadInfo fppLoadInfo = null;
         Bundle bundle = null;
         List<FPPLoadInfo> fppList = null;
-        for (ModelSources src : sources) {
+        for (ModelSourceKind src : sources) {
             modelDbId = src.getModelId();
             mfd = getCurrFamilyDefinition();
             totalPrecipValue = mfd.getTotalPrecip();

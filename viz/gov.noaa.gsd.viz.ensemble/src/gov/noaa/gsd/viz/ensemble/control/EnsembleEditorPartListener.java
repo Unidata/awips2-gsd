@@ -14,6 +14,9 @@ import com.raytheon.uf.viz.xy.timeseries.TimeSeriesEditor;
 
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolCompatibility;
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;
+import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.SwapState;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.MatrixNavigatorComposite;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.VizMatrixEditor;
 
 /**
  * This is the part listener for the editors associated with Ensemble Tool.
@@ -25,7 +28,8 @@ import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Nov 17, 2014    5056      polster     Initial creation
- * Mar 01, 2017    19443      polster     handle part opened for time series
+ * Mar 01, 2017    19443     polster     Handle part opened for time series
+ * Dec 01, 2017    41520     polster     Now supports matrix editor open/close/swapping
  * 
  * </pre>
  * 
@@ -60,7 +64,23 @@ public class EnsembleEditorPartListener implements IPartListener2 {
 
     @Override
     public void partClosed(final IWorkbenchPartReference partRef) {
-        // Needed only because the interface requires it
+
+        /*
+         * The matrix editor is closed when the entire tool is closed or when
+         * the editor is swapped out. If the latter then set the swap flag
+         * accordingly.
+         */
+        if (partRef instanceof IEditorReference) {
+            IEditorPart openedEditor = ((IEditorReference) partRef)
+                    .getEditor(false);
+            if (openedEditor instanceof VizMatrixEditor
+                    && EnsembleTool.isExtant()
+                    && MatrixNavigatorComposite.isExtant()) {
+                // MatrixNavigatorComposite.setSwappedOut(true);
+                EnsembleTool.getInstance().setSwapState(SwapState.SWAPPED_OUT);
+            }
+        }
+
     }
 
     @Override
@@ -118,7 +138,27 @@ public class EnsembleEditorPartListener implements IPartListener2 {
                     EnsembleTool.getInstance().refreshToolByActiveEditor();
                 }
             }
+            /*
+             * If the matrix editor was just opened then either it is because it
+             * was created (and not yet initialized/exant) or it is after a
+             * swap. If the latter then refresh the editor and reset the swap
+             * flag.
+             */
+            if (openedEditor instanceof VizMatrixEditor
+                    && EnsembleTool.isExtant()
+                    && MatrixNavigatorComposite.isExtant()) {
+
+                if (EnsembleTool.getInstance()
+                        .getSwapState() == SwapState.SWAPPED_OUT) {
+                    EnsembleTool.getInstance()
+                            .setSwapState(SwapState.SWAPPED_IN);
+                    EnsembleTool.getInstance().refreshToolByEditor(
+                            (IDisplayPaneContainer) openedEditor);
+                }
+            }
+
         }
+
     }
 
     @Override

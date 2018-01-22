@@ -16,13 +16,14 @@ package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Dec 20, 2016   12371     polster     Initial creation
+ * Dec 01, 2017  41520      polster     ModelSources renamed to ModelSourceKind
  * 
  * </pre>
  * 
  * @author polster
  * @version 1.0
  */
-public enum ModelSources {
+public enum ModelSourceKind {
 
     ARW_EAST("ARWmodel1", "ARW East", "HiResW-ARW-East", false), //
     ARW_WEST("ARWmodel2", "ARW West", "HiResW-ARW-West", false), //
@@ -57,7 +58,8 @@ public enum ModelSources {
 
     private boolean active = false;
 
-    ModelSources(String varName, String name, String id, boolean visibleInMenu) {
+    ModelSourceKind(String varName, String name, String id,
+            boolean visibleInMenu) {
         setVariableName(varName);
         setModelId(id);
         setModelName(name);
@@ -100,7 +102,7 @@ public enum ModelSources {
         return modelName;
     }
 
-    public boolean isSameAs(ModelSources operand) {
+    public boolean isSameAs(ModelSourceKind operand) {
         boolean isEqual = false;
         if (getModelId().equals(operand.getModelId())
                 && getModelName().equals(operand.getModelName())) {

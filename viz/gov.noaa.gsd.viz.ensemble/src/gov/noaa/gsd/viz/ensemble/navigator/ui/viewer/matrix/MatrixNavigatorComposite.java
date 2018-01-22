@@ -33,10 +33,13 @@ import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.ui.PlatformUI;
 
+import com.raytheon.uf.common.localization.IPathManager;
+import com.raytheon.uf.common.serialization.SerializationException;
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.common.status.UFStatus.Priority;
 import com.raytheon.uf.viz.core.IDisplayPane;
+import com.raytheon.uf.viz.core.IDisplayPaneContainer;
 import com.raytheon.uf.viz.core.IGraphicsTarget.LineStyle;
 import com.raytheon.uf.viz.core.VizApp;
 import com.raytheon.uf.viz.core.drawables.IDescriptor.FramesInfo;
@@ -44,7 +47,6 @@ import com.raytheon.uf.viz.core.drawables.IFrameCoordinator;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
 import com.raytheon.uf.viz.core.maps.display.VizMapEditor;
-import com.raytheon.uf.viz.core.maps.scales.MapScales.PartId;
 import com.raytheon.uf.viz.core.maps.scales.MapScalesManager;
 import com.raytheon.uf.viz.core.maps.scales.MapScalesManager.ManagedMapScale;
 import com.raytheon.uf.viz.core.procedures.Bundle;
@@ -98,6 +100,7 @@ import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
  *                                       arrives before selection event.
  * Oct 12, 2016   19443      polster     Make sure matrix editor can be swapped
  * Mar 01, 2017   19443      polster     Safer way to hide color bar
+ * Dec 01, 2017   41520      polster     Now uses actual VizMatrixEditor
  * 
  * </pre>
  * 
@@ -115,7 +118,14 @@ public class MatrixNavigatorComposite extends Composite
 
     public static final String MATRIX_EDITOR_TAB_TITLE = "Matrix";
 
+    private static final String DEFAULT_SCALES_DIR = "bundles"
+            + IPathManager.SEPARATOR + "scales";
+
+    private static final String DEFAULT_SCALES_FILE = "ET_scalesInfo.xml";
+
     private VizMapEditor matrixEditor = null;
+
+    private static boolean isExtant = false;
 
     private static ModelFamilyBrowserDialog modelFamilyDialog = null;
 
@@ -139,7 +149,7 @@ public class MatrixNavigatorComposite extends Composite
 
     private List<Image> imageCache = null;
 
-    private ModelSources lastSelectedSource = null;
+    private ModelSourceKind lastSelectedSource = null;
 
     private EnsembleToolLayer matrixToolLayer = null;
 
@@ -167,7 +177,7 @@ public class MatrixNavigatorComposite extends Composite
 
         EnsembleTool.getInstance().ignorePartActivatedEvent(true);
         try {
-            matrixEditor = (VizMapEditor) create();
+            matrixEditor = (VizMatrixEditor) create();
         } catch (Exception e) {
             throw new InstantiationException(
                     "Unable to create a Matrix Navigator editor: "
@@ -188,32 +198,23 @@ public class MatrixNavigatorComposite extends Composite
      * Create the Matrix editor which is a VizMapEditor with a unique name.
      * 
      * @return the created editor
+     * @throws SerializationException
      */
-    public AbstractEditor create() {
-        AbstractEditor editor = null;
+    public AbstractEditor create() throws SerializationException {
+        AbstractEditor matrixEditor = null;
 
-        ManagedMapScale editorScale = null;
-        for (ManagedMapScale scale : MapScalesManager.getInstance()
-                .getScales()) {
-            for (PartId partId : scale.getPartIds()) {
-                if (partId.isView() == false) {
-                    editorScale = scale;
-                }
-            }
-        }
+        MapScalesManager mgr = new MapScalesManager(DEFAULT_SCALES_DIR,
+                DEFAULT_SCALES_FILE);
+        ManagedMapScale editorScale = mgr.getScaleByName("CONUS");
 
         if (editorScale != null) {
             try {
                 Bundle b = editorScale.getScaleBundle();
-                editor = UiUtil.createEditor(VizMapEditor.EDITOR_ID,
-                        b.getDisplays());
-                /*
-                 * TODO: We don't want anything to change the editor name ...
-                 * How do we guarantee that the Matrix editor always has the
-                 * name "Matrix" ??
-                 */
 
-                editor.setPartName(MATRIX_EDITOR_TAB_TITLE);
+                matrixEditor = UiUtil.createEditor(VizMatrixEditor.EDITOR_ID,
+                        b.getDisplays());
+
+                matrixEditor.setPartName(MATRIX_EDITOR_TAB_TITLE);
             } catch (Exception e) {
                 statusHandler.handle(Priority.SIGNIFICANT,
                         "Unable to load bundle for scale " + editorScale
@@ -223,23 +224,28 @@ public class MatrixNavigatorComposite extends Composite
         } else {
             statusHandler.handle(Priority.SIGNIFICANT,
                     "Unable to find an editor based map scale");
-            editor = null;
+            matrixEditor = null;
         }
         EnsembleToolLayer toolLayer = null;
-        if (editor != null) {
+        if (matrixEditor != null) {
             try {
-                toolLayer = EnsembleTool.getInstance().createToolLayer(editor,
-                        EnsembleToolMode.MATRIX);
+                toolLayer = EnsembleTool.getInstance()
+                        .createToolLayer(matrixEditor, EnsembleToolMode.MATRIX);
             } catch (VizException e1) {
                 statusHandler.handle(Priority.SIGNIFICANT,
                         "Unable to create tool layer for Matrix Navigator", e1);
             }
             matrixToolLayer = toolLayer;
-            EnsembleTool.getInstance().setEditor(editor);
+            EnsembleTool.getInstance().setEditor(matrixEditor);
             EnsembleTool.getInstance().setHideLegendsMode();
             EnsembleTool.getInstance().refreshTool(true);
         }
-        return editor;
+        MatrixNavigatorComposite.isExtant = true;
+        return matrixEditor;
+    }
+
+    public static boolean isExtant() {
+        return isExtant;
     }
 
     /**
@@ -306,7 +312,7 @@ public class MatrixNavigatorComposite extends Composite
         modelSourceTreeViewer.setSorter(new ModelSourcesTreeSorter());
         modelSourceTreeViewer.addSelectionChangedListener(
                 new ModelSourceTreeSelectionListener());
-
+        modelSourceTree.addMouseListener(new IgnoreFocusListener());
     }
 
     /**
@@ -347,6 +353,8 @@ public class MatrixNavigatorComposite extends Composite
      */
     @Override
     public void dispose() {
+
+        MatrixNavigatorComposite.isExtant = false;
 
         for (Image img : imageCache) {
             img.dispose();
@@ -472,7 +480,7 @@ public class MatrixNavigatorComposite extends Composite
     }
 
     /**
-     * The method to reset controls and state varialbles to an initial state.
+     * The method to reset controls and state variables to an initial state.
      */
     public void clearAllResources() {
 
@@ -515,7 +523,8 @@ public class MatrixNavigatorComposite extends Composite
          * The editor will be null on initial selection if SWT sends the focus
          * event before the selection event.
          */
-        if (matrixEditor != null) {
+        if (matrixEditor != null && matrixEditor.getEditorSite() != null
+                && matrixEditor.getEditorSite().getPart() != null) {
             matrixEditor.getEditorSite().getPart().setFocus();
         }
     }
@@ -533,7 +542,7 @@ public class MatrixNavigatorComposite extends Composite
 
         public Image getImage(Object element) {
             Image image = null;
-            if (element instanceof ModelSources) {
+            if (element instanceof ModelSourceKind) {
                 image = EnsembleToolImageStore.DOT_IMG;
             }
             return image;
@@ -541,9 +550,9 @@ public class MatrixNavigatorComposite extends Composite
 
         public String getText(Object element) {
             String nodeLabel = null;
-            ModelSources src = null;
-            if (element instanceof ModelSources) {
-                src = (ModelSources) element;
+            ModelSourceKind src = null;
+            if (element instanceof ModelSourceKind) {
+                src = (ModelSourceKind) element;
                 nodeLabel = src.getModelName();
             }
             return spacerPadding + nodeLabel;
@@ -572,10 +581,10 @@ public class MatrixNavigatorComposite extends Composite
             Object[] members = null;
 
             if (currentModelFamily != null) {
-                List<ModelSources> sources = currentModelFamily.getSources();
+                List<ModelSourceKind> sources = currentModelFamily.getSources();
                 members = new Object[sources.size()];
                 int i = 0;
-                for (ModelSources src : sources) {
+                for (ModelSourceKind src : sources) {
                     members[i++] = src;
                 }
             } else {
@@ -639,7 +648,7 @@ public class MatrixNavigatorComposite extends Composite
                         || !isWidgetReady()) {
                     return;
                 }
-                if (treeItem.getData() instanceof ModelSources) {
+                if (treeItem.getData() instanceof ModelSourceKind) {
 
                     getShell().setCursor(EnsembleToolViewer.getWaitCursor());
                     List<AbstractResourceHolder> rscHolderList = EnsembleTool
@@ -647,7 +656,7 @@ public class MatrixNavigatorComposite extends Composite
 
                     if (rscHolderList != null) {
                         modelSourceTree.select(treeItem);
-                        ModelSources currSrc = (ModelSources) treeItem
+                        ModelSourceKind currSrc = (ModelSourceKind) treeItem
                                 .getData();
                         if (lastSelectedSource != null
                                 && lastSelectedSource == currSrc) {
@@ -706,7 +715,31 @@ public class MatrixNavigatorComposite extends Composite
      *            the map which contains the resources loaded into the matrix
      *            editor.
      */
-    public void refreshDisplayBySelectedSource(ModelSources selectedSrc,
+    public void updateControls() {
+
+        List<AbstractResourceHolder> rscHolderList = EnsembleTool.getInstance()
+                .getResourceList();
+        if (rscHolderList != null && !rscHolderList.isEmpty()
+                && fieldPlaneChooserControl != null
+                && !fieldPlaneChooserControl.isDisposed()) {
+            fieldPlaneChooserControl.updateControls(rscHolderList);
+        }
+
+    }
+
+    /**
+     * If the user chooses a different model source in the list, then refresh
+     * the display by hiding all existing resources displayed (i.e. of the
+     * previously selected source) and then update the display with the new
+     * model sources resources.
+     * 
+     * @param selectedSrc
+     *            the newly selected model source
+     * @param rscHolderList
+     *            the map which contains the resources loaded into the matrix
+     *            editor.
+     */
+    public void refreshDisplayBySelectedSource(ModelSourceKind selectedSrc,
             List<AbstractResourceHolder> rscHolderList) {
 
         hideAllResources(rscHolderList);
@@ -721,7 +754,7 @@ public class MatrixNavigatorComposite extends Composite
      * 
      * @param ensembleResourcesMap
      */
-    private void updateElementsBySelectedSource(final ModelSources currSrc,
+    private void updateElementsBySelectedSource(final ModelSourceKind currSrc,
             final List<AbstractResourceHolder> rscHolderList) {
 
         if (rscHolderList == null || rscHolderList.isEmpty()) {
@@ -772,7 +805,8 @@ public class MatrixNavigatorComposite extends Composite
      * Show the Elements (field/plane pairs) that are currently asserted for the
      * currently selected Source.
      */
-    private void updateChangeInElementVisibility(final ModelSources selectedSrc,
+    private void updateChangeInElementVisibility(
+            final ModelSourceKind selectedSrc,
             final FieldPlanePair changedElement) {
 
         final List<AbstractResourceHolder> rscHolderList = EnsembleTool
@@ -937,8 +971,8 @@ public class MatrixNavigatorComposite extends Composite
                     && modelSourceTree.getItems().length > 0) {
                 loadFrameCountDefault = true;
                 modelSourceTree.select(modelSourceTree.getItem(0));
-                lastSelectedSource = (ModelSources) modelSourceTree.getItem(0)
-                        .getData();
+                lastSelectedSource = (ModelSourceKind) modelSourceTree
+                        .getItem(0).getData();
             }
         }
         /*
@@ -1012,14 +1046,23 @@ public class MatrixNavigatorComposite extends Composite
         /* Refresh the display to match the change in Element visibility */
         TreeItem[] selectedItems = modelSourceTree.getSelection();
         TreeItem currItem = selectedItems[0];
-        if (currItem.getData() instanceof ModelSources) {
-            ModelSources currSrc = (ModelSources) currItem.getData();
+        if (currItem.getData() instanceof ModelSourceKind) {
+            ModelSourceKind currSrc = (ModelSourceKind) currItem.getData();
             updateChangeInElementVisibility(currSrc, e);
         }
     }
 
     @Override
-    public ModelSources getSelected() {
+    public ModelSourceKind getSelected() {
+
+        if (lastSelectedSource == null) {
+            if (isWidgetReady() && modelSourceTree.getItemCount() > 0) {
+                lastSelectedSource = (ModelSourceKind) modelSourceTree
+                        .getItem(0).getData();
+                modelSourceTree.select(modelSourceTree.getItem(0));
+            }
+        }
+
         return lastSelectedSource;
     }
 
@@ -1056,19 +1099,28 @@ public class MatrixNavigatorComposite extends Composite
 
         @Override
         public void selectionChanged(SelectionChangedEvent event) {
-            getShell().setCursor(EnsembleToolViewer.getWaitCursor());
-            TreeItem[] tis = modelSourceTree.getSelection();
 
-            if (tis != null && tis.length > 0 && tis[0] != null
-                    && !tis[0].isDisposed()
-                    && tis[0].getData() instanceof ModelSources) {
+            IDisplayPaneContainer editor = EditorUtil.getActiveVizContainer();
 
-                select(tis[0]);
+            /*
+             * This check is here as during swapping we want to make sure the
+             * editor hasn't changed out from under us.
+             */
+            if (editor != null && EnsembleTool.isMatrixEditor(editor)) {
 
+                getShell().setCursor(EnsembleToolViewer.getWaitCursor());
+                TreeItem[] tis = modelSourceTree.getSelection();
+
+                if (tis != null && tis.length > 0 && tis[0] != null
+                        && !tis[0].isDisposed()
+                        && tis[0].getData() instanceof ModelSourceKind) {
+
+                    select(tis[0]);
+
+                }
+                getShell().setCursor(EnsembleToolViewer.getNormalCursor());
+                giveEditorFocus();
             }
-            getShell().setCursor(EnsembleToolViewer.getNormalCursor());
-            giveEditorFocus();
-
         }
     }
 
@@ -1492,10 +1544,22 @@ public class MatrixNavigatorComposite extends Composite
     @Override
     public boolean isResourceInVisibleSource(AbstractVizResource<?, ?> rsc) {
         boolean isOfVisibleSource = false;
-        if (rsc.getName().contains(lastSelectedSource.getModelId())) {
-            isOfVisibleSource = true;
+        ModelSourceKind ms = getSelected();
+        if (ms != null) {
+            if (rsc.getName().contains(ms.getModelName())) {
+                isOfVisibleSource = true;
+            }
         }
         return isOfVisibleSource;
+    }
+
+    class IgnoreFocusListener extends MouseAdapter {
+
+        @Override
+        public void mouseUp(MouseEvent e) {
+            giveEditorFocus();
+        }
+
     }
 
 }

@@ -14,6 +14,7 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PlatformUI;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
+import com.raytheon.uf.common.geospatial.ReferencedCoordinate;
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.common.time.DataTime;
@@ -26,6 +27,7 @@ import com.raytheon.uf.viz.core.drawables.PaintProperties;
 import com.raytheon.uf.viz.core.drawables.PaintStatus;
 import com.raytheon.uf.viz.core.drawables.ResourcePair;
 import com.raytheon.uf.viz.core.exception.VizException;
+import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
 import com.raytheon.uf.viz.core.rsc.AbstractNameGenerator;
 import com.raytheon.uf.viz.core.rsc.AbstractRequestableResourceData;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
@@ -40,10 +42,14 @@ import com.raytheon.uf.viz.core.rsc.RenderingOrderFactory.ResourceOrder;
 import com.raytheon.uf.viz.core.rsc.ResourceList.AddListener;
 import com.raytheon.uf.viz.core.rsc.ResourceList.RemoveListener;
 import com.raytheon.uf.viz.core.rsc.ResourceProperties;
+import com.raytheon.uf.viz.core.rsc.capabilities.AbstractCapability;
+import com.raytheon.uf.viz.core.rsc.capabilities.ColorMapCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.EditableCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.GroupNamingCapability;
 import com.raytheon.uf.viz.core.rsc.capabilities.ImagingCapability;
+import com.raytheon.uf.viz.core.rsc.interrogation.InterrogateMap;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
+import com.raytheon.viz.grid.rsc.GridResourceData;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
 import com.raytheon.viz.grid.rsc.general.GridResource;
 import com.raytheon.viz.ui.input.EditableManager;
@@ -74,7 +80,7 @@ import gov.noaa.gsd.viz.ensemble.display.rsc.GeneratedEnsembleGridResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.display.rsc.timeseries.GeneratedTimeSeriesResource;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.FieldPlanePair;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.ModelSources;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.ModelSourceKind;
 import gov.noaa.gsd.viz.ensemble.util.RequestableResourceMetadata;
 
 /**
@@ -114,8 +120,10 @@ import gov.noaa.gsd.viz.ensemble.util.RequestableResourceMetadata;
  * Nov 12, 2016   19443      polster    Clean up dispose process
  * Dec 29, 2016   19325      jing       Process image items in calculation menu
  * Feb 17, 2017   19325      jing       Added ERF image capability
- * Mar 01, 2017   19443    polster      Fix clear and close behavior
+ * Mar 01, 2017   19443      polster    Fix clear and close behavior
  * Mar 17, 2017   19325      jing       Added resource group behavior
+ * Dec 01, 2017   41520      polster    Added find resource method
+ * Dec 12, 2017   41520      jing       Fixed colorbar and sampling
  * 
  * </pre>
  * 
@@ -232,10 +240,11 @@ public class EnsembleToolLayer
                     }
 
                 } else if (toolMode == EnsembleTool.EnsembleToolMode.MATRIX) {
-                    // if (resource instanceof GridResource
-                    // || resource instanceof BestResResource) {
+                    /*
+                     * TODO - This will need to be reinvestigated for future
+                     * releases
+                     */
                     isCompatible = true;
-                    // }
                 }
             }
         }
@@ -303,7 +312,7 @@ public class EnsembleToolLayer
     }
 
     public ResourcePair getResourcePair(FieldPlanePair e,
-            ModelSources modelSrc) {
+            ModelSourceKind modelSrc) {
 
         ResourcePair foundRp = null;
         String fieldAbbrev = null;
@@ -449,6 +458,8 @@ public class EnsembleToolLayer
         /*
          * Paint images first
          */
+
+        ColorMapCapability lastColorMapCapability = null;
         for (ResourcePair rp : this.getResourceList()) {
             AbstractVizResource<?, ?> resource = rp.getResource();
             if (resource.getProperties().isVisible()) {
@@ -458,12 +469,35 @@ public class EnsembleToolLayer
                     paintProps.setAlpha(resource
                             .getCapability(ImagingCapability.class).getAlpha());
                     paintStatus = resource.paint(target, newProps);
+                    /*
+                     * Remember the last ColorMapCapability, because there is
+                     * only one color bar.
+                     */
+                    if (resource.hasCapability(ColorMapCapability.class)) {
+                        lastColorMapCapability = (ColorMapCapability) (resource
+                                .getCapability(ColorMapCapability.class));
+                    }
                 }
             }
         }
 
+        /* Copy last ColorMapCapability into Ensemble Tool layer */
+        if (lastColorMapCapability != null) {
+
+            this.getCapabilities().addCapability(lastColorMapCapability);
+        } else {
+            /*
+             * Remove any ColorMapCapability since there is no visible image
+             * resource
+             */
+            if (this.getCapabilities()
+                    .hasCapability(ColorMapCapability.class)) {
+                this.getCapabilities()
+                        .removeCapability(ColorMapCapability.class);
+            }
+        }
         /*
-         * Paint non-image resources after images and maps
+         * Paint non-image resources after images
          */
         for (ResourcePair rp : this.getResourceList()) {
             AbstractVizResource<?, ?> resource = rp.getResource();
@@ -477,6 +511,45 @@ public class EnsembleToolLayer
         if (paintStatus != PaintStatus.PAINTED) {
             updatePaintStatus(paintStatus);
         }
+    }
+
+    @Override
+    public String inspect(ReferencedCoordinate coord) throws VizException {
+
+        /*
+         * Look for the top visible image and contour Resource
+         */
+        AbstractGridResource<?> rTopImage = null;
+        AbstractGridResource<?> rTopContour = null;
+        for (ResourcePair rp : this.getResourceList()) {
+            AbstractVizResource<?, ?> resource = rp.getResource();
+            if (!(resource.getResourceData() instanceof GridResourceData)
+                    || !resource.hasCapability(ImagingCapability.class)
+                    || !resource.getProperties().isVisible()) {
+                continue;
+            }
+
+            if (resource.hasCapability(ImagingCapability.class)) {
+                rTopImage = (AbstractGridResource<?>) resource;
+            } else {
+                rTopContour = (AbstractGridResource<?>) resource;
+            }
+        }
+
+        /* sample top image */
+        if (rTopImage != null) {
+            System.out.println("Hello 1!: " + rTopImage.inspect(coord));
+            return rTopImage.inspect(coord);
+            /*
+             * sample top contour or other if no image, is controlled by the
+             * resource
+             */
+        } else if (rTopContour != null) {
+            System.out.println("Hello 2!");
+            return rTopContour.inspect(coord);
+        }
+
+        return null;
 
     }
 
@@ -985,7 +1058,6 @@ public class EnsembleToolLayer
     }
 
     public NavigatorResourceList getResourceList() {
-
         return this.getResourceData().getResourceList();
     }
 
@@ -1068,4 +1140,10 @@ public class EnsembleToolLayer
     public void refresh() {
     }
 
+    public AbstractVizResource<?, ?> findResource(
+            AbstractVizResource<?, ?> srcRsc) {
+
+        return getResourceList().findResource(srcRsc);
+
+    }
 }

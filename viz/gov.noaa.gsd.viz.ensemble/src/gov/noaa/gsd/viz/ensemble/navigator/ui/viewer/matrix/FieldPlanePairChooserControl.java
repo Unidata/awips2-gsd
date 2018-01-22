@@ -2,14 +2,13 @@ package gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.eclipse.jface.action.IMenuListener;
 import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ScrolledComposite;
-import org.eclipse.swt.events.FocusAdapter;
-import org.eclipse.swt.events.FocusEvent;
 import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseListener;
@@ -38,6 +37,7 @@ import com.raytheon.uf.viz.d2d.core.map.D2DColorBarResource;
 
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.control.IResourceRegisteredListener;
+import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.ContextMenuManager;
 import gov.noaa.gsd.viz.ensemble.util.EnsembleToolImageStore;
@@ -59,6 +59,8 @@ import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
  * Nov 19, 2016  19443      polster     Refactoring for 17.1.1 release
  * Dec 19, 2016  19443      polster     added isWidgetReady methods
  * Mar 01, 2017  19443      polster     no longer remove viz resources associated with widget
+ * Dec 01, 2017  41520      polster     Method registerResource now handles correct resource
+ * Dec 01, 2017  41520      polster     Cosemtics of FPP control enhanced
  * 
  * </pre>
  * 
@@ -68,6 +70,10 @@ import gov.noaa.gsd.viz.ensemble.util.SWTResourceManager;
 
 public class FieldPlanePairChooserControl extends Composite
         implements IFieldPlanePairVisibilityChangedListener {
+
+    static public GlobalColor activeBackgroundDefaultColor = null;
+
+    static public GlobalColor inactiveBackgroundDefaultColor = null;
 
     protected static int resourceCount = 0;
 
@@ -94,6 +100,8 @@ public class FieldPlanePairChooserControl extends Composite
     private IMatrixEditorFocusProvider focusProvider = null;
 
     private EnsembleToolLayer toolLayer = null;
+
+    private FieldPlanePairControllerMouseListener transferFocusOnMouseUp = null;
 
     /**
      * Create the composite.
@@ -135,6 +143,11 @@ public class FieldPlanePairChooserControl extends Composite
      */
     private void createContents() {
 
+        transferFocusOnMouseUp = new FieldPlanePairControllerMouseListener();
+
+        activeBackgroundDefaultColor = GlobalColor.DARKER_GRAY;
+        inactiveBackgroundDefaultColor = GlobalColor.DARKISH_GRAY;
+
         setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
         setLayout(new GridLayout(1, true));
 
@@ -169,7 +182,7 @@ public class FieldPlanePairChooserControl extends Composite
         activeFieldPlanePairComposite = new Composite(
                 activeFieldPlanePairScrolledComposite, SWT.NONE);
         activeFieldPlanePairComposite
-                .setBackground(GlobalColor.get(GlobalColor.PALE_LIGHT_AZURE));
+                .setBackground(GlobalColor.get(activeBackgroundDefaultColor));
         GridData fieldPlanePairComposite_gd = new GridData(SWT.FILL, SWT.FILL,
                 true, true, 1, 1);
         activeFieldPlanePairComposite.setLayoutData(fieldPlanePairComposite_gd);
@@ -179,6 +192,10 @@ public class FieldPlanePairChooserControl extends Composite
         activeFieldPlanePairComposite.setLayout(fieldPlanePairComposite_gl);
         activeFieldPlanePairScrolledComposite
                 .setContent(activeFieldPlanePairComposite);
+
+        activeFieldPlanePairScrolledComposite
+                .addMouseListener(transferFocusOnMouseUp);
+
     }
 
     /**
@@ -207,7 +224,7 @@ public class FieldPlanePairChooserControl extends Composite
         notActiveFieldPlanePairComposite = new Composite(
                 notActiveFieldPlanePairScrolledComposite, SWT.NONE);
         notActiveFieldPlanePairComposite
-                .setBackground(GlobalColor.get(GlobalColor.LIGHTER_GRAY));
+                .setBackground(GlobalColor.get(inactiveBackgroundDefaultColor));
         GridData fieldPlanePairComposite_gd = new GridData(SWT.FILL, SWT.FILL,
                 true, true, 1, 1);
         notActiveFieldPlanePairComposite
@@ -218,6 +235,10 @@ public class FieldPlanePairChooserControl extends Composite
         notActiveFieldPlanePairComposite.setLayout(fieldPlanePairComposite_gl);
         notActiveFieldPlanePairScrolledComposite
                 .setContent(notActiveFieldPlanePairComposite);
+
+        activeFieldPlanePairScrolledComposite
+                .addMouseListener(transferFocusOnMouseUp);
+
     }
 
     @Override
@@ -368,9 +389,9 @@ public class FieldPlanePairChooserControl extends Composite
 
         if (isWidgetReady()) {
             setEditable(activeFieldPlanePairComposite, enabled,
-                    GlobalColor.PALE_LIGHT_AZURE);
+                    activeBackgroundDefaultColor);
             setEditable(notActiveFieldPlanePairComposite, enabled,
-                    GlobalColor.LIGHTER_GRAY);
+                    inactiveBackgroundDefaultColor);
         }
     }
 
@@ -387,7 +408,7 @@ public class FieldPlanePairChooserControl extends Composite
         if (enabled) {
             comp.setBackground(GlobalColor.get(background));
         } else {
-            comp.setBackground(GlobalColor.get(GlobalColor.LIGHTER_GRAY));
+            comp.setBackground(GlobalColor.get(inactiveBackgroundDefaultColor));
         }
     }
 
@@ -484,6 +505,23 @@ public class FieldPlanePairChooserControl extends Composite
 
     }
 
+    public void updateControls(List<AbstractResourceHolder> rscHolderList) {
+
+        for (AbstractResourceHolder arh : rscHolderList) {
+            for (FieldPlanePairControl fppc : getActiveFieldPlanePairControls()) {
+                Set<AbstractVizResource<?, ?>> assocRscs = modelFamilyProvider
+                        .getActiveModelFamily()
+                        .getAssociatedRscSet(fppc.getFieldPlanePair());
+                for (AbstractVizResource<?, ?> rsc : assocRscs) {
+                    if (rsc.equals(arh.getRsc())
+                            && rsc.getProperties().isVisible()) {
+                        fppc.setResourceVisibleCosmetics(true);
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * 
      * This class represents and individual field/plane pair widget control.
@@ -518,6 +556,8 @@ public class FieldPlanePairChooserControl extends Composite
 
         private Button fieldPlanePairActionBtn = null;
 
+        private Composite displayTypeRoot = null;
+
         private Button displayTypeBtn = null;
 
         private Color defaultBkgdColor = null;
@@ -545,7 +585,7 @@ public class FieldPlanePairChooserControl extends Composite
          * currently loaded model family. When users click on a
          * FieldPlanePairControl when it is in the not-yet-loaded (lower)
          * composite, it goes from being not-active to active. Active fpps are
-         * moved to the upper "load" composite and have their associated
+         * moved to the upper "loaded" composite and have their associated
          * resources loaded to the active matrix editor with visibility of the
          * resource asserted.
          */
@@ -561,6 +601,7 @@ public class FieldPlanePairChooserControl extends Composite
                 FieldPlanePairChooserControl fppcc, FieldPlanePair e,
                 IModelFamilyProvider mfp, IMatrixResourceMatcher rm,
                 IMatrixEditorFocusProvider fp) {
+
             super(parent, SWT.BORDER);
             modelFamilyProvider = mfp;
             fppController = fppcc;
@@ -592,14 +633,13 @@ public class FieldPlanePairChooserControl extends Composite
             noResourceForSourceBkgdColor = GlobalColor
                     .get(GlobalColor.MEDIUM_LIGHT_GRAY);
             inactiveBkgdColor = GlobalColor.get(GlobalColor.LIGHT_GRAY);
-            visibleBkgdColor = GlobalColor
-                    .get(GlobalColor.LIGHT_CARIBBEAN_GREEN);
-            notVisibleBkgdColor = GlobalColor.get(GlobalColor.PALE_LIGHT_BLUE);
+            visibleBkgdColor = GlobalColor.get(GlobalColor.BLACK);
+            notVisibleBkgdColor = GlobalColor.get(GlobalColor.DARKISH_GRAY);
             defaultBkgdColor = this.getBackground();
             rscVisibleBorderBkgdColor = GlobalColor
                     .get(GlobalColor.LIGHTER_YELLOW);
-            notLoadedBkgdColor = GlobalColor.get(GlobalColor.PALE_LIGHT_RED);
 
+            notLoadedBkgdColor = GlobalColor.get(GlobalColor.LIGHT_YELLOW);
             fppActiveFont = SWTResourceManager.getFont("Sans", 9, SWT.NORMAL);
             fppNotActiveFont = SWTResourceManager.getFont("Sans", 8,
                     SWT.NORMAL);
@@ -706,19 +746,41 @@ public class FieldPlanePairChooserControl extends Composite
 
         private void createContents() {
 
-            setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false, 1, 1));
+            GridData gridData = new GridData(SWT.FILL, SWT.TOP, true, false, 1,
+                    1);
+            setLayoutData(gridData);
 
-            GridLayout gridLayout = new GridLayout(5, false);
-            gridLayout.marginWidth = 4;
-            gridLayout.marginHeight = 2;
+            GridLayout gridLayout = new GridLayout(11, false);
+            gridLayout.marginWidth = 2;
+            gridLayout.marginHeight = 3;
             gridLayout.verticalSpacing = 1;
             gridLayout.horizontalSpacing = 1;
             setLayout(gridLayout);
 
-            displayTypeBtn = new Button(this, SWT.BORDER | SWT.PUSH);
-            GridData displayTypeBtn_gd = new GridData(SWT.FILL, SWT.CENTER,
-                    false, false, 1, 1);
+            displayTypeRoot = new Composite(this, SWT.BORDER);
+
+            displayTypeRoot.addMouseListener(transferFocusOnMouseUp);
+            GridData displayTypeRoot_gd = new GridData(SWT.FILL, SWT.FILL,
+                    false, false, 3, 1);
+            displayTypeRoot.setLayoutData(displayTypeRoot_gd);
+            GridLayout displayTypeRoot_gl = new GridLayout(3, false);
+            displayTypeRoot.setLayout(displayTypeRoot_gl);
+
+            Label tl0 = new Label(displayTypeRoot, SWT.NONE);
+            GridData tl0_gd = new GridData(SWT.LEFT, SWT.CENTER, false, false,
+                    1, 1);
+            tl0.setLayoutData(tl0_gd);
+
+            displayTypeBtn = new Button(displayTypeRoot, SWT.BORDER | SWT.PUSH);
+            GridData displayTypeBtn_gd = new GridData(SWT.CENTER, SWT.CENTER,
+                    true, false, 1, 1);
             displayTypeBtn.setLayoutData(displayTypeBtn_gd);
+
+            Label tl1 = new Label(displayTypeRoot, SWT.NONE);
+            GridData tl1_gd = new GridData(SWT.RIGHT, SWT.CENTER, false, false,
+                    1, 1);
+            tl1.setLayoutData(tl1_gd);
+
             if (fieldPlanePair.getDisplayType() == DisplayType.CONTOUR) {
                 displayTypeBtn.setToolTipText("Contour");
                 displayTypeBtn
@@ -746,26 +808,19 @@ public class FieldPlanePairChooserControl extends Composite
                         EnsembleToolImageStore.ELEMENT_STREAMLINE_IMG);
             }
 
-            displayTypeBtn.addFocusListener(new FocusAdapter() {
+            displayTypeBtn.addMouseListener(transferFocusOnMouseUp);
 
-                @Override
-                public void focusGained(FocusEvent e) {
-                    focusProvider.giveEditorFocus();
-                }
-
-            });
-
-            fieldPlanePairActionBtnContainer = new Composite(this, SWT.BORDER);
+            fieldPlanePairActionBtnContainer = new Composite(this, SWT.NONE);
 
             GridData fieldPlanePairActionBtnContainer_gd = new GridData(
-                    SWT.FILL, SWT.CENTER, true, false, 3, 1);
+                    SWT.FILL, SWT.FILL, true, true, 8, 1);
             fieldPlanePairActionBtnContainer
                     .setLayoutData(fieldPlanePairActionBtnContainer_gd);
-            GridLayout fieldPlanePairActionBtnContainer_gl = new GridLayout(3,
+            GridLayout fieldPlanePairActionBtnContainer_gl = new GridLayout(1,
                     false);
             fieldPlanePairActionBtnContainer_gl.horizontalSpacing = 0;
-            fieldPlanePairActionBtnContainer_gl.marginHeight = 0;
-            fieldPlanePairActionBtnContainer_gl.marginWidth = 0;
+            fieldPlanePairActionBtnContainer_gl.marginHeight = 6;
+            fieldPlanePairActionBtnContainer_gl.marginWidth = 9;
             fieldPlanePairActionBtnContainer_gl.verticalSpacing = 0;
             fieldPlanePairActionBtnContainer
                     .setLayout(fieldPlanePairActionBtnContainer_gl);
@@ -782,30 +837,20 @@ public class FieldPlanePairChooserControl extends Composite
                             /* ignore */
                         }
 
+                        /*
+                         * the call to toggleActive will transfer input focus
+                         * back to the viz matrix editor with approriate key
+                         * bindings.
+                         */
                         @Override
                         public void mouseUp(MouseEvent e) {
                             toggleActive();
                         }
                     });
 
-            fieldPlanePairActionBtnContainer
-                    .addFocusListener(new FocusAdapter() {
-
-                        @Override
-                        public void focusGained(FocusEvent e) {
-                            focusProvider.giveEditorFocus();
-                        }
-
-                    });
-
-            // left spacer
-            new Label(fieldPlanePairActionBtnContainer, SWT.NONE).setLayoutData(
-                    new GridData(SWT.LEFT, SWT.CENTER, false, false, 1, 1));
-
-            // center button
             fieldPlanePairActionBtn = new Button(
                     fieldPlanePairActionBtnContainer, SWT.NONE);
-            GridData gd_fieldPlanePairActionBtn = new GridData(SWT.CENTER,
+            GridData gd_fieldPlanePairActionBtn = new GridData(SWT.FILL,
                     SWT.FILL, true, true, 1, 1);
             fieldPlanePairActionBtn.setLayoutData(gd_fieldPlanePairActionBtn);
             fieldPlanePairActionBtn.setFont(fppNotActiveFont);
@@ -816,21 +861,9 @@ public class FieldPlanePairChooserControl extends Composite
             fieldPlanePairActionBtn.setBackground(inactiveBkgdColor);
             fieldPlanePairActionBtnContainer.setBackground(inactiveBkgdColor);
 
-            // right spacer
-            new Label(fieldPlanePairActionBtnContainer, SWT.NONE).setLayoutData(
-                    new GridData(SWT.RIGHT, SWT.CENTER, false, false, 1, 1));
-
             /* always start out as not visible */
             setResourceVisibleCosmetics(false);
 
-            fieldPlanePairActionBtn.addFocusListener(new FocusAdapter() {
-
-                @Override
-                public void focusGained(FocusEvent e) {
-                    focusProvider.giveEditorFocus();
-                }
-
-            });
             fieldPlanePairActionBtn
                     .addSelectionListener(new SelectionAdapter() {
 
@@ -902,10 +935,10 @@ public class FieldPlanePairChooserControl extends Composite
 
                     toggleOtherImagesOff(fieldPlanePair);
                 }
-                focusProvider.giveEditorFocus();
             } else {
                 makeActive(true);
             }
+            focusProvider.giveEditorFocus();
 
         }
 
@@ -1005,8 +1038,12 @@ public class FieldPlanePairChooserControl extends Composite
                             if (isWidgetReady() && rgb != null) {
                                 if (finalThis.getFieldPlanePair()
                                         .getDisplayType() != DisplayType.IMAGE) {
-                                    displayTypeBtn.setBackground(
+                                    displayTypeRoot.setBackground(
                                             SWTResourceManager.getColor(rgb));
+                                } else {
+                                    displayTypeRoot.setBackground(GlobalColor
+                                            .get(GlobalColor.DARKISH_GRAY));
+
                                 }
                             }
                         }
@@ -1038,117 +1075,102 @@ public class FieldPlanePairChooserControl extends Composite
                     @Override
                     public void run() {
 
-                        rsc.getProperties().setVisible(false);
-                        /*
-                         * Is the incoming resource an image? If so, make sure
-                         * the colorbar is visible.
-                         */
-                        if (rsc.hasCapability(ImagingCapability.class)) {
-                            List<D2DColorBarResource> colorBarList = rsc
-                                    .getDescriptor().getResourceList()
-                                    .getResourcesByTypeAsType(
-                                            D2DColorBarResource.class);
-                            /* only one color bar in any given editor. */
-                            if (!colorBarList.isEmpty()) {
-                                D2DColorBarResource cbr = colorBarList.get(0);
-                                if (!cbr.getProperties().isVisible()) {
-                                    cbr.getProperties().setVisible(true);
+                        if (getFieldPlanePair().isCompatible(rsc)) {
+
+                            rsc.getProperties().setVisible(false);
+                            /*
+                             * Is the incoming resource an image? If so, make
+                             * sure the colorbar is visible.
+                             */
+                            if (rsc.hasCapability(ImagingCapability.class)) {
+                                List<D2DColorBarResource> colorBarList = rsc
+                                        .getDescriptor().getResourceList()
+                                        .getResourcesByTypeAsType(
+                                                D2DColorBarResource.class);
+                                /* only one color bar in any given editor. */
+                                if (colorBarList != null
+                                        && !colorBarList.isEmpty()) {
+                                    D2DColorBarResource cbr = colorBarList
+                                            .get(0);
+                                    if (!cbr.getProperties().isVisible()) {
+                                        cbr.getProperties().setVisible(true);
+                                    }
                                 }
                             }
-                        }
-                        String incomingRscField = null;
-                        String incomingRscPlane = null;
-                        RequestableResourceMetadata incomingRscMetaData = null;
+                            String incomingRscField = null;
+                            String incomingRscPlane = null;
+                            RequestableResourceMetadata incomingRscMetaData = null;
 
-                        AbstractRequestableResourceData arrd = (AbstractRequestableResourceData) rsc
-                                .getResourceData();
-                        incomingRscMetaData = new RequestableResourceMetadata(
-                                arrd);
+                            AbstractRequestableResourceData arrd = (AbstractRequestableResourceData) rsc
+                                    .getResourceData();
+                            incomingRscMetaData = new RequestableResourceMetadata(
+                                    arrd);
 
-                        incomingRscField = incomingRscMetaData.getFieldAbbrev();
-                        incomingRscPlane = incomingRscMetaData.getPlane();
+                            incomingRscField = incomingRscMetaData
+                                    .getFieldAbbrev();
+                            incomingRscPlane = incomingRscMetaData.getPlane();
 
-                        if (incomingRscField == null
-                                || incomingRscField.length() == 0
-                                || incomingRscPlane == null
-                                || incomingRscField.length() == 0) {
-                            return;
-                        }
-
-                        if (incomingRscField
-                                .equals(fieldPlanePair.getFieldAbbrev())
-                                && incomingRscPlane
-                                        .equals(fieldPlanePair.getPlane())) {
-
-                            setResourceVisibleCosmetics(true);
-                            if (modelFamilyProvider
-                                    .isResourceInVisibleSource(rsc)) {
-                                rsc.getProperties().setVisible(true);
+                            if (incomingRscField == null
+                                    || incomingRscField.length() == 0
+                                    || incomingRscPlane == null
+                                    || incomingRscField.length() == 0) {
+                                return;
                             }
 
-                            /*
-                             * the incoming resource is kindred so bring it into
-                             * the fold.
-                             */
-                            modelFamilyProvider.getActiveModelFamily()
-                                    .getAssociatedRscSet(
-                                            FieldPlanePairControl.this.fieldPlanePair)
-                                    .add(rsc);
+                            if (incomingRscField
+                                    .equals(fieldPlanePair.getFieldAbbrev())
+                                    && incomingRscPlane.equals(
+                                            fieldPlanePair.getPlane())) {
 
-                            /* TODO: Save echo statement */
-                            // System.out.println(
-                            // ">>>>>>>>>> Field Plane Pair is matched to: "
-                            // + fieldPlanePair.toString()
-                            // + " with set size of: "
-                            // + modelFamilyProvider
-                            // .getActiveModelFamily()
-                            // .getAssociatedRscSet(
-                            // FieldPlanePairControl.this.fieldPlanePair)
-                            // .size());
-
-                            /*
-                             * if this incoming resource is the first resource
-                             * to be stored for this field/plane pair, then
-                             * match the controls label with the resource's
-                             * color.
-                             */
-
-                            if (modelFamilyProvider.getActiveModelFamily()
-                                    .getAssociatedRscSet(
-                                            FieldPlanePairControl.this.fieldPlanePair)
-                                    .size() == 1) {
-                                RGB rgb = null;
-                                if (rsc.hasCapability(ColorableCapability.class)
-                                        && !rsc.hasCapability(
-                                                ImagingCapability.class)) {
-                                    rgb = rsc
-                                            .getCapability(
-                                                    ColorableCapability.class)
-                                            .getColor();
-                                    displayTypeBtn.setBackground(
-                                            SWTResourceManager.getColor(rgb));
+                                if (modelFamilyProvider
+                                        .isResourceInVisibleSource(rsc)) {
+                                    /*
+                                     * only set the resources that are
+                                     * associated with the currently selected
+                                     * model source.
+                                     */
+                                    setResourceVisibleCosmetics(true);
+                                    rsc.getProperties().setVisible(true);
                                 }
+
+                                /*
+                                 * the incoming resource is kindred so bring it
+                                 * into the fold.
+                                 */
+                                modelFamilyProvider.getActiveModelFamily()
+                                        .getAssociatedRscSet(
+                                                FieldPlanePairControl.this.fieldPlanePair)
+                                        .add(rsc);
+
+                                resourceMatcher.matchDefaultProductCapability(
+                                        FieldPlanePairControl.this);
+
+                                /*
+                                 * listen for any resource state changes on our
+                                 * new resource.
+                                 */
+                                rsc.getResourceData().addChangeListener(
+                                        (IResourceDataChanged) FieldPlanePairControl.this);
+
+                                FieldPlanePairChooserControl.resourceCount++;
                             }
-
-                            resourceMatcher.matchDefaultProductCapability(
-                                    FieldPlanePairControl.this);
-
-                            /*
-                             * listen for any resource state changes on our new
-                             * resource.
-                             */
-                            rsc.getResourceData().addChangeListener(
-                                    (IResourceDataChanged) FieldPlanePairControl.this);
-
-                            rsc.issueRefresh();
-                            EnsembleTool.getInstance().refreshEditor();
-
-                            FieldPlanePairChooserControl.resourceCount++;
                         }
                     }
                 });
             }
         }
+
+    }
+
+    class FieldPlanePairControllerMouseListener extends MouseAdapter {
+
+        @Override
+        public void mouseUp(MouseEvent e) {
+            if (focusProvider != null) {
+                focusProvider.giveEditorFocus();
+            }
+        }
+
     }
 
 }

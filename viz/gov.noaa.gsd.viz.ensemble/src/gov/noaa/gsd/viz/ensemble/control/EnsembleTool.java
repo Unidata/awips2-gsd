@@ -63,13 +63,15 @@ import gov.noaa.gsd.viz.ensemble.display.calculate.Range;
 import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.EnsembleMembersHolder;
 import gov.noaa.gsd.viz.ensemble.display.common.HistogramGridResourceHolder;
+import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.EnsSamplingResource;
+import gov.noaa.gsd.viz.ensemble.display.rsc.histogram.HistogramResource;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayerData;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.IToolLayerChanged;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.EnsembleToolViewer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.GlobalPreferencesComposite;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.FieldPlanePair;
-import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.ModelSources;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.ModelSourceKind;
 import gov.noaa.gsd.viz.ensemble.util.ViewerWindowState;
 
 /**
@@ -121,6 +123,7 @@ import gov.noaa.gsd.viz.ensemble.util.ViewerWindowState;
  * Nov 19, 2016   19443    polster     Fix for swapping and other refactoring
  * Mar 01, 2017   19443    polster     Cleaned up clear and close behavior
  * Mar 17  2017   19325    jing        Resource group behavior added
+ * Dec 01, 2017   41520    polster     Now supports matrix editor
  * 
  *         </pre>
  * 
@@ -143,10 +146,12 @@ public class EnsembleTool extends AbstractTool
     }
 
     public enum EnsembleToolCompatibility {
-        NOT_COMPATIBLE, COMPATIBLE_CONTAINS_ENSEMBLE_TOOL_LAYER, COMPATIBLE_NO_ENSEMBLE_TOOL_LAYER
+        NOT_COMPATIBLE,
+        COMPATIBLE_CONTAINS_ENSEMBLE_TOOL_LAYER,
+        COMPATIBLE_NO_ENSEMBLE_TOOL_LAYER
     }
 
-    private enum SwapState {
+    public enum SwapState {
         SWAPPED_IN, SWAPPED_OUT, NOT_SWAPPING
     }
 
@@ -204,7 +209,9 @@ public class EnsembleTool extends AbstractTool
     public static boolean isCompatibleResource(AbstractVizResource<?, ?> rsc) {
 
         boolean isCompatible = false;
-        if (rsc instanceof TimeSeriesResource) {
+        if (rsc instanceof TimeSeriesResource
+                || rsc instanceof EnsSamplingResource
+                || rsc instanceof HistogramResource) {
             isCompatible = true;
         } else if (rsc instanceof AbstractGridResource<?>) {
             if (((AbstractGridResource<?>) rsc)
@@ -267,6 +274,14 @@ public class EnsembleTool extends AbstractTool
         }
     }
 
+    public SwapState getSwapState() {
+        return swapState;
+    }
+
+    public void setSwapState(SwapState swapState) {
+        this.swapState = swapState;
+    }
+
     /**
      * Are they any ensemble tool layers still in existence? Yes then the
      * ensemble tool is considered running.
@@ -307,10 +322,16 @@ public class EnsembleTool extends AbstractTool
         EnsembleResourceIngester.getInstance().dispose();
 
         if (theEditorsListener != null) {
-            PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage()
-                    .removePartListener(theEditorsListener);
+            if (PlatformUI.getWorkbench() != null
+                    && PlatformUI.getWorkbench()
+                            .getActiveWorkbenchWindow() != null
+                    && PlatformUI.getWorkbench().getActiveWorkbenchWindow()
+                            .getActivePage() != null)
+                PlatformUI.getWorkbench().getActiveWorkbenchWindow()
+                        .getActivePage().removePartListener(theEditorsListener);
             theEditorsListener = null;
         }
+
         ensembleToolViewer = null;
         viewPartRef = null;
 
@@ -329,6 +350,51 @@ public class EnsembleTool extends AbstractTool
         if (theEditorsListener != null) {
             theEditorsListener.ignorePartActivatedEvent(ignore);
         }
+    }
+
+    /**
+     * This checks to see if the this is an otherwise empty map editor. An
+     * virtually empty map editor is considered to be empty when its resource
+     * list has the same resources of a newly created map editor and no more.
+     * This would be any resource that is not a system resource and also not a
+     * map resource.
+     * 
+     * The caller must make sure the argument is a display container of a Map
+     * editor, otherwise the method throws an unchecked illegal argument
+     * exception.
+     * 
+     * This method will check to see if any other resources exist in the
+     * resource list other than the default on-load resources.
+     * 
+     * TODO: This needs to be revisited as it should not be up to this class to
+     * define what it means to be an "empty" map editor.
+     * 
+     * @param rscList
+     * @return true if the map editor is empty
+     */
+    private boolean isVirtuallyEmpty(IDisplayPaneContainer dc) {
+        boolean isEmpty = true;
+
+        if (EnsembleTool.isMapEditor(dc)) {
+            ResourceList rscList = dc.getActiveDisplayPane().getDescriptor()
+                    .getResourceList();
+
+            /*
+             * if the resource isn't any of the initial (default) on-load
+             * resources then the resource list is considered not empty.
+             */
+            for (ResourcePair rp : rscList) {
+                if ((!rp.getResource().getProperties().isSystemResource())
+                        && (!rp.getResource().getProperties().isMapLayer())) {
+                    isEmpty = false;
+                    break;
+                }
+            }
+        } else {
+            throw new IllegalArgumentException(
+                    "Method must take display container that is a map editor.");
+        }
+        return isEmpty;
     }
 
     /**
@@ -367,6 +433,14 @@ public class EnsembleTool extends AbstractTool
          * have a tool layer in it.
          */
         if (EnsembleTool.isMapEditor(dc) && !hasToolLayer(dc)) {
+
+            if (!isVirtuallyEmpty(dc)) {
+                MessageDialog.openWarning(Display.getCurrent().getActiveShell(),
+                        "Ensemble Tool",
+                        "The Ensemble Tool must be opened in a new map editor.");
+                return null;
+
+            }
             super.setEditor(dc);
             editor.addRenderableDisplayChangedListener(this);
 
@@ -644,7 +718,7 @@ public class EnsembleTool extends AbstractTool
      * resource pair found in the active tool layer.
      */
     public ResourcePair getResourcePair(FieldPlanePair e,
-            ModelSources modelSrc) {
+            ModelSourceKind modelSrc) {
 
         ResourcePair rp = null;
         EnsembleToolLayer etl = getToolLayer();
@@ -690,6 +764,15 @@ public class EnsembleTool extends AbstractTool
     }
 
     /**
+     * Refresh the tool based on the currently active editor.
+     */
+    public void refreshToolByEditor(IDisplayPaneContainer pane) {
+
+        setEditor(pane);
+        refreshTool(false);
+    }
+
+    /**
      * Reflect the change in editor. If the editor has a tool layer then upate
      * the tool mode. Keep track of the last used editor. Set by calling parent.
      */
@@ -712,9 +795,14 @@ public class EnsembleTool extends AbstractTool
                 break;
             }
         } else {
-            /* disable the tool viewer */
+            /*
+             * disable the tool viewer but not for matrix mode which will clear
+             * itself.
+             */
             if (ensembleToolViewer != null) {
-                ensembleToolViewer.clearAllByActiveMode();
+                if (lastUsedMatrixEditorPane != editor) {
+                    ensembleToolViewer.clearAllByActiveMode();
+                }
                 ensembleToolViewer.setEditable(false);
                 super.setEditor(null);
             }
