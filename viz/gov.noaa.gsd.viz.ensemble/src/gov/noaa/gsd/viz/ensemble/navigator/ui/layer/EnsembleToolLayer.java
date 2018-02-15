@@ -122,8 +122,9 @@ import gov.noaa.gsd.viz.ensemble.util.RequestableResourceMetadata;
  * Feb 17, 2017   19325      jing       Added ERF image capability
  * Mar 01, 2017   19443      polster    Fix clear and close behavior
  * Mar 17, 2017   19325      jing       Added resource group behavior
- * Dec 01, 2017   41520      polster    Added find resource method
+ * Dec 01, 2017   20328      polster    Added find resource method
  * Dec 12, 2017   41520      jing       Fixed colorbar and sampling
+ * Jan 10, 2018   20524      polster    Removed echo statements
  * 
  * </pre>
  * 
@@ -333,6 +334,7 @@ public class EnsembleToolLayer
                     plane = rrmd.getPlane();
                     String rscName = rp.getResource().getName();
                     String modelName = modelSrc.getModelName();
+
                     if (rscName.startsWith(modelName)) {
                         if (e.getFieldAbbrev().equals(fieldAbbrev)
                                 && e.getPlane().equals(plane)) {
@@ -538,14 +540,12 @@ public class EnsembleToolLayer
 
         /* sample top image */
         if (rTopImage != null) {
-            System.out.println("Hello 1!: " + rTopImage.inspect(coord));
             return rTopImage.inspect(coord);
             /*
              * sample top contour or other if no image, is controlled by the
              * resource
              */
         } else if (rTopContour != null) {
-            System.out.println("Hello 2!");
             return rTopContour.inspect(coord);
         }
 

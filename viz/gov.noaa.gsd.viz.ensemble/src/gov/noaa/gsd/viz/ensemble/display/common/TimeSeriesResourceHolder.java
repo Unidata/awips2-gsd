@@ -20,6 +20,7 @@ import gov.noaa.gsd.viz.ensemble.util.Utilities;
  * ------------ ---------- ----------- --------------------------
  * Nov 17, 2014   5056      polster     Initial creation
  * May 01, 2017  26745      polster     Initial Creation.
+ * Jan 10, 2018  20524      polster     getEnsembleID now returns non-null string
  * 
  * </pre>
  * 
@@ -145,6 +146,8 @@ public class TimeSeriesResourceHolder extends AbstractResourceHolder {
                             && ((ensId != null && ensId.length() > 0)
                                     && (getModel().indexOf("SREF") >= 0))) {
                         ensId = srefPerturbationPrettyfied(ensId);
+                    } else {
+                        ensId = "";
                     }
                 }
             } catch (Exception e) {

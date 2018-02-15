@@ -35,6 +35,7 @@ import gov.noaa.gsd.viz.ensemble.control.IToolModeChangedListener;
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.common.PreferencesDialog;
+import gov.noaa.gsd.viz.ensemble.navigator.ui.viewer.matrix.MatrixNavigatorComposite;
 import gov.noaa.gsd.viz.ensemble.util.EnsembleToolImageStore;
 
 /***
@@ -381,24 +382,39 @@ public class EnsembleToolBar extends Composite
         }
 
         public void run() {
-            boolean isFull = (EnsembleTool.getInstance().getToolLayer() == null
-                    || EnsembleTool.getInstance().getToolLayer().isEmpty())
-                            ? false : true;
+            String clearResourcesPrompt = null;
+            /* only act on clearing resources if the active tool layer exists */
+            if (EnsembleTool.getInstance().getToolLayer() != null) {
+                if (EnsembleTool.getInstance()
+                        .getToolMode() == EnsembleToolMode.MATRIX) {
 
-            IDisplayPaneContainer editor = null;
-            String clearResourcesPrompt = "Are you sure you want to clear all Ensemble Tool resources in the active editor?";
-            if (EnsembleTool.getInstance().getActiveEditor() != null) {
-                editor = EnsembleTool.getInstance().getActiveEditor();
-                if (EnsembleTool.isMatrixEditor(editor)) {
-                    clearResourcesPrompt = "Are you sure you want to clear all Matrix resources in the active editor?";
-                }
-            }
-            if (isFull) {
-                boolean isOkay = MessageDialog.open(MessageDialog.QUESTION,
-                        getShell(), "Confirm Clear All Entries",
-                        clearResourcesPrompt, SWT.NONE);
-                if (isOkay) {
-                    EnsembleTool.getInstance().clearToolLayer();
+                    if (!EnsembleTool.getInstance().getToolLayer().isEmpty()
+                            || (MatrixNavigatorComposite.isExtant()
+                                    && (MatrixNavigatorComposite
+                                            .isEmpty() == false))) {
+                        clearResourcesPrompt = "Are you sure you want to clear all Matrix resources in the active editor?";
+                        boolean isOkay = MessageDialog.open(
+                                MessageDialog.QUESTION, getShell(),
+                                "Confirm Clear All Matrix Entries",
+                                clearResourcesPrompt, SWT.NONE);
+                        if (isOkay) {
+                            EnsembleTool.getInstance().clearToolLayer();
+                        }
+                    }
+                } else {
+                    boolean isFull = (EnsembleTool.getInstance().getToolLayer()
+                            .isEmpty()) ? false : true;
+
+                    clearResourcesPrompt = "Are you sure you want to clear all Ensemble Tool resources in the active editor?";
+                    if (isFull) {
+                        boolean isOkay = MessageDialog.open(
+                                MessageDialog.QUESTION, getShell(),
+                                "Confirm Clear All Entries",
+                                clearResourcesPrompt, SWT.NONE);
+                        if (isOkay) {
+                            EnsembleTool.getInstance().clearToolLayer();
+                        }
+                    }
                 }
             }
         }

@@ -34,6 +34,7 @@ import com.raytheon.uf.viz.core.rsc.DisplayType;
 import com.raytheon.uf.viz.core.rsc.LoadProperties;
 import com.raytheon.uf.viz.core.rsc.ResourceList;
 import com.raytheon.uf.viz.core.rsc.ResourceProperties;
+import com.raytheon.uf.viz.core.rsc.groups.BestResResourceData;
 import com.raytheon.viz.grid.rsc.GridResourceData;
 import com.raytheon.viz.ui.BundleLoader;
 import com.raytheon.viz.ui.BundleLoader.BundleInfoType;
@@ -196,6 +197,8 @@ public class ModelFamily {
      * Creates a bundle from the raw model family XML file and then extracts the
      * field/plane pairs.
      * 
+     * TODO: For the 17.3.1 delivery ignore BestResResource types.
+     * 
      * @return the set of field/plane pairs in the convenience class
      *         <code>ElementSet</code>
      */
@@ -217,7 +220,8 @@ public class ModelFamily {
                         .getResourceList();
                 for (int i = 0; i < rscList.size(); i++) {
                     ResourcePair rp = rscList.get(i);
-                    if (rp != null && rp.getResourceData() != null) {
+                    if (rp != null && rp.getResourceData() != null && ((rp
+                            .getResourceData() instanceof BestResResourceData) == false)) {
                         if (rp.getResourceData() instanceof AbstractRequestableResourceData) {
 
                             DisplayType displayType = getDisplayType(
@@ -226,6 +230,9 @@ public class ModelFamily {
                             ResourceProperties rscProps = rp.getProperties();
                             AbstractRequestableResourceData ard = (AbstractRequestableResourceData) rp
                                     .getResourceData();
+                            if (ard instanceof BestResResourceData) {
+                                continue;
+                            }
                             RequestableResourceMetadata rrd = new RequestableResourceMetadata(
                                     ard);
                             fieldAbbrev = rrd.getFieldAbbrev();

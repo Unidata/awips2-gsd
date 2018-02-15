@@ -124,6 +124,7 @@ import gov.noaa.gsd.viz.ensemble.util.ViewerWindowState;
  * Mar 01, 2017   19443    polster     Cleaned up clear and close behavior
  * Mar 17  2017   19325    jing        Resource group behavior added
  * Dec 01, 2017   41520    polster     Now supports matrix editor
+ * Jan 10, 2018   20524    polster     isCompatibleResource method fixed
  * 
  *         </pre>
  * 
@@ -209,17 +210,38 @@ public class EnsembleTool extends AbstractTool
     public static boolean isCompatibleResource(AbstractVizResource<?, ?> rsc) {
 
         boolean isCompatible = false;
-        if (rsc instanceof TimeSeriesResource
-                || rsc instanceof EnsSamplingResource
-                || rsc instanceof HistogramResource) {
-            isCompatible = true;
-        } else if (rsc instanceof AbstractGridResource<?>) {
-            if (((AbstractGridResource<?>) rsc)
-                    .getDisplayType() == DisplayType.IMAGE
-                    || ((AbstractGridResource<?>) rsc)
-                            .getDisplayType() == DisplayType.CONTOUR) {
+        EnsembleToolMode mode = EnsembleTool
+                .getToolMode(EditorUtil.getActiveVizContainer());
+        switch (mode) {
+        case MATRIX:
+            if (rsc instanceof AbstractGridResource<?>) {
                 isCompatible = true;
             }
+            break;
+        case LEGENDS_TIME_SERIES:
+            if (rsc instanceof TimeSeriesResource) {
+                isCompatible = true;
+            }
+            break;
+        case LEGENDS_PLAN_VIEW:
+            if (rsc instanceof AbstractGridResource<?>) {
+                if (((AbstractGridResource<?>) rsc)
+                        .getDisplayType() == DisplayType.IMAGE
+                        || ((AbstractGridResource<?>) rsc)
+                                .getDisplayType() == DisplayType.CONTOUR) {
+                    isCompatible = true;
+                }
+            } else if (rsc instanceof EnsSamplingResource
+                    || rsc instanceof HistogramResource) {
+                isCompatible = true;
+            }
+            break;
+        default:
+            if (rsc instanceof TimeSeriesResource) {
+                isCompatible = true;
+            }
+            break;
+
         }
         return isCompatible;
     }
