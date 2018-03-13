@@ -47,10 +47,9 @@ import com.raytheon.uf.viz.core.rsc.capabilities.AbstractCapability;
 import com.raytheon.uf.viz.d2d.ui.actions.BlinkToggleAction;
 import com.raytheon.viz.ui.cmenu.AbstractRightClickAction;
 import com.raytheon.viz.ui.cmenu.EnableDisableAction;
-import com.raytheon.viz.ui.cmenu.ImagingAction;
 import com.raytheon.viz.ui.cmenu.LoadAsArrowsAction;
 import com.raytheon.viz.ui.cmenu.LoadAsBarbsAction;
-import com.raytheon.viz.ui.cmenu.LoadAsGraphicsAction;
+import com.raytheon.viz.ui.cmenu.LoadAsContoursAction;
 import com.raytheon.viz.ui.cmenu.LoadAsImageAction;
 import com.raytheon.viz.ui.cmenu.LoadAsStreamlinesAction;
 import com.raytheon.viz.ui.cmenu.MoveDownAction;
@@ -60,7 +59,6 @@ import com.raytheon.viz.ui.cmenu.RightClickSeparator;
 
 import gov.noaa.gsd.viz.ensemble.action.ContourControlSelectionAction;
 import gov.noaa.gsd.viz.ensemble.action.RemoveEnsembleToolResourceAction;
-import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
 
 /**
  * Provide resource-based right click support. This solution was lifted from the
@@ -80,13 +78,12 @@ import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
  * 
  * Date          Ticket#  Engineer    Description
  * ------------- -------- ----------- --------------------------
- * Jan 10, 2018  20525      polster     Initial version.
+ * Jan 10, 2018  20525    polster     Initial version.
+ * Mar 13, 2018  6815     njensen     Renamed LoadAsGraphics to LoadAsContours
  * 
  * </pre>
  * 
- * @author chammack
  * @author polster
- * @version 1
  */
 public class MatrixNavigatorContextMenuManager {
 
@@ -142,7 +139,7 @@ public class MatrixNavigatorContextMenuManager {
                         Set<AbstractRightClickAction> actions = contextualItems
                                 .get(c);
                         if (actions == null) {
-                            actions = new TreeSet<AbstractRightClickAction>(
+                            actions = new TreeSet<>(
                                     new MyComparator());
 
                         }
@@ -211,7 +208,7 @@ public class MatrixNavigatorContextMenuManager {
                             || action instanceof MoveDownAction
                             || action instanceof RemoveResourceAction
                             || action instanceof RemoveEnsembleToolResourceAction
-                            || action instanceof LoadAsGraphicsAction
+                            || action instanceof LoadAsContoursAction
                             || action instanceof LoadAsImageAction
                             || action instanceof LoadAsArrowsAction
                             || action instanceof LoadAsStreamlinesAction
@@ -243,6 +240,7 @@ public class MatrixNavigatorContextMenuManager {
     private static class MyComparator
             implements Comparator<AbstractRightClickAction> {
 
+        @Override
         public int compare(AbstractRightClickAction o1,
                 AbstractRightClickAction o2) {
             if (o1.getOrder() > o2.getOrder()) {
