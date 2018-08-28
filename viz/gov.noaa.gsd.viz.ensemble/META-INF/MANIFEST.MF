@@ -33,7 +33,7 @@ Require-Bundle: org.eclipse.ui;bundle-version="3.108.0",
  com.raytheon.uf.viz.datacube;bundle-version="1.14.0",
  com.raytheon.uf.viz.core.maps;bundle-version="1.16.0",
  org.eclipse.osgi;bundle-version="3.11.1"
-Bundle-RequiredExecutionEnvironment: JavaSE-1.7
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-ActivationPolicy: lazy
 Export-Package: gov.noaa.gsd.viz.ensemble.display.control.load,
  gov.noaa.gsd.viz.ensemble.display.rsc.timeseries,
