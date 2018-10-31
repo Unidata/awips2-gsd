@@ -15,8 +15,6 @@ import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.eclipse.swt.graphics.RGB;
 
-import com.raytheon.uf.common.dataplugin.grid.dataset.DatasetInfo;
-import com.raytheon.uf.common.dataplugin.grid.dataset.DatasetInfoLookup;
 import com.raytheon.uf.common.status.IUFStatusHandler;
 import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.common.status.UFStatus.Priority;
@@ -104,31 +102,8 @@ public class ResolvedModelFamily extends ModelFamily {
         associatedRscMap = new ConcurrentHashMap<>();
 
         sources = givenSources;
-        sortSources();
 
         createIndividualBundles();
-    }
-
-    /**
-     * Sorts the model sources by shortest model time-step first, which is the
-     * also the order that the models get loaded.
-     */
-    private void sortSources() {
-        /*
-         * sort (ascending) by the shortest time resolution (time steps).
-         */
-        Collections.sort(sources, new Comparator<ModelSourceKind>() {
-
-            @Override
-            public int compare(ModelSourceKind o1, ModelSourceKind o2) {
-                DatasetInfoLookup lookup = DatasetInfoLookup.getInstance();
-                DatasetInfo info1 = lookup.getInfo(o1.getModelId());
-                DatasetInfo info2 = lookup.getInfo(o2.getModelId());
-                Integer dt1 = new Integer(info1.getDt());
-                Integer dt2 = new Integer(info2.getDt());
-                return dt1.compareTo(dt2);
-            }
-        });
     }
 
     /**
