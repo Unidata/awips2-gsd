@@ -108,6 +108,7 @@ import gov.noaa.gsd.viz.ensemble.util.Utilities;
  * Mar 17  2017   19443      jing        Resource group behavior added
  * Mar 31, 2017   19598      jing        Contour control feature
  * Jan 10, 2018   20524      polster     Fixed time series get legend name
+ * Nov 12, 2018   7604       bsteffen    Expand tree on first left click.
  * 
  * </pre>
  * 
@@ -1424,11 +1425,7 @@ public class LegendBrowserComposite extends Composite {
                      * visibility. This place to make this change will not be
                      * here, but instead in the getDirectDescendants method.
                      */
-
-                    boolean isExpanded = userClickedTreeItem.getExpanded();
-                    if (!isExpanded) {
-                        userClickedTreeItem.setExpanded(true);
-                    }
+                    legendsTreeViewer.setExpandedState(emh, true);
 
                     ToggleEnsembleVisiblityJob ccj = new ToggleEnsembleVisiblityJob(
                             "Toggle Ensemble Members Visibility");
