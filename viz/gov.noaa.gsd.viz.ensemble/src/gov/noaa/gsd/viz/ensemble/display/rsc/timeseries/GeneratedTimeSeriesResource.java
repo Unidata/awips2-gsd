@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeSet;
 
-import javax.measure.unit.Unit;
+import javax.measure.Unit;
 
 import org.eclipse.swt.graphics.RGB;
 
@@ -33,7 +33,9 @@ import com.raytheon.uf.viz.xy.timeseries.adapter.AbstractTimeSeriesAdapter;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
 import com.raytheon.viz.core.graphing.util.GraphPrefsFactory;
 import com.raytheon.viz.core.graphing.xy.XYData;
+
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
+import tec.uom.se.AbstractUnit;
 
 
 /**
@@ -77,7 +79,7 @@ public class GeneratedTimeSeriesResource<T extends AbstractResourceData>
     protected Level preferredLevel = null;
 
     /** the unit to convert to, matches preferredLevel unit **/
-    protected Unit<?> preferredUnit = Unit.ONE;
+    protected Unit<?> preferredUnit = AbstractUnit.ONE;
 
     /** a map of levels to units for quick lookup **/
     protected Map<Level, Unit<?>> levelUnitMap = new HashMap<Level, Unit<?>>();
