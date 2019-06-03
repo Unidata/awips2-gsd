@@ -1,10 +1,15 @@
 package gov.noaa.gsd.viz.ensemble.display.control.contour;
 
+import java.util.Arrays;
 import java.util.List;
 
+import org.apache.commons.lang.ArrayUtils;
+
 import com.raytheon.uf.common.style.AbstractStylePreferences;
-import com.raytheon.uf.common.style.LabelingPreferences;
+import com.raytheon.uf.common.style.ContourLabelingPreferences;
+import com.raytheon.uf.common.style.IncrementLabelingPreferences;
 import com.raytheon.uf.common.style.StyleException;
+import com.raytheon.uf.common.style.ValuesLabelingPreferences;
 import com.raytheon.uf.common.style.contour.ContourPreferences;
 import com.raytheon.uf.viz.core.grid.rsc.AbstractGridResource;
 import com.raytheon.uf.viz.core.rsc.DisplayType;
@@ -30,7 +35,7 @@ import com.raytheon.uf.viz.core.rsc.capabilities.DensityCapability;
  * ------------ ---------- ----------- --------------------------
  * Feb 28, 2017   19598         jing     Initial creation
  * Jun 27, 2017   19325         jing     Upgrade to 17.3.1
- *
+ * Jun 03, 2019   64512         ksunil   changes to absorb new labelingPreferences
  * </pre>
  *
  * @author jing
@@ -46,12 +51,12 @@ public class ContourControl {
     /*
      * Save the original contour increment
      */
-    private float incrementOrig;
+    private float[] incrementOrig;
 
     /*
      * The labeling preferences of a grid resource
      */
-    private LabelingPreferences labelingPreferences = null;
+    private ContourLabelingPreferences labelingPreferences = null;
 
     /*
      * The labeling preferences of a grid resource
@@ -84,18 +89,25 @@ public class ContourControl {
      * @return The labelingPreferences object of the grid resource
      * @throws StyleException
      */
-    private LabelingPreferences initCountourLabeling(
+    private ContourLabelingPreferences initCountourLabeling(
             AbstractGridResource<?> rsc) {
 
-        LabelingPreferences labelingPreferences = null;
+        ContourLabelingPreferences labelingPreferences = null;
         AbstractStylePreferences stylePreferences = rsc.getStylePreferences();
         if (stylePreferences instanceof ContourPreferences) {
             contourPreferences = (ContourPreferences) stylePreferences;
             labelingPreferences = contourPreferences.getContourLabeling();
-            if (labelingPreferences != null) {
-                incrementOrig = labelingPreferences.getIncrement();
-                valuesOrig = labelingPreferences.getValues();
+            for (ValuesLabelingPreferences labelPrefs : labelingPreferences
+                    .getValues()) {
+                valuesOrig = ArrayUtils.addAll(valuesOrig,
+                        labelPrefs.getValues());
             }
+            for (IncrementLabelingPreferences labelPrefs : labelingPreferences
+                    .getIncrement()) {
+                incrementOrig = ArrayUtils.addAll(valuesOrig,
+                        labelPrefs.getValues());
+            }
+
         }
 
         return labelingPreferences;
@@ -140,9 +152,13 @@ public class ContourControl {
         /*
          * Sets contour label increment and values.
          */
-        labelingPreferences.setIncrement(increment);
+        IncrementLabelingPreferences incr = new IncrementLabelingPreferences();
+        incr.setValues(new float[] { increment });
+        labelingPreferences.setIncrement(Arrays.asList(incr));
 
-        labelingPreferences.setValues(values);
+        ValuesLabelingPreferences val = new ValuesLabelingPreferences();
+        incr.setValues(new float[] { contourValue });
+        labelingPreferences.setValues(Arrays.asList(val));
 
         rsc.setStylePreferences(contourPreferences);
 
@@ -181,11 +197,15 @@ public class ContourControl {
                     .getStylePreferences();
             if (stylePreferences instanceof ContourPreferences) {
 
+                IncrementLabelingPreferences incr = new IncrementLabelingPreferences();
+                incr.setValues(new float[] { increment });
                 ((ContourPreferences) stylePreferences).getContourLabeling()
-                        .setIncrement(increment);
+                        .setIncrement(Arrays.asList(incr));
 
+                ValuesLabelingPreferences val = new ValuesLabelingPreferences();
+                incr.setValues(new float[] { value });
                 ((ContourPreferences) stylePreferences).getContourLabeling()
-                        .setValues(values);
+                        .setValues(Arrays.asList(val));
 
                 rscList.get(i).setStylePreferences(contourPreferences);
 
@@ -199,8 +219,13 @@ public class ContourControl {
      * Reset the contour to original.
      */
     public void reset() {
-        labelingPreferences.setIncrement(incrementOrig);
-        labelingPreferences.setValues(valuesOrig);
+        IncrementLabelingPreferences incr = new IncrementLabelingPreferences();
+        incr.setValues(incrementOrig);
+        labelingPreferences.setIncrement(Arrays.asList(incr));
+
+        ValuesLabelingPreferences val = new ValuesLabelingPreferences();
+        incr.setValues(valuesOrig);
+        labelingPreferences.setValues(Arrays.asList(val));
 
         redrawContours(rsc);
 
@@ -237,7 +262,11 @@ public class ContourControl {
     }
 
     public float getIncrementOrig() {
-        return incrementOrig;
+        if (incrementOrig == null || incrementOrig.length == 0) {
+            return 0;
+        } else {
+            return incrementOrig[0];
+        }
     }
 
 }
