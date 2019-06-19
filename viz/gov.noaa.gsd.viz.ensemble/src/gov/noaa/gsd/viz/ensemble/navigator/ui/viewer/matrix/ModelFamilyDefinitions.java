@@ -44,14 +44,6 @@ public enum ModelFamilyDefinitions {
             "TP",
             41), //
 
-    HAIL_GFS20(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.HAIL,
-            ModelSourceKind.GFS20,
-            "bundles/volume/ModelFamilyC.xml",
-            "TP",
-            55), //
-
     HAIL_LAPS(
             ModelFamilyType.CONVECTION,
             ModelFamilySubType.HAIL,
@@ -84,14 +76,6 @@ public enum ModelFamilyDefinitions {
             "TP3hr",
             29), //
 
-    HAIL_NAM80(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.HAIL,
-            ModelSourceKind.NAM80,
-            "bundles/volume/ModelFamilyC.xml",
-            "TP6hr",
-            15), //
-
     HAIL_RAP13(
             ModelFamilyType.CONVECTION,
             ModelFamilySubType.HAIL,
@@ -118,13 +102,6 @@ public enum ModelFamilyDefinitions {
             "TP",
             41), //
 
-    HEAVY_RAIN_GFS20(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.HEAVY_RAIN,
-            ModelSourceKind.GFS20,
-            "bundles/volume/HeavyRainFamily.xml",
-            "TP",
-            55), //
 
     HEAVY_RAIN_GFS_GLOBAL(
             ModelFamilyType.CONVECTION,
@@ -158,14 +135,6 @@ public enum ModelFamilyDefinitions {
             "TP3hr",
             29), //
 
-    HEAVY_RAIN_NAM80(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.HEAVY_RAIN,
-            ModelSourceKind.NAM80,
-            "bundles/volume/HeavyRainFamily.xml",
-            "TP6hr",
-            15), //
-
     HEAVY_RAIN_RAP13(
             ModelFamilyType.CONVECTION,
             ModelFamilySubType.HEAVY_RAIN,
@@ -191,14 +160,6 @@ public enum ModelFamilyDefinitions {
             "bundles/volume/ModelFamilyX.xml",
             "TP",
             41), //
-
-    MCS_GFS20(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.MCS,
-            ModelSourceKind.GFS20,
-            "bundles/volume/ModelFamilyX.xml",
-            "TP",
-            55), //
 
     MCS_GFS_GLOBAL(
             ModelFamilyType.CONVECTION,
@@ -232,14 +193,6 @@ public enum ModelFamilyDefinitions {
             "TP3hr",
             29), //
 
-    MCS_NAM80(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.MCS,
-            ModelSourceKind.NAM80,
-            "bundles/volume/ModelFamilyX.xml",
-            "TP6hr",
-            15), //
-
     MCS_RAP13(
             ModelFamilyType.CONVECTION,
             ModelFamilySubType.MCS,
@@ -265,14 +218,6 @@ public enum ModelFamilyDefinitions {
             "bundles/volume/ModelFamilyA.xml",
             "TP",
             41), //
-
-    NON_SUPERCELL_TOR_GFS20(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.NONSUPERCELL_TORNADO,
-            ModelSourceKind.GFS20,
-            "bundles/volume/ModelFamilyA.xml",
-            "TP",
-            55), //
 
     NON_SUPERCELL_TOR_GFS_GLOBAL(
             ModelFamilyType.CONVECTION,
@@ -306,14 +251,6 @@ public enum ModelFamilyDefinitions {
             "TP3hr",
             29), //
 
-    NON_SUPERCELL_TOR_NAM80(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.NONSUPERCELL_TORNADO,
-            ModelSourceKind.NAM80,
-            "bundles/volume/ModelFamilyA.xml",
-            "TP6hr",
-            15), //
-
     NON_SUPERCELL_TOR_RAP13(
             ModelFamilyType.CONVECTION,
             ModelFamilySubType.NONSUPERCELL_TORNADO,
@@ -339,14 +276,6 @@ public enum ModelFamilyDefinitions {
             "bundles/volume/ModelFamilyH.xml",
             "TP",
             41), //
-
-    QLCS_WIND_GFS20(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.QLCS_WIND,
-            ModelSourceKind.GFS20,
-            "bundles/volume/ModelFamilyH.xml",
-            "TP",
-            55), //
 
     QLCS_WIND_GFS_GLOBAL(
             ModelFamilyType.CONVECTION,
@@ -380,13 +309,6 @@ public enum ModelFamilyDefinitions {
             "TP3hr",
             29), //
 
-    QLCS_WIND_NAM80(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.QLCS_WIND,
-            ModelSourceKind.NAM80,
-            "bundles/volume/ModelFamilyH.xml",
-            "TP6hr",
-            15), //
 
     QLCS_WIND_RAP13(
             ModelFamilyType.CONVECTION,
@@ -413,14 +335,6 @@ public enum ModelFamilyDefinitions {
             "bundles/volume/ModelFamilyB.xml",
             "TP",
             41), //
-
-    STORM_INIT_GFS20(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.STORM_INITIATION,
-            ModelSourceKind.GFS20,
-            "bundles/volume/ModelFamilyB.xml",
-            "TP",
-            55), //
 
     STORM_INIT_GFS_GLOBAL(
             ModelFamilyType.CONVECTION,
@@ -454,14 +368,6 @@ public enum ModelFamilyDefinitions {
             "TP3hr",
             29), //
 
-    STORM_INIT_NAM80(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.STORM_INITIATION,
-            ModelSourceKind.NAM80,
-            "bundles/volume/ModelFamilyB.xml",
-            "TP6hr",
-            15), //
-
     STORM_INIT_RAP13(
             ModelFamilyType.CONVECTION,
             ModelFamilySubType.STORM_INITIATION,
@@ -487,14 +393,6 @@ public enum ModelFamilyDefinitions {
             "bundles/volume/ModelFamilyV.xml",
             "TP",
             41), //
-
-    STORM_TYPE_GFS20(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.STORM_TYPE,
-            ModelSourceKind.GFS20,
-            "bundles/volume/ModelFamilyV.xml",
-            "TP",
-            55), //
 
     STORM_TYPE_GFS_GLOBAL(
             ModelFamilyType.CONVECTION,
@@ -528,13 +426,6 @@ public enum ModelFamilyDefinitions {
             "TP3hr",
             29), //
 
-    STORM_TYPE_NAM80(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.STORM_TYPE,
-            ModelSourceKind.NAM80,
-            "bundles/volume/ModelFamilyV.xml",
-            "TP6hr",
-            15), //
 
     STORM_TYPE_RAP13(
             ModelFamilyType.CONVECTION,
@@ -561,14 +452,6 @@ public enum ModelFamilyDefinitions {
             "bundles/volume/ModelFamilyW.xml",
             "TP",
             41), //
-
-    SUPERCELL_GFS20(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.SUPERCELL,
-            ModelSourceKind.GFS20,
-            "bundles/volume/ModelFamilyW.xml",
-            "TP",
-            55), //
 
     SUPERCELL_GFS_GLOBAL(
             ModelFamilyType.CONVECTION,
@@ -602,14 +485,6 @@ public enum ModelFamilyDefinitions {
             "TP3hr",
             29), //
 
-    SUPERCELL_NAM80(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.SUPERCELL,
-            ModelSourceKind.NAM80,
-            "bundles/volume/ModelFamilyW.xml",
-            "TP6hr",
-            15), //
-
     SUPERCELL_RAP13(
             ModelFamilyType.CONVECTION,
             ModelFamilySubType.SUPERCELL,
@@ -635,14 +510,6 @@ public enum ModelFamilyDefinitions {
             "bundles/volume/ModelFamilyYY.xml",
             "TP",
             41), //
-
-    SUPERCELL_TOR_GFS20(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.SUPERCELL_TORNADO,
-            ModelSourceKind.GFS20,
-            "bundles/volume/ModelFamilyYY.xml",
-            "TP",
-            55), //
 
     SUPERCELL_TOR_GFS_GLOBAL(
             ModelFamilyType.CONVECTION,
@@ -676,14 +543,6 @@ public enum ModelFamilyDefinitions {
             "TP3hr",
             29), //
 
-    SUPERCELL_TOR_NAM80(
-            ModelFamilyType.CONVECTION,
-            ModelFamilySubType.SUPERCELL_TORNADO,
-            ModelSourceKind.NAM80,
-            "bundles/volume/ModelFamilyYY.xml",
-            "TP6hr",
-            15), //
-
     SUPERCELL_TOR_RAP13(
             ModelFamilyType.CONVECTION,
             ModelFamilySubType.SUPERCELL_TORNADO,
@@ -709,15 +568,7 @@ public enum ModelFamilyDefinitions {
             "bundles/volume/DefaultSurface.xml",
             "TP",
             41), //
-
-    SURFACE_GFS20(
-            ModelFamilyType.SURFACE,
-            ModelFamilySubType.BASIC_SFC,
-            ModelSourceKind.GFS20,
-            "bundles/volume/DefaultSurface.xml",
-            "TP",
-            55), //
-
+    
     SURFACE_ARW(
             ModelFamilyType.SURFACE,
             ModelFamilySubType.BASIC_SFC,
@@ -800,14 +651,6 @@ public enum ModelFamilyDefinitions {
             "TP",
             41), //
 
-    WINTER_BASIC_GFS20(
-            ModelFamilyType.WINTER_MODEL,
-            ModelFamilySubType.BASIC,
-            ModelSourceKind.GFS20,
-            "bundles/volume/ModelFamilyD.xml",
-            "TP",
-            55), //
-
     WINTER_BASIC_GFS_GLOBAL(
             ModelFamilyType.WINTER_MODEL,
             ModelFamilySubType.BASIC,
@@ -815,14 +658,6 @@ public enum ModelFamilyDefinitions {
             "bundles/volume/ModelFamilyD.xml",
             "TP",
             41), //
-
-    WINTER_BASIC_AK_NAM12(
-            ModelFamilyType.WINTER_MODEL,
-            ModelFamilySubType.BASIC,
-            ModelSourceKind.AK_NAM12,
-            "bundles/volume/ModelFamilyD.xml",
-            "TP3hr",
-            29), //
 
     WINTER_BASIC_NAM12(
             ModelFamilyType.WINTER_MODEL,
@@ -832,14 +667,6 @@ public enum ModelFamilyDefinitions {
             "TP3hr",
             29), //
 
-    WINTER_BASIC_AK_NAM40(
-            ModelFamilyType.WINTER_MODEL,
-            ModelFamilySubType.BASIC,
-            ModelSourceKind.AK_NAM40,
-            "bundles/volume/ModelFamilyD.xml",
-            "TP6hr",
-            21), //
-
     WINTER_BASIC_NAM40(
             ModelFamilyType.WINTER_MODEL,
             ModelFamilySubType.BASIC,
@@ -847,14 +674,6 @@ public enum ModelFamilyDefinitions {
             "bundles/volume/ModelFamilyD.xml",
             "TP3hr",
             21), //
-
-    WINTER_BASIC_NAM80(
-            ModelFamilyType.WINTER_MODEL,
-            ModelFamilySubType.BASIC,
-            ModelSourceKind.NAM80,
-            "bundles/volume/ModelFamilyD.xml",
-            "TP6hr",
-            15), //
 
     WINTER_BASIC_RAP13(
             ModelFamilyType.WINTER_MODEL,

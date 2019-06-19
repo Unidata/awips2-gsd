@@ -46,7 +46,7 @@
 
       <menuContribution
             allPopups="false"
-            locationURI="menu:models?after=ensemble">
+            locationURI="menu:models">
          <command
                commandId="gov.noaa.gsd.viz.ensemble.start.tool"
                style="push">

@@ -29,26 +29,19 @@ public enum ModelSourceKind {
     ARW_WEST("ARWmodel2", "ARW West", "HiResW-ARW-West", false), //
     CANADIAN_NH("NO_VARIABLE_NEEDED", "Canadian-NH", "Canadian-NH", false), //
     CANADIAN_REG("NO_VARIABLE_NEEDED", "Canadian-Reg", "Canadian-Reg", false), //
-    DGEX("DGEXmodel", "DGEX", "DGEX185", true), //
     ECMWF_HIRES("NO_VARIABLE_NEEDED", "ECMWF-HiRes", "ECMWF-HiRes", true), //
     GEM_NH("GEMNHmodel", "GEM-NHem", "Canadian-NH", false), //
     GEM_REG("GEMRegmodel", "GEM-Regional", "Canadian-Reg", false), //
-    GFS20("NO_VARIABLE_NEEDED", "GFS20", "GFS215", true), //
-    GFS40("NO_VARIABLE_NEEDED", "GFS40", "GFS212", true), //
-    GFS_GLOBAL("GFSmodel", "GFS Global", "GFS229", true), //
+    GFS_GLOBAL("GFSmodel", "GFS Global", "GEFS", true), //
     HRRR("NO_VARIABLE_NEEDED", "HRRR", "HRRR", true), //
     LAPS("NO_VARIABLE_NEEDED", "LAPS", "LAPS", true), //
-    AK_NAM12("AK-NAM12model", "AK-NAM12", "ETA242", true), //
-    NAM12("NAM12model", "NAM12", "ETA218", true), //
-    AK_NAM40("AK-NAM40model", "AK-NAM40", "mesoEta216", true), //
-    NAM40("NAM40model", "NAM40", "mesoEta212", true), //
-    NAM80("NO_VARIABLE_NEEDED", "NAM80", "ETA", true), //
+    NAM12("NAM12model", "NAM12", "NAM12", true), //
+    NAM40("NAM40model", "NAM40", "NAM40", true), //
     NAM_Nest("NAMNestmodel", "NAMNest 4km", "CR-NAMNest", false), //
     NMM_EAST("MMMmodel1", "HiResW-NMM-East", "HiResW-NMM-East", false), //
     NMM_WEST("MMMmodel2", "HiResW-NMM-West", "HiResW-NMM-West", false), //
-    RAP13("RAP13model", "RAP13", "RUC130", true), //
-    RAP40("RAPmodel", "RAP40", "RUC236", true), //
-    SREF("SREFmodel", "SREF", "SREF212", true);
+    RAP13("RAP13model", "RAP13", "RAP13", true), //
+    RAP40("RAPmodel", "RAP40", "RAP40", true);
 
     private String variableName = null;
 
