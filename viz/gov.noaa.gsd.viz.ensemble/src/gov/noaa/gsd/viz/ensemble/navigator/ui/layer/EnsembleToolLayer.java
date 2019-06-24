@@ -53,7 +53,7 @@ import com.raytheon.viz.grid.rsc.GridResourceData;
 import com.raytheon.viz.grid.rsc.general.D2DGridResource;
 import com.raytheon.viz.grid.rsc.general.GridResource;
 import com.raytheon.viz.ui.input.EditableManager;
-import com.vividsolutions.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Coordinate;
 
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool;
 import gov.noaa.gsd.viz.ensemble.control.EnsembleTool.EnsembleToolMode;

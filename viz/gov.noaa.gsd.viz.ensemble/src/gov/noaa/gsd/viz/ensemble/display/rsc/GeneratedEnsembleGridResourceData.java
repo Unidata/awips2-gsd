@@ -1,5 +1,6 @@
 package gov.noaa.gsd.viz.ensemble.display.rsc;
 
+import java.text.ParsePosition;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -7,8 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
-import javax.measure.unit.Unit;
 
 import com.raytheon.uf.common.dataquery.requests.RequestConstraint;
 import com.raytheon.uf.common.time.DataTime;
@@ -33,6 +32,7 @@ import gov.noaa.gsd.viz.ensemble.display.calculate.ERFCalculator;
 import gov.noaa.gsd.viz.ensemble.display.calculate.EnsembleCalculator;
 import gov.noaa.gsd.viz.ensemble.display.common.AbstractResourceHolder;
 import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
+import tec.uom.se.format.SimpleUnitFormat;
 
 /**
  * Construct the GeneratedEnsembleGridResource and provide data for it by
@@ -49,6 +49,7 @@ import gov.noaa.gsd.viz.ensemble.navigator.ui.layer.EnsembleToolLayer;
  * ------------ ---------- ----------- --------------------------
  * Jan 2014       5056       jing        Initial creation
  * Dec 2016       19325      jing        Dispaly calculated grid as image
+ * May 8, 2019    7596       tgurney     Fixes for Units upgrade
  * 
  *          </pre>
  */
@@ -214,7 +215,8 @@ public class GeneratedEnsembleGridResourceData extends GridResourceData
             if (calculator != null && unit != null && !unit.isEmpty()
                     && calculator instanceof ERFCalculator) {
                 calculator.setDataUnit(inputData.get(0).get(0).getDataUnit());
-                calculator.setDispUnit(Unit.valueOf(unit));
+                calculator.setDispUnit(SimpleUnitFormat.getInstance()
+                        .parseProductUnit(unit, new ParsePosition(0)));
                 ((ERFCalculator) (this.calculator)).matchUnit();
 
             }

@@ -4,7 +4,7 @@ import com.raytheon.uf.common.style.level.SingleLevel;
 import com.raytheon.uf.viz.core.rsc.AbstractVizResource;
 import com.raytheon.uf.viz.d2d.xy.adapters.timeseries.GridTimeSeriesAdapter;
 import com.raytheon.uf.viz.xy.timeseries.rsc.TimeSeriesResource;
-import com.vividsolutions.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Coordinate;
 
 import gov.noaa.gsd.viz.ensemble.display.calculate.Calculation;
 import gov.noaa.gsd.viz.ensemble.util.Utilities;

@@ -2,8 +2,12 @@ package gov.noaa.gsd.viz.ensemble.display.calculate;
 
 import java.util.Arrays;
 
-import javax.measure.unit.NonSI;
-import javax.measure.unit.Unit;
+import com.raytheon.uf.common.status.IUFStatusHandler;
+import com.raytheon.uf.common.status.UFStatus;
+import com.raytheon.uf.common.units.UnitConv;
+
+import tec.uom.se.unit.Units;
+
 
 /**
  * Value of Relative Frequency of an ensemble set. The range values for the
@@ -24,6 +28,7 @@ import javax.measure.unit.Unit;
  * Date         Ticket#    Engineer    Description
  * ------------ ---------- ----------- --------------------------
  * Jun 2, 2014    5056        jing     Initial creation
+ * May 8, 2019    7596     tgurney     Fixes for Units upgrade
  * 
  * </pre>
  */
@@ -88,7 +93,7 @@ public class ERFCalculator extends EnsembleCalculator {
         // Set the Calculation flag
         super(Calculation.ENSEMBLE_RELATIVE_FREQUENCY);
 
-        resultUnit = NonSI.PERCENT;
+        resultUnit = Units.PERCENT;
 
         range = r;
 
@@ -153,10 +158,12 @@ public class ERFCalculator extends EnsembleCalculator {
         if (dispUnit != null && dataUnit != null && !dispUnit.equals(dataUnit)) {
 
             if (min != MAX_OR_MIN_NO_VALUE) {
-                min = dispUnit.getConverterTo(dataUnit).convert(min);
+                min = UnitConv.getConverterToUnchecked(dispUnit, dataUnit)
+                        .convert(min);
             }
             if (max != MAX_OR_MIN_NO_VALUE) {
-                max = dispUnit.getConverterTo(dataUnit).convert(max);
+                max = UnitConv.getConverterToUnchecked(dispUnit, dataUnit)
+                        .convert(max);
             }
 
         }
