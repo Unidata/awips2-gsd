@@ -22,6 +22,8 @@ import com.raytheon.uf.common.status.UFStatus;
 import com.raytheon.uf.common.status.UFStatus.Priority;
 import com.raytheon.uf.common.time.DataTime;
 import com.raytheon.uf.viz.core.grid.rsc.data.GeneralGridData;
+import com.raytheon.uf.viz.core.grid.rsc.data.ScalarGridData;
+import com.raytheon.uf.viz.core.grid.rsc.data.VectorGridData;
 import com.raytheon.viz.core.graphing.xy.XYData;
 import com.raytheon.viz.core.graphing.xy.XYDataList;
 import com.raytheon.viz.grid.rsc.general.GridMemoryManager;
@@ -37,20 +39,21 @@ import com.raytheon.viz.grid.rsc.general.GridMemoryManager;
  * cross-section... will be implemented in next Version. Each type is with its
  * own data format. plan view is grid and time series is xy points. So the data
  * processing is different.
- * 
- * @author jing
- * @version 1.0
- * 
- *          <pre>
- * 
+ *
+ * <pre>
+ *
  * SOFTWARE HISTORY
- * 
- * Date         Ticket#    Engineer    Description
- * ------------ ---------- ----------- --------------------------
- * Jan 5 2014     5056      jing     Initial creation
- * Jan 15 2014    12301     jing     Fixed unit matching
- * Dec 29 2016    19325     jing     Added image flag
- *          </pre>
+ *
+ * Date          Ticket#  Engineer  Description
+ * ------------- -------- --------- ------------------------------------
+ * Jan 05, 2014  5056     jing      Initial creation
+ * Jan 15, 2014  12301    jing      Fixed unit matching
+ * Dec 29, 2016  19325    jing      Added image flag
+ * Aug 29, 2019  67959    tjensen   Update for GeneralGridData refactor
+ *
+ * </pre>
+ *
+ * @author jing
  */
 
 public abstract class EnsembleCalculator {
@@ -157,7 +160,7 @@ public abstract class EnsembleCalculator {
      * Calculating with different geometries is no extra memory cost, but is
      * very complicated and slow. The calculation result data is added into the
      * grid data monitor.
-     * 
+     *
      * @param inputData
      *            - loaded grid data of all members in one frame
      * @return - Calculation result grid data
@@ -170,14 +173,15 @@ public abstract class EnsembleCalculator {
             return null;
         }
 
+        List<GeneralGridData> gridDataList = inputData.get(0);
         GridGeometry2D geometry = matchGeometry(inputData);
 
         /**
          * Suppose the grid data is in same domain and unit, therefore the grid
          * size of the result is same as any input member.
-         * 
+         *
          */
-        GeneralGridData[] resultGridData = new GeneralGridData[inputData.get(0)
+        GeneralGridData[] resultGridData = new GeneralGridData[gridDataList
                 .size()];
 
         /**
@@ -188,14 +192,16 @@ public abstract class EnsembleCalculator {
         if (rUnit == null) {
             rUnit = dataUnit;
         }
+
+        GeneralGridData generalGridData = gridDataList.get(0);
         if (rUnit == null) {
-            rUnit = inputData.get(0).get(0).getDataUnit();
+            rUnit = generalGridData.getDataUnit();
         }
-        for (int k = 0; k < inputData.get(0).size(); k++) {// List
+        for (int k = 0; k < gridDataList.size(); k++) {// List
 
             int imax = inputData.size();
 
-            if (inputData.get(0).get(0).isVector()) {
+            if (generalGridData instanceof VectorGridData) {
                 /**
                  * Vector grid data case Is not used in current implementation
                  */
@@ -203,17 +209,19 @@ public abstract class EnsembleCalculator {
                 // Get U component data
                 GeographicDataSource[] dataU = new GeographicDataSource[imax];
                 for (int i = 0; i < imax; i++) {
-                    dataU[i] = inputData.get(i).get(k).getUComponent();
+                    dataU[i] = ((VectorGridData) inputData.get(i).get(k))
+                            .getUComponent();
                 }
 
                 // Get V component data
                 GeographicDataSource[] dataV = new GeographicDataSource[imax];
                 for (int i = 0; i < imax; i++) {
-                    dataV[i] = inputData.get(i).get(k).getVComponent();
+                    dataV[i] = ((VectorGridData) inputData.get(i).get(k))
+                            .getVComponent();
                 }
 
                 // Do Calculation
-                GeneralGridData resultData = GeneralGridData.createVectorDataUV(
+                GeneralGridData resultData = VectorGridData.createVectorDataUV(
                         geometry, doGridCalculation(dataU, imax, geometry),
                         doGridCalculation(dataV, imax, geometry), rUnit);
 
@@ -231,11 +239,12 @@ public abstract class EnsembleCalculator {
                 // Get the grid data
                 GeographicDataSource[] data = new GeographicDataSource[imax];
                 for (int i = 0; i < imax; i++) {// ArrayList
-                    data[i] = inputData.get(i).get(k).getScalarData();
+                    data[i] = ((ScalarGridData) inputData.get(i).get(k))
+                            .getScalarData();
                 }
 
                 // Do Calculation
-                GeneralGridData resultData = GeneralGridData.createScalarData(
+                GeneralGridData resultData = ScalarGridData.createScalarData(
                         geometry, doGridCalculation(data, imax, geometry),
                         rUnit);
 
@@ -253,7 +262,7 @@ public abstract class EnsembleCalculator {
     /**
      * Do a grid calculation with members' data. loop through each xy point, get
      * all member data and calculate the data set.
-     * 
+     *
      * @param data
      *            - member grids
      * @param imax
@@ -264,8 +273,9 @@ public abstract class EnsembleCalculator {
      */
     protected FloatBufferWrapper doGridCalculation(GeographicDataSource[] data,
             int imax, GridGeometry2D geometry) {
-        if (data == null || imax < 1)
+        if (data == null || imax < 1) {
             return null;
+        }
 
         GridEnvelope2D gridRange = geometry.getGridRange2D();
         int numGridPoints = gridRange.width * gridRange.height;
@@ -280,10 +290,12 @@ public abstract class EnsembleCalculator {
                 int countJ = 0;
 
                 // Read out all available member data at same location
-                for (int i = 0; i < imax; i++)
-                    if (!Float.isNaN((float) (data[i].getDataValue(x, y))))
+                for (int i = 0; i < imax; i++) {
+                    if (!Float.isNaN((float) (data[i].getDataValue(x, y)))) {
                         workValue[countJ++] = (float) (data[i].getDataValue(x,
                                 y));
+                    }
+                }
 
                 // Do real calculation at this location
                 result[y * gridRange.width + x] = calculatePoint(workValue,
@@ -305,7 +317,7 @@ public abstract class EnsembleCalculator {
     /**
      * Make all member grid data with same geometry. Currently, we use the
      * geometry of the input member with biggest domain.
-     * 
+     *
      * @param inputData
      *            - loaded grid data of all members in one frame
      * @return-
@@ -326,22 +338,26 @@ public abstract class EnsembleCalculator {
             int imax = inputData.size();
             int gridSize = 0;
             for (int i = 0; i < imax; i++) {
-                gridSize = inputData.get(i).get(k).getScalarData()
-                        .getGridGeometry().getGridRange2D().height
-                        * inputData.get(i).get(k).getScalarData()
-                                .getGridGeometry().getGridRange2D().width;
-                if (gridSize <= 1)
+                ScalarGridData scalarGridData = (ScalarGridData) inputData
+                        .get(i).get(k);
+                gridSize = scalarGridData.getScalarData().getGridGeometry()
+                        .getGridRange2D().height
+                        * scalarGridData.getScalarData().getGridGeometry()
+                                .getGridRange2D().width;
+                if (gridSize <= 1) {
                     continue;
+                }
 
                 if (maxSize < gridSize) {
                     maxSize = gridSize;
-                    geometry = inputData.get(i).get(k).getGridGeometry();
+                    geometry = scalarGridData.getGridGeometry();
                 }
             }
         }
 
-        if (maxSize < 0 || geometry == null)
+        if (maxSize < 0 || geometry == null) {
             return null;
+        }
 
         // Make sure all data with same geometry by re-projecting
         BilinearInterpolation bilinear = new BilinearInterpolation();
@@ -382,18 +398,19 @@ public abstract class EnsembleCalculator {
      * different size case that each member maybe with different number of
      * values on the X axis. For different products case, calculate at all valid
      * times with available data.
-     * 
+     *
      * @param inputData
      *            - xy point data sets of time series resource members
      * @return- xy - the calculated point data set.
      */
     public XYDataList calculateTimeSeries(List<XYDataList> inputData) {
         XYDataList result = new XYDataList();
-        if (inputData == null || inputData.isEmpty())
+        if (inputData == null || inputData.isEmpty()) {
             return result;
+        }
 
         // Prepare data by using all X axis values, matching time.
-        ArrayList<Object> xlist = new ArrayList<Object>();
+        ArrayList<Object> xlist = new ArrayList<>();
         for (XYDataList xyList : inputData) {
             ArrayList<XYData> data = xyList.getData();
 
@@ -419,8 +436,9 @@ public abstract class EnsembleCalculator {
                 }
             }
         }
-        if (xlist.isEmpty())
+        if (xlist.isEmpty()) {
             return result;
+        }
 
         // Sort times
 
@@ -450,7 +468,7 @@ public abstract class EnsembleCalculator {
 
     /**
      * Loop through each time/x point, do calculating for time series display.
-     * 
+     *
      * @param inputData
      *            - xy point data sets of time series resource members
      * @param xValues
@@ -460,22 +478,23 @@ public abstract class EnsembleCalculator {
     protected List<XYData> doTimeSeriesCalculation(List<XYDataList> inputData,
             Object[] xValues) {
 
-        ArrayList<XYData> dataList = new ArrayList<XYData>();
+        ArrayList<XYData> dataList = new ArrayList<>();
 
         // Calculate for all point
-        for (int i = 0; i < xValues.length; i++) {
+        for (Object xValue : xValues) {
 
             // Calculate for one x point. Look for y data of this x point first.
-            ArrayList<Float> yValues = new ArrayList<Float>();
+            ArrayList<Float> yValues = new ArrayList<>();
             for (XYDataList xyList : inputData) {
                 ArrayList<XYData> data = xyList.getData();
 
                 for (int j = 0; j < xyList.getData().size(); j++) {
                     if (data.get(j).getX() == null
-                            && data.get(j).getY() == null)
+                            && data.get(j).getY() == null) {
                         continue;
+                    }
 
-                    if (((DataTime) xValues[i]).getValidTime().equals(
+                    if (((DataTime) xValue).getValidTime().equals(
                             ((DataTime) (data.get(j).getX())).getValidTime())) {
                         yValues.add(Float
                                 .parseFloat(data.get(j).getY().toString()));
@@ -486,14 +505,16 @@ public abstract class EnsembleCalculator {
                 }
             }
 
-            if (yValues.isEmpty())
+            if (yValues.isEmpty()) {
                 continue;
+            }
 
             // Put the y values in the work buffer and do calculate the point.
             float[] workValue = new float[yValues.size()];
-            for (int k = 0; k < yValues.size(); k++)
-                workValue[k] = (float) yValues.get(k);
-            XYData xy = new XYData(xValues[i],
+            for (int k = 0; k < yValues.size(); k++) {
+                workValue[k] = yValues.get(k);
+            }
+            XYData xy = new XYData(xValue,
                     calculatePoint(workValue, yValues.size()));
 
             dataList.add(xy);
@@ -506,7 +527,7 @@ public abstract class EnsembleCalculator {
     /**
      * Do real calculation for one data set, This interface is implemented in
      * the derived classes.
-     * 
+     *
      * @param workValue
      *            - inputed data set as a work buffer
      * @param length
