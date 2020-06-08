@@ -47,22 +47,23 @@ import gov.noaa.gsd.viz.ensemble.display.calculate.EnsembleCalculator;
  * Auto-updating and other. Issue:Since extend the GridResource, how to black
  * request data from EDEX? Current solution is to override and minor change
  * related
- * 
- * @author jing
- * @version 1.0
- * 
- *          <pre>
- * 
+ *
+ *
+ * <pre>
+ *
  * SOFTWARE HISTORY
- * 
- * Date         Ticket#    Engineer    Description
- * ------------ ---------- ----------- --------------------------
- * Jan 10, 2014    5056     jing       Initial creation
- * Dec 26, 2016    19325    jing       Display and sample image
- * Feb 17, 2017    19325    jing       Added ERF image capability
- * 
- *          </pre>
- * 
+ *
+ * Date          Ticket#  Engineer  Description
+ * ------------- -------- --------- ---------------------------------------
+ * Jan 10, 2014  5056     jing      Initial creation
+ * Dec 26, 2016  19325    jing      Display and sample image
+ * Feb 17, 2017  19325    jing      Added ERF image capability
+ * Apr 23, 2020  8145     randerso  Updated to allow new sample formatting
+ *
+ * </pre>
+ *
+ * @author jing
+ *
  * @param <T>
  */
 @SuppressWarnings("rawtypes")
@@ -70,7 +71,7 @@ public class GeneratedEnsembleGridResource
         extends AbstractGridResource<GeneratedEnsembleGridResourceData>
         implements IGridNameResource {
 
-    private static final transient IUFStatusHandler statusHandler = UFStatus
+    private static final IUFStatusHandler statusHandler = UFStatus
             .getHandler(GeneratedEnsembleGridResource.class);
 
     private Parameter parameter = null;
@@ -79,7 +80,7 @@ public class GeneratedEnsembleGridResource
 
     private ParamLevelMatchCriteria paramLevelMatchCriteria = null;
 
-    private ArrayList<String> models = null;
+    private List<String> models = null;
 
     private Calculation calculation = Calculation.NONE;
 
@@ -97,7 +98,7 @@ public class GeneratedEnsembleGridResource
 
     /**
      * Constructor
-     * 
+     *
      * @param resourceData
      *            - resource data to construct the generated grid resource.
      * @param loadProperties
@@ -119,11 +120,11 @@ public class GeneratedEnsembleGridResource
                     .setNameGenerator(new GridNameGenerator());
         }
 
-    };
+    }
 
     /**
      * Constructor
-     * 
+     *
      * @param resourceData
      *            - resource data to construct the generated grid resource.
      * @param loadProperties
@@ -138,47 +139,27 @@ public class GeneratedEnsembleGridResource
 
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * com.raytheon.viz.grid.rsc.general.AbstractGridResource#initInternal(com
-     * .raytheon.uf.viz.core.IGraphicsTarget)
-     */
     @Override
     protected void initInternal(IGraphicsTarget target) throws VizException {
 
         // Set DisplayTypeCapability with CONTOUR IMAGE
         if (parameter != null) {
             String paramAbbrev = parameter.getAbbreviation();
-            ((DisplayTypeCapability) this
-                    .getCapability(DisplayTypeCapability.class))
-                            .setAlternativeDisplayTypes(
-                                    FieldDisplayTypesFactory.getInstance()
-                                            .getDisplayTypes(paramAbbrev));
+            this.getCapability(DisplayTypeCapability.class)
+                    .setAlternativeDisplayTypes(FieldDisplayTypesFactory
+                            .getInstance().getDisplayTypes(paramAbbrev));
         }
 
         super.initInternal(target);
 
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.raytheon.viz.grid.rsc.GridNameGenerator.IGridNameResource#
-     * getLegendParameters()
-     */
     @Override
     public LegendParameters getLegendParameters() {
 
         return null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.raytheon.viz.grid.rsc.general.GridResource#getName()
-     */
     @Override
     public String getName() {
         String rscName = null;
@@ -212,10 +193,10 @@ public class GeneratedEnsembleGridResource
     /**
      * Update a calculation display if the data is changed The real update will
      * be implemented later.
-     * 
+     *
      * @param dataMap
      *            -The loaded member data
-     * 
+     *
      *            TODO
      */
     public void updateData(Map<DataTime, List<GeneralGridData>> dataMap) {
@@ -249,11 +230,11 @@ public class GeneratedEnsembleGridResource
         return super.getDataTimes();
     }
 
-    public ArrayList<String> getModels() {
+    public List<String> getModels() {
         return models;
     }
 
-    public void setModels(ArrayList<String> models) {
+    public void setModels(List<String> models) {
         this.models = models;
     }
 
@@ -269,8 +250,9 @@ public class GeneratedEnsembleGridResource
      * Set parameter of any grid resource
      */
     public void setParameter(GridResource rcs) {
-        if (parameter != null)
+        if (parameter != null) {
             return;
+        }
 
         GridRecord randomRec = rcs.getAnyGridRecord();
 
@@ -291,11 +273,6 @@ public class GeneratedEnsembleGridResource
         }
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.raytheon.viz.grid.rsc.general.GridResource#getMatchCriteria()
-     */
     @Override
     public ParamLevelMatchCriteria getMatchCriteria() {
         return paramLevelMatchCriteria;
@@ -303,7 +280,7 @@ public class GeneratedEnsembleGridResource
 
     /**
      * Match criteria for generated grid displaying.
-     * 
+     *
      * @param record
      *            - any grid record for get the parameters
      */
@@ -360,7 +337,8 @@ public class GeneratedEnsembleGridResource
                     return "NO DATA";
                 }
                 double value = (Double) map.get(INTERROGATE_VALUE);
-                return sampleFormat.format(value) + map.get(INTERROGATE_UNIT);
+                return sampleFormat.format(value,
+                        map.get(INTERROGATE_UNIT).toString());
             } else if (getDisplayType() == DisplayType.CONTOUR) {
                 if (parameter != null) {
                     return parameter.getAbbreviation() + "="
