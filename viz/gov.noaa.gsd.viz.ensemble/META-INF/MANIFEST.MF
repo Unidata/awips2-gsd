@@ -32,7 +32,7 @@ Require-Bundle: org.eclipse.ui,
  com.raytheon.uf.viz.d2d.ui,
  com.raytheon.uf.viz.datacube,
  com.raytheon.uf.viz.core.maps,
- org.eclipse.osgi,
+  org.eclipse.osgi,
  javax.xml.bind
 Bundle-RequiredExecutionEnvironment: JavaSE-11
 Bundle-ActivationPolicy: lazy
